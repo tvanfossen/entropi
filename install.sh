@@ -95,8 +95,31 @@ if [ "$INSTALL_MODE" = "native" ]; then
     fi
     echo -e "${GREEN}✓${NC} Python 3 found: $(python3 --version)"
 
+    # Detect GPU for CUDA compilation
+    CUDA_ARCH=""
+    if command -v nvidia-smi &> /dev/null; then
+        GPU_NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1)
+        COMPUTE_CAP=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1)
+        if [ -n "$GPU_NAME" ]; then
+            echo -e "${GREEN}✓${NC} Found GPU: $GPU_NAME"
+            if [ -n "$COMPUTE_CAP" ]; then
+                CUDA_ARCH=$(echo "$COMPUTE_CAP" | tr -d '.')
+                echo -e "${GREEN}✓${NC} Compute capability: $COMPUTE_CAP (CUDA arch: $CUDA_ARCH)"
+            fi
+        fi
+    fi
+
     # Get script directory
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+    # Install llama-cpp-python with CUDA if GPU detected
+    if [ -n "$CUDA_ARCH" ]; then
+        echo ""
+        echo "Installing llama-cpp-python with CUDA support for arch $CUDA_ARCH..."
+        pip uninstall -y llama-cpp-python 2>/dev/null || true
+        CMAKE_ARGS="-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=$CUDA_ARCH" \
+            pip install llama-cpp-python --no-cache-dir
+    fi
 
     # Install in editable mode
     echo ""
@@ -136,14 +159,28 @@ else
     echo ""
 fi
 
-# Check for GPU
+# Detect GPU and compute capability
+CUDA_ARCH=""
 if command -v nvidia-smi &> /dev/null; then
     GPU_NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1)
+    COMPUTE_CAP=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1)
     if [ -n "$GPU_NAME" ]; then
         echo -e "${GREEN}✓${NC} Found GPU: $GPU_NAME"
+        if [ -n "$COMPUTE_CAP" ]; then
+            # Convert "6.1" to "61" format for CMake
+            CUDA_ARCH=$(echo "$COMPUTE_CAP" | tr -d '.')
+            echo -e "${GREEN}✓${NC} Compute capability: $COMPUTE_CAP (CUDA arch: $CUDA_ARCH)"
+        fi
     fi
 else
     echo -e "${YELLOW}⚠${NC} nvidia-smi not found. GPU detection skipped."
+fi
+
+if [ -z "$CUDA_ARCH" ]; then
+    echo -e "${YELLOW}⚠${NC} Could not detect GPU compute capability."
+    echo "  Using 'native' (requires GPU access during build)."
+    echo "  To specify manually, set: CUDA_ARCH=XX (e.g., 61, 75, 86, 89, 120)"
+    CUDA_ARCH="${CUDA_ARCH:-native}"
 fi
 
 # Get the directory where this script is located
@@ -163,9 +200,14 @@ echo "=== Step 1: Building/Pulling Docker image ==="
 echo ""
 
 if [ "$BUILD_FROM_SOURCE" = true ]; then
-    # Build from local source
-    echo "Building Entropi image (this may take several minutes on first build)..."
-    docker build -f "$SCRIPT_DIR/docker/Dockerfile" -t entropi:latest "$SCRIPT_DIR"
+    # Build from local source with detected GPU architecture
+    echo "Building Entropi image for CUDA arch $CUDA_ARCH..."
+    echo "(this may take several minutes on first build)"
+    docker build \
+        --build-arg CUDA_ARCH="$CUDA_ARCH" \
+        -f "$SCRIPT_DIR/docker/Dockerfile" \
+        -t entropi:latest \
+        "$SCRIPT_DIR"
 
     IMAGE_NAME="entropi:latest"
 else

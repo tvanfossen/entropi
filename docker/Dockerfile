@@ -1,9 +1,14 @@
 # ============================================================================
 # Entropi Dockerfile
-# CUDA 12.8 with Blackwell (compute_120) support
+# CUDA 12.8 with auto-detected GPU architecture support
 # ============================================================================
 
 FROM nvidia/cuda:12.8.0-devel-ubuntu24.04
+
+# CUDA architecture for llama-cpp-python (passed from install.sh)
+# Examples: 61 (Pascal/GTX 1080), 75 (Turing/RTX 2080), 86 (Ampere/RTX 3080),
+#           89 (Ada/RTX 4080), 120 (Blackwell/RTX 5080)
+ARG CUDA_ARCH=native
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -37,14 +42,14 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Upgrade pip
 RUN pip install --upgrade pip setuptools wheel
 
-# Build llama-cpp-python with CUDA for Blackwell (compute_120)
+# Build llama-cpp-python with CUDA for detected GPU architecture
 # Link against CUDA stubs during build (driver not available in build container)
 RUN ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1 && \
     echo "/usr/local/cuda/lib64/stubs" > /etc/ld.so.conf.d/cuda-stubs.conf && \
     ldconfig
-ENV CMAKE_ARGS="-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=120"
 ENV CUDACXX=/usr/local/cuda/bin/nvcc
-RUN pip install llama-cpp-python --no-cache-dir && \
+RUN CMAKE_ARGS="-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=${CUDA_ARCH}" \
+    pip install llama-cpp-python --no-cache-dir && \
     rm /usr/local/cuda/lib64/stubs/libcuda.so.1 && \
     rm /etc/ld.so.conf.d/cuda-stubs.conf && \
     ldconfig
