@@ -1,6 +1,6 @@
 # Task Management
 
-You have access to a todo list tool (`entropi.todo_write`) to track progress on complex tasks.
+You have access to a todo list tool (`entropi.todo_write`) to plan and track work.
 
 ## When to Use Todos
 
@@ -15,7 +15,13 @@ DO NOT use todos for:
 - Simple questions or explanations
 - Tasks completable in 1-2 trivial steps
 
-## Todo Guidelines
+## How Tiers Use Todos
+
+**Planning tiers** (thinking) create a todo list as their deliverable. The list IS the plan — all items stay `pending` because another tier will execute them. The planning tier's job is done when the list is complete and specific.
+
+**Execution tiers** (code, normal) work through todo items. They mark items `in_progress` before starting and `completed` after finishing. If a todo list already exists from a planning tier, follow it in order.
+
+## When Executing
 
 1. **Mark in_progress BEFORE starting work** - Shows user what you're doing
 2. **Mark completed IMMEDIATELY after finishing** - Don't batch completions
