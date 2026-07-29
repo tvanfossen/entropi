@@ -115,7 +115,7 @@ bool ConstitutionalValidator::should_validate(
 /**
  * @brief Toggle the global validation gate at runtime.
  * @param enabled New global enable state.
- * @req REQ-VALID-004
+ * @req REQ-VALID-001
  * @version 2.0.4
  */
 void ConstitutionalValidator::set_global_enabled(bool enabled) {

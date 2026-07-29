@@ -150,7 +150,7 @@ public:
      * no per-identity override exists.
      *
      * @param enabled true to enable validation globally, false to disable.
-     * @req REQ-VALID-004
+     * @req REQ-VALID-001
      * @version 2.0.2
      */
     void set_global_enabled(bool enabled);

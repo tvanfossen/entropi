@@ -1,1 +1,29 @@
-[]
+[
+  {
+    "req_id": "REQ-ABI-001",
+    "req_name": "Pure C at every .so boundary \u2014 opaque handles and explicit ownership",
+    "functions": [
+      {
+        "name": "entropic_inference_generate",
+        "file": "src/inference/inference_c_api.cpp",
+        "version": "2.1.8"
+      },
+      {
+        "name": "entropic_inference_generate_streaming",
+        "file": "src/inference/inference_c_api.cpp",
+        "version": "2.1.8"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-VALID-001",
+    "req_name": "Layered validation gating with cheap-path skips",
+    "functions": [
+      {
+        "name": "set_global_enabled",
+        "file": "src/core/constitutional_validator.cpp",
+        "version": "2.0.4"
+      }
+    ]
+  }
+]
