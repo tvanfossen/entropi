@@ -218,7 +218,7 @@ bool extract_path(ryml::ConstNodeRef node, c4::csubstr key,
  * @param[out] disabled Set to true if value is explicitly false.
  * @return true if key was found.
  * @version 1.8.2
- * @utility
+ * @req REQ-TYPE-005
  */
 bool extract_tri_state_path(
     ryml::ConstNodeRef node, c4::csubstr key,
@@ -272,7 +272,7 @@ bool extract_string_list(ryml::ConstNodeRef node, c4::csubstr key,
  * @param[out] out Output optional vector.
  * @return true if key was found.
  * @version 1.8.2
- * @utility
+ * @req REQ-TYPE-005
  */
 bool extract_string_list_opt(ryml::ConstNodeRef node, c4::csubstr key,
                              std::optional<std::vector<std::string>>& out)

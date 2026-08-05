@@ -22,7 +22,7 @@ static auto logger = entropic::log::get("facade.identity");
  * @brief Check handle prerequisites for identity manager APIs.
  * @param h Engine handle.
  * @return ENTROPIC_OK if valid, error code otherwise.
- * @internal
+ * @req REQ-API-005
  * @version 2.0.0
  */
 static entropic_error_t check_identity_mgr(entropic_handle_t h) {
@@ -37,7 +37,8 @@ static entropic_error_t check_identity_mgr(entropic_handle_t h) {
  * @param handle Engine handle returned by entropic_create.
  * @param identity_name Identity name from configured tier set.
  * @return ENTROPIC_OK if identity exists, error otherwise.
- * @internal
+ * @req REQ-IDEN-002
+ * @req REQ-API-005
  * @version 2.0.0
  */
 extern "C" ENTROPIC_EXPORT entropic_error_t
@@ -61,7 +62,9 @@ entropic_load_identity(
  * @param handle Engine handle returned by entropic_create.
  * @param identity_json Out-param: newly allocated JSON string (caller owns; free with entropic_free).
  * @return ENTROPIC_OK on success, error otherwise.
- * @internal
+ * @req REQ-IDEN-002
+ * @req REQ-API-008
+ * @req REQ-API-005
  * @version 2.0.2
  */
 extern "C" ENTROPIC_EXPORT entropic_error_t

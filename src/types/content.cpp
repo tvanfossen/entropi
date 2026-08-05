@@ -14,7 +14,7 @@ namespace entropic {
  * @param parts Content parts array.
  * @return All text parts joined with spaces, images skipped.
  *         Empty string if parts is empty or contains no text.
- * @internal
+ * @req REQ-TYPE-006
  * @version 1.9.11
  */
 std::string extract_text(const std::vector<ContentPart>& parts) {
@@ -35,7 +35,7 @@ std::string extract_text(const std::vector<ContentPart>& parts) {
  * @brief Check if content parts contain any image parts.
  * @param parts Content parts array.
  * @return true if at least one IMAGE part exists.
- * @internal
+ * @req REQ-TYPE-006
  * @version 1.9.11
  */
 bool has_images(const std::vector<ContentPart>& parts) {

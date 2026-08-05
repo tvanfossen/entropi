@@ -35,7 +35,7 @@ bool HookRegistry::is_valid_point(entropic_hook_point_t point) {
  * @param user_data Opaque pointer.
  * @param priority Execution order (ascending).
  * @return ENTROPIC_OK or ENTROPIC_ERROR_INVALID_CONFIG.
- * @internal
+ * @req REQ-HOOK-001
  * @version 1.9.1
  */
 entropic_error_t HookRegistry::register_hook(
@@ -72,7 +72,7 @@ entropic_error_t HookRegistry::register_hook(
  * @param callback Callback to match.
  * @param user_data user_data to match.
  * @return ENTROPIC_OK (idempotent).
- * @internal
+ * @req REQ-HOOK-001
  * @version 1.9.1
  */
 entropic_error_t HookRegistry::deregister_hook(
@@ -120,7 +120,7 @@ std::vector<HookEntry> HookRegistry::snapshot(
  * @param context_json Input context JSON.
  * @param out_json Output: accumulated modified JSON, or NULL.
  * @return 0 = proceed, non-zero = cancelled.
- * @internal
+ * @req REQ-HOOK-001
  * @version 2.0.0
  */
 int HookRegistry::fire_pre(
@@ -179,7 +179,7 @@ int HookRegistry::fire_pre(
  * @param point Hook point.
  * @param context_json Input result JSON.
  * @param out_json Output: accumulated transformed JSON, or NULL.
- * @internal
+ * @req REQ-HOOK-001
  * @version 1.9.1
  */
 void HookRegistry::fire_post(
@@ -228,7 +228,7 @@ void HookRegistry::fire_post(
  * @brief Fire informational hooks (no modify, no cancel).
  * @param point Hook point.
  * @param context_json Context JSON.
- * @internal
+ * @req REQ-HOOK-001
  * @version 1.9.1
  */
 void HookRegistry::fire_info(
@@ -260,7 +260,7 @@ void HookRegistry::fire_info(
  * @brief Get the number of registered hooks for a point.
  * @param point Hook point.
  * @return Entry count.
- * @internal
+ * @req REQ-HOOK-001
  * @version 1.9.1
  */
 size_t HookRegistry::hook_count(entropic_hook_point_t point) const {

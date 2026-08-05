@@ -20,7 +20,7 @@ static auto logger = entropic::log::get("facade.compaction");
  * @brief Check handle prerequisites for compaction APIs.
  * @param h Engine handle.
  * @return ENTROPIC_OK if valid, error code otherwise.
- * @internal
+ * @req REQ-API-005
  * @version 2.0.0
  */
 static entropic_error_t check_compactor(entropic_handle_t h) {
@@ -36,7 +36,9 @@ static entropic_error_t check_compactor(entropic_handle_t h) {
  * @param identity Identity name from configured tier set.
  * @param result_json Out-param: newly allocated JSON string (caller owns; free with entropic_free).
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-COMPACT-001
+ * @req REQ-API-008
+ * @req REQ-API-005
  * @version 2.0.0
  */
 extern "C" ENTROPIC_EXPORT entropic_error_t
@@ -65,7 +67,8 @@ entropic_compact(
  * @param compactor Function pointer to consumer-supplied compactor.
  * @param user_data Opaque pointer passed back to the callback.
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-COMPACT-001
+ * @req REQ-API-005
  * @version 2.0.0
  */
 extern "C" ENTROPIC_EXPORT entropic_error_t
@@ -93,7 +96,8 @@ entropic_register_compactor(
  * @param handle Engine handle returned by entropic_create.
  * @param identity Identity name from configured tier set.
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-COMPACT-001
+ * @req REQ-API-005
  * @version 2.0.0
  */
 extern "C" ENTROPIC_EXPORT entropic_error_t
@@ -116,7 +120,8 @@ entropic_deregister_compactor(
  * @param compactor Out-param: receives function pointer to current compactor.
  * @param user_data Opaque pointer passed back to the callback.
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-COMPACT-001
+ * @req REQ-API-005
  * @version 2.0.0
  */
 extern "C" ENTROPIC_EXPORT entropic_error_t

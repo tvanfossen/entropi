@@ -60,12 +60,14 @@ public:
     /**
      * @brief Initialize database and run pending migrations.
      * @return true on success, false on error.
+     * @req REQ-STOR-001
      * @version 1.8.8
      */
     bool initialize();
 
     /**
      * @brief Close database connection.
+     * @req REQ-STOR-001
      * @version 1.8.8
      */
     void close();
@@ -73,6 +75,7 @@ public:
     /**
      * @brief Check if database is open.
      * @return true if connection is active.
+     * @req REQ-STOR-001
      * @version 1.8.8
      */
     bool is_open() const;
@@ -82,6 +85,7 @@ public:
      * @param sql SQL statement with ? placeholders.
      * @param binder Function to bind parameters to the prepared statement.
      * @return true on success.
+     * @req REQ-STOR-002
      * @version 1.8.8
      */
     bool execute(std::string_view sql,
@@ -91,6 +95,7 @@ public:
      * @brief Execute raw SQL (multiple statements, no binding).
      * @param sql SQL text (may contain multiple semicolon-separated statements).
      * @return true on success.
+     * @req REQ-STOR-002
      * @version 1.8.8
      */
     bool execute_raw(std::string_view sql);
@@ -101,6 +106,7 @@ public:
      * @param binder Function to bind parameters.
      * @param extractor Function to extract columns from result row.
      * @return true if row found.
+     * @req REQ-STOR-002
      * @version 1.8.8
      */
     bool fetch_one(std::string_view sql,
@@ -113,6 +119,7 @@ public:
      * @param binder Function to bind parameters.
      * @param row_handler Called for each result row.
      * @return Number of rows fetched.
+     * @req REQ-STOR-002
      * @version 1.8.8
      */
     size_t fetch_all(std::string_view sql,

@@ -120,7 +120,10 @@ def _extract_to(tarball: Path, root: Path) -> None:
 
 
 ## @brief Install the engine tarball; return process-style exit code.
-## @utility
+## @return 0 on success or when the stamped install already matches the
+##         published sha256; 2 when the downloaded bytes do not match the
+##         .sha256 sidecar (nothing is extracted).
+## @req REQ-PROD-003
 ## @version 2.1.0
 def install(version: str | None = None, backend: str | None = None) -> int:
     """Install the engine tarball; return process-style exit code."""
@@ -158,7 +161,8 @@ def install(version: str | None = None, backend: str | None = None) -> int:
 
 
 ## @brief `entropic install-engine` entry point. Optional --version / --backend.
-## @utility
+## @return install() exit code, or 64 on an unrecognized argument.
+## @req REQ-PROD-001
 ## @version 2.1.0
 def main(argv: list[str] | None = None) -> int:
     """``entropic install-engine`` entry point. Optional --version / --backend."""

@@ -1124,7 +1124,7 @@
   module: Configuration
   description: "A tier block under `models.<name>:` may narrow any global default for that\n\
     tier alone, and the loader parses these tier-scoped mirrors of global\nsettings:\n  -\
-    \ sampler knobs (see REQ-CFG-004) — a YAML lever independent of identity\n    frontmatter,\
+    \ sampler knobs (see REQ-TYPE-005) — a YAML lever independent of identity\n    frontmatter,\
     \ and, because YAML loads before init_orchestrator, one that\n    actually lands in the\
     \ orchestrator's config snapshot;\n  - `speculative.mtp` — a tier-scoped mirror of the\
     \ global\n    `inference.speculative.mtp`; nullopt inherits the global flag, so a\n  \

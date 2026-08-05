@@ -16,7 +16,7 @@ namespace entropic {
  * @brief Construct with consumer callback.
  * @param cb Consumer callback.
  * @param ud Consumer user_data.
- * @internal
+ * @req REQ-LOOP-008
  * @version 2.0.1
  */
 StreamThinkFilter::StreamThinkFilter(TokenCallback cb, void* ud)
@@ -28,7 +28,7 @@ StreamThinkFilter::StreamThinkFilter(TokenCallback cb, void* ud)
  * @param ud Consumer user_data.
  * @param open_marker Opening delimiter.
  * @param close_marker Closing delimiter.
- * @internal
+ * @req REQ-LOOP-008
  * @version 2.10.3
  */
 StreamThinkFilter::StreamThinkFilter(TokenCallback cb, void* ud,
@@ -43,7 +43,7 @@ StreamThinkFilter::StreamThinkFilter(TokenCallback cb, void* ud,
  * @brief Set raw (unfiltered) callback.
  * @param cb Raw callback.
  * @param ud Raw user_data.
- * @internal
+ * @req REQ-LOOP-008
  * @version 2.0.1
  */
 void StreamThinkFilter::set_raw_callback(TokenCallback cb, void* ud) {
@@ -91,7 +91,7 @@ static int utf8_char_len(unsigned char byte) {
  *
  * @param data Byte data to emit.
  * @param len Byte length.
- * @internal
+ * @req REQ-LOOP-008
  * @version 2.0.2
  */
 void StreamThinkFilter::emit_utf8_safe(const char* data, size_t len) {
@@ -162,7 +162,7 @@ void StreamThinkFilter::process_byte(char c) {
  * @brief Process an incoming token through the think-tag filter.
  * @param chunk Token byte data.
  * @param len Byte length of chunk.
- * @utility
+ * @req REQ-LOOP-008
  * @version 2.0.2
  */
 void StreamThinkFilter::on_token(const char* chunk, size_t len) {
@@ -176,7 +176,7 @@ void StreamThinkFilter::on_token(const char* chunk, size_t len) {
 
 /**
  * @brief Flush buffered partial tag and UTF-8 content.
- * @internal
+ * @req REQ-LOOP-008
  * @version 2.0.2
  */
 void StreamThinkFilter::flush() {

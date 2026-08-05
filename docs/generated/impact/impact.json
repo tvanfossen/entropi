@@ -4,13 +4,4058 @@
     "req_name": "Pure C at every .so boundary \u2014 opaque handles and explicit ownership",
     "functions": [
       {
-        "name": "entropic_inference_generate",
-        "file": "src/inference/inference_c_api.cpp",
+        "name": "entropic_last_error",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.2.6"
+      },
+      {
+        "name": "entropic_create",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_configure",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_configure_from_file",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.5"
+      },
+      {
+        "name": "entropic_configure_dir",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.6"
+      },
+      {
+        "name": "entropic_destroy",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.8"
+      },
+      {
+        "name": "entropic_version",
+        "file": "src/facade/entropic.cpp",
+        "version": "1.8.0"
+      },
+      {
+        "name": "entropic_api_version",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_seconds_since_last_activity",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.3.0"
+      },
+      {
+        "name": "entropic_alloc",
+        "file": "src/facade/entropic.cpp",
+        "version": "1.8.0"
+      },
+      {
+        "name": "entropic_free",
+        "file": "src/facade/entropic.cpp",
+        "version": "1.8.0"
+      },
+      {
+        "name": "entropic_queue_user_message",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.10"
+      },
+      {
+        "name": "entropic_user_message_queue_depth",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.10"
+      },
+      {
+        "name": "entropic_clear_user_message_queue",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.10"
+      },
+      {
+        "name": "entropic_context_clear",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.1"
+      },
+      {
+        "name": "entropic_context_count",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.1"
+      },
+      {
+        "name": "entropic_context_usage",
+        "file": "src/facade/entropic.cpp",
         "version": "2.1.8"
       },
       {
-        "name": "entropic_inference_generate_streaming",
-        "file": "src/inference/inference_c_api.cpp",
+        "name": "entropic_state_save",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.3.25"
+      },
+      {
+        "name": "entropic_state_load",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.3.25"
+      },
+      {
+        "name": "entropic_grammar_validate",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_free_logprob_result",
+        "file": "src/facade/entropic.cpp",
+        "version": "1.9.10"
+      },
+      {
+        "name": "entropic_storage_create",
+        "file": "src/storage/c_interface.cpp",
+        "version": "1.8.8"
+      },
+      {
+        "name": "entropic_storage_initialize",
+        "file": "src/storage/c_interface.cpp",
+        "version": "1.8.8"
+      },
+      {
+        "name": "entropic_storage_destroy",
+        "file": "src/storage/c_interface.cpp",
+        "version": "1.8.8"
+      },
+      {
+        "name": "entropic_storage_create_conversation",
+        "file": "src/storage/c_interface.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_storage_save_conversation",
+        "file": "src/storage/c_interface.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_storage_load_conversation",
+        "file": "src/storage/c_interface.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_storage_list_conversations",
+        "file": "src/storage/c_interface.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_storage_search_conversations",
+        "file": "src/storage/c_interface.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_storage_delete_conversation",
+        "file": "src/storage/c_interface.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_storage_create_delegation",
+        "file": "src/storage/c_interface.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_storage_complete_delegation",
+        "file": "src/storage/c_interface.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_storage_get_delegations",
+        "file": "src/storage/c_interface.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_storage_save_snapshot",
+        "file": "src/storage/c_interface.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_storage_get_stats",
+        "file": "src/storage/c_interface.cpp",
+        "version": "2.0.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-ABI-002",
+    "req_name": "C++ exceptions never cross any .so boundary",
+    "functions": [
+      {
+        "name": "c_api_try",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.3.13"
+      },
+      {
+        "name": "do_configure_json",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.9.5"
+      },
+      {
+        "name": "entropic_configure",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "do_configure_from_file",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.3.13"
+      },
+      {
+        "name": "entropic_configure_from_file",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.5"
+      },
+      {
+        "name": "do_configure_dir",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.3.13"
+      },
+      {
+        "name": "entropic_configure_dir",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.6"
+      },
+      {
+        "name": "entropic_run",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.9.5"
+      },
+      {
+        "name": "entropic_run_batch",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.9.5"
+      },
+      {
+        "name": "entropic_run_streaming",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.9.5"
+      },
+      {
+        "name": "entropic_run_messages",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.9.5"
+      },
+      {
+        "name": "entropic_run_messages_streaming",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.9.5"
+      },
+      {
+        "name": "entropic_state_save",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.3.25"
+      },
+      {
+        "name": "entropic_state_load",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.3.25"
+      },
+      {
+        "name": "entropic_adapter_load",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_adapter_unload",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_adapter_swap",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_adapter_state",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_adapter_info",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_adapter_list",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_grammar_register",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_grammar_register_file",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_grammar_deregister",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_grammar_get",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_grammar_validate",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_grammar_list",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_profile_register",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_profile_deregister",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_profile_get",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_profile_list",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_throughput_tok_per_sec",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_throughput_reset",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_list_mcp_keys",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_serialize_mcp_keys",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_create_identity",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_update_identity",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_get_identity_config",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_list_identities",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_get_logprobs",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_compute_perplexity",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_model_has_vision",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_validation_last_result",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.10.0"
+      },
+      {
+        "name": "entropic_audit_read",
+        "file": "src/facade/entropic_audit.cpp",
+        "version": "2.1.1"
+      },
+      {
+        "name": "entropic_register_mcp_server",
+        "file": "src/facade/entropic_mcp.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "entropic_deregister_mcp_server",
+        "file": "src/facade/entropic_mcp.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_list_mcp_servers",
+        "file": "src/facade/entropic_mcp.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_storage_open",
+        "file": "src/facade/entropic_storage.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_storage_create",
+        "file": "src/storage/c_interface.cpp",
+        "version": "1.8.8"
+      },
+      {
+        "name": "entropic_storage_initialize",
+        "file": "src/storage/c_interface.cpp",
+        "version": "1.8.8"
+      },
+      {
+        "name": "entropic_storage_create_conversation",
+        "file": "src/storage/c_interface.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_storage_save_conversation",
+        "file": "src/storage/c_interface.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_storage_load_conversation",
+        "file": "src/storage/c_interface.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_storage_list_conversations",
+        "file": "src/storage/c_interface.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_storage_search_conversations",
+        "file": "src/storage/c_interface.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_storage_delete_conversation",
+        "file": "src/storage/c_interface.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_storage_create_delegation",
+        "file": "src/storage/c_interface.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_storage_complete_delegation",
+        "file": "src/storage/c_interface.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_storage_get_delegations",
+        "file": "src/storage/c_interface.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_storage_save_snapshot",
+        "file": "src/storage/c_interface.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_storage_get_stats",
+        "file": "src/storage/c_interface.cpp",
+        "version": "2.0.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-API-002",
+    "req_name": "Handle lifecycle \u2014 create, configure, destroy, NULL-safe teardown",
+    "functions": [
+      {
+        "name": "entropic_create",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_destroy",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.8"
+      },
+      {
+        "name": "entropic_run",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.9.5"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-API-003",
+    "req_name": "Multiple handles are fully independent within one process",
+    "functions": [
+      {
+        "name": "entropic_last_error",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.2.6"
+      },
+      {
+        "name": "entropic_create",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_destroy",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.8"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-API-004",
+    "req_name": "Three configure entry points, one shared body, one-shot per handle",
+    "functions": [
+      {
+        "name": "reject_if_configured",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.2.5"
+      },
+      {
+        "name": "init_orchestrator",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.2.9"
+      },
+      {
+        "name": "configure_common",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.7.3"
+      },
+      {
+        "name": "do_configure_json",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.9.5"
+      },
+      {
+        "name": "entropic_configure",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "do_configure_from_file",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.3.13"
+      },
+      {
+        "name": "entropic_configure_from_file",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.5"
+      },
+      {
+        "name": "do_configure_dir",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.3.13"
+      },
+      {
+        "name": "entropic_configure_dir",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.6"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-API-005",
+    "req_name": "Uniform precondition guard on every exported entry point",
+    "functions": [
+      {
+        "name": "check_orchestrator",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "check_mcp_auth",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "check_identity",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_configure",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_configure_from_file",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.5"
+      },
+      {
+        "name": "entropic_configure_dir",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.6"
+      },
+      {
+        "name": "entropic_seconds_since_last_activity",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.3.0"
+      },
+      {
+        "name": "entropic_run",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.9.5"
+      },
+      {
+        "name": "entropic_run_as",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.9.5"
+      },
+      {
+        "name": "entropic_run_batch",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.9.5"
+      },
+      {
+        "name": "entropic_run_streaming",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.9.5"
+      },
+      {
+        "name": "entropic_run_messages",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.9.5"
+      },
+      {
+        "name": "entropic_run_messages_streaming",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.9.5"
+      },
+      {
+        "name": "entropic_set_stream_observer",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.6-rc16"
+      },
+      {
+        "name": "entropic_validation_set_auto_retry",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.5"
+      },
+      {
+        "name": "entropic_validation_resume_retry",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.5"
+      },
+      {
+        "name": "entropic_validation_accept_last",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.5"
+      },
+      {
+        "name": "entropic_set_attempt_boundary_cb",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.5"
+      },
+      {
+        "name": "entropic_set_delegation_callbacks",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.5"
+      },
+      {
+        "name": "entropic_set_state_observer",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.10"
+      },
+      {
+        "name": "entropic_set_critique_callbacks",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.12"
+      },
+      {
+        "name": "entropic_interrupt",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_queue_user_message",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.10"
+      },
+      {
+        "name": "entropic_user_message_queue_depth",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.10"
+      },
+      {
+        "name": "entropic_clear_user_message_queue",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.10"
+      },
+      {
+        "name": "entropic_set_queue_observer",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.10"
+      },
+      {
+        "name": "entropic_context_clear",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.1"
+      },
+      {
+        "name": "entropic_context_get",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.1"
+      },
+      {
+        "name": "entropic_context_count",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.1"
+      },
+      {
+        "name": "entropic_context_usage",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.8"
+      },
+      {
+        "name": "entropic_state_save",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.3.25"
+      },
+      {
+        "name": "entropic_state_load",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.3.25"
+      },
+      {
+        "name": "entropic_metrics_json",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.6-rc16.2"
+      },
+      {
+        "name": "entropic_adapter_load",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_adapter_unload",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_adapter_swap",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_adapter_state",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_adapter_info",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_adapter_list",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_grammar_register",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_grammar_register_file",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_grammar_deregister",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_grammar_get",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_grammar_list",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_profile_register",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_profile_deregister",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_profile_get",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_profile_list",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_throughput_tok_per_sec",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_throughput_reset",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_grant_mcp_key",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_revoke_mcp_key",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_check_mcp_key",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_list_mcp_keys",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_grant_mcp_key_from",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_serialize_mcp_keys",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_deserialize_mcp_keys",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_create_identity",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_update_identity",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_destroy_identity",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_get_identity_config",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_list_identities",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_identity_count",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_get_logprobs",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_compute_perplexity",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_model_has_vision",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_validation_set_enabled",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_validation_set_identity",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_validation_last_result",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.10.0"
+      },
+      {
+        "name": "entropic_get_diagnostic_prompt",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_speculative_compat",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.11"
+      },
+      {
+        "name": "entropic_set_residency_observer",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.2.4"
+      },
+      {
+        "name": "entropic_residency_snapshot",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.2.4"
+      },
+      {
+        "name": "entropic_audit_flush",
+        "file": "src/facade/entropic_audit.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_audit_count",
+        "file": "src/facade/entropic_audit.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_audit_read",
+        "file": "src/facade/entropic_audit.cpp",
+        "version": "2.1.1"
+      },
+      {
+        "name": "check_compactor",
+        "file": "src/facade/entropic_compaction.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_compact",
+        "file": "src/facade/entropic_compaction.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_register_compactor",
+        "file": "src/facade/entropic_compaction.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_deregister_compactor",
+        "file": "src/facade/entropic_compaction.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_get_default_compactor",
+        "file": "src/facade/entropic_compaction.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_register_hook",
+        "file": "src/facade/entropic_hooks.cpp",
+        "version": "1.9.1"
+      },
+      {
+        "name": "entropic_deregister_hook",
+        "file": "src/facade/entropic_hooks.cpp",
+        "version": "1.9.1"
+      },
+      {
+        "name": "check_identity_mgr",
+        "file": "src/facade/entropic_identity.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_load_identity",
+        "file": "src/facade/entropic_identity.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_get_identity",
+        "file": "src/facade/entropic_identity.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "check_server_mgr",
+        "file": "src/facade/entropic_mcp.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_register_mcp_server",
+        "file": "src/facade/entropic_mcp.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "entropic_deregister_mcp_server",
+        "file": "src/facade/entropic_mcp.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_list_mcp_servers",
+        "file": "src/facade/entropic_mcp.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_storage_open",
+        "file": "src/facade/entropic_storage.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_storage_close",
+        "file": "src/facade/entropic_storage.cpp",
+        "version": "2.0.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-API-007",
+    "req_name": "Per-handle error state and a stable, append-only error enum",
+    "functions": [
+      {
+        "name": "entropic_last_error",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.2.6"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-API-008",
+    "req_name": "Single cross-boundary allocator pair and explicit ownership transfer",
+    "functions": [
+      {
+        "name": "alloc_cstr",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.1"
+      },
+      {
+        "name": "alloc_cstr",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.1"
+      },
+      {
+        "name": "entropic_version",
+        "file": "src/facade/entropic.cpp",
+        "version": "1.8.0"
+      },
+      {
+        "name": "entropic_alloc",
+        "file": "src/facade/entropic.cpp",
+        "version": "1.8.0"
+      },
+      {
+        "name": "entropic_free",
+        "file": "src/facade/entropic.cpp",
+        "version": "1.8.0"
+      },
+      {
+        "name": "entropic_run",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.9.5"
+      },
+      {
+        "name": "entropic_run_as",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.9.5"
+      },
+      {
+        "name": "entropic_run_batch",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.9.5"
+      },
+      {
+        "name": "entropic_run_messages",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.9.5"
+      },
+      {
+        "name": "entropic_context_get",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.1"
+      },
+      {
+        "name": "entropic_metrics_json",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.6-rc16.2"
+      },
+      {
+        "name": "entropic_adapter_info",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_adapter_list",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_grammar_get",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_grammar_validate",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_grammar_list",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_profile_get",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_profile_list",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_list_mcp_keys",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_serialize_mcp_keys",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_get_identity_config",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_list_identities",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_get_logprobs",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_free_logprob_result",
+        "file": "src/facade/entropic.cpp",
+        "version": "1.9.10"
+      },
+      {
+        "name": "entropic_validation_last_result",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.10.0"
+      },
+      {
+        "name": "entropic_get_diagnostic_prompt",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_speculative_compat",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.11"
+      },
+      {
+        "name": "entropic_residency_snapshot",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.2.4"
+      },
+      {
+        "name": "entropic_audit_read",
+        "file": "src/facade/entropic_audit.cpp",
+        "version": "2.1.1"
+      },
+      {
+        "name": "entropic_compact",
+        "file": "src/facade/entropic_compaction.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_get_identity",
+        "file": "src/facade/entropic_identity.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_list_mcp_servers",
+        "file": "src/facade/entropic_mcp.cpp",
+        "version": "2.0.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-API-009",
+    "req_name": "Run entry-point family, result contract, and cross-thread interruptibility",
+    "functions": [
+      {
+        "name": "entropic_run",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.9.5"
+      },
+      {
+        "name": "entropic_run_as",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.9.5"
+      },
+      {
+        "name": "entropic_run_batch",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.9.5"
+      },
+      {
+        "name": "entropic_run_streaming",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.9.5"
+      },
+      {
+        "name": "entropic_run_messages",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.9.5"
+      },
+      {
+        "name": "entropic_run_messages_streaming",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.9.5"
+      },
+      {
+        "name": "entropic_interrupt",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-API-010",
+    "req_name": "Observer and callback slots survive configure and fire uniformly",
+    "functions": [
+      {
+        "name": "rewire_stream_observer",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.6-rc16"
+      },
+      {
+        "name": "rewire_queue_observer",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.10"
+      },
+      {
+        "name": "rewire_state_observer",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.10"
+      },
+      {
+        "name": "rewire_critique_callbacks",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.12"
+      },
+      {
+        "name": "rewire_observers",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.12"
+      },
+      {
+        "name": "entropic_run",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.9.5"
+      },
+      {
+        "name": "entropic_run_as",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.9.5"
+      },
+      {
+        "name": "entropic_run_streaming",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.9.5"
+      },
+      {
+        "name": "entropic_set_stream_observer",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.6-rc16"
+      },
+      {
+        "name": "entropic_set_attempt_boundary_cb",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.5"
+      },
+      {
+        "name": "entropic_set_delegation_callbacks",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.5"
+      },
+      {
+        "name": "entropic_set_state_observer",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.10"
+      },
+      {
+        "name": "entropic_set_critique_callbacks",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.12"
+      },
+      {
+        "name": "entropic_set_queue_observer",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.10"
+      },
+      {
+        "name": "entropic_set_residency_observer",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.2.4"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-API-012",
+    "req_name": "Final-answer selection from a serialized conversation",
+    "functions": [
+      {
+        "name": "final_answer_from_context",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.10.2"
+      },
+      {
+        "name": "handle_ask_plain",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.10.2"
+      },
+      {
+        "name": "handle_ask",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.10.2"
+      },
+      {
+        "name": "extract_final_text",
+        "file": "src/facade/final_text.h",
+        "version": "2.10.2"
+      },
+      {
+        "name": "no_response_reason",
+        "file": "src/facade/final_text.h",
+        "version": "2.10.2"
+      },
+      {
+        "name": "final_text_or_reason",
+        "file": "src/facade/final_text.h",
+        "version": "2.10.2"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-API-013",
+    "req_name": "Identity frontmatter threaded into config before the orchestrator snapshot",
+    "functions": [
+      {
+        "name": "thread_frontmatter_sampler",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.7.4"
+      },
+      {
+        "name": "apply_identity_frontmatter",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.7.3"
+      },
+      {
+        "name": "cache_tier_allowed_tools",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.5.2"
+      },
+      {
+        "name": "thread_frontmatter_samplers",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.7.3"
+      },
+      {
+        "name": "wire_tool_executor",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.6-rc16"
+      },
+      {
+        "name": "init_orchestrator",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.2.9"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-API-014",
+    "req_name": "Header is the generator input for the Python wrapper; drift is a commit gate",
+    "functions": [
+      {
+        "name": "generate",
+        "file": "scripts/gen_bindings.py",
+        "version": "2.2.1"
+      },
+      {
+        "name": "write_outputs",
+        "file": "scripts/gen_bindings.py",
+        "version": "2.2.1"
+      },
+      {
+        "name": "check_outputs",
+        "file": "scripts/gen_bindings.py",
+        "version": "2.2.1"
+      },
+      {
+        "name": "main",
+        "file": "scripts/gen_bindings.py",
+        "version": "2.2.1"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-BRIDGE-001",
+    "req_name": "External bridge exposes the engine over a peer-authenticated unix socket",
+    "functions": [
+      {
+        "name": "start_external_bridge",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.8"
+      },
+      {
+        "name": "final_answer_from_context",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.10.2"
+      },
+      {
+        "name": "handle_ask_plain",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.10.2"
+      },
+      {
+        "name": "handle_ask",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.10.2"
+      },
+      {
+        "name": "handle_status",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.0.6-rc16.2"
+      },
+      {
+        "name": "derive_async_final_state",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.10.2"
+      },
+      {
+        "name": "cancel_inflight_async_tasks",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.1.0"
+      },
+      {
+        "name": "handle_clear",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.0.6-rc16"
+      },
+      {
+        "name": "handle_count",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.0.8"
+      },
+      {
+        "name": "handle_ask_status",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.0.6-rc16"
+      },
+      {
+        "name": "dispatch_ask",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.9.12"
+      },
+      {
+        "name": "dispatch_tool",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.0.6-rc16"
+      },
+      {
+        "name": "ExternalBridge",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.0.8"
+      },
+      {
+        "name": "~ExternalBridge",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.0.8"
+      },
+      {
+        "name": "prepare_socket_dir",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.1.7"
+      },
+      {
+        "name": "socket_path_safe",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.1.7"
+      },
+      {
+        "name": "bind_and_listen",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.1.7"
+      },
+      {
+        "name": "create_listen_socket",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.1.7"
+      },
+      {
+        "name": "peer_uid_matches",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.1.7"
+      },
+      {
+        "name": "start",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.0.8"
+      },
+      {
+        "name": "stop",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.1.2"
+      },
+      {
+        "name": "accept_loop",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.1.7"
+      },
+      {
+        "name": "serve_client",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.0.6-rc16"
+      },
+      {
+        "name": "dispatch",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.0.11"
+      },
+      {
+        "name": "attach_phase_observer",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.1.0"
+      },
+      {
+        "name": "detach_phase_observer",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.1.0"
+      },
+      {
+        "name": "run_async_ask",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.1.4"
+      },
+      {
+        "name": "subscribe",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.0.6-rc16"
+      },
+      {
+        "name": "unsubscribe",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.0.6-rc16"
+      },
+      {
+        "name": "broadcast_notification",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.1.2"
+      },
+      {
+        "name": "update_task_phase",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.0.6-rc16"
+      },
+      {
+        "name": "cleanup_expired_tasks",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.1.4"
+      },
+      {
+        "name": "async_sentinel_dir",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.1.4"
+      },
+      {
+        "name": "set_async_sentinel_root",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.1.4"
+      },
+      {
+        "name": "write_sentinel",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.1.4"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-CFG-001",
+    "req_name": "Layered configuration resolution with most-specific-layer-wins precedence",
+    "functions": [
+      {
+        "name": "apply_env_overrides",
+        "file": "src/config/env_overrides.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "parse_models_config",
+        "file": "src/config/loader.cpp",
+        "version": "1.8.2"
+      },
+      {
+        "name": "parse_config_file",
+        "file": "src/config/loader.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "load_config_layers",
+        "file": "src/config/loader.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "load_config",
+        "file": "src/config/loader.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "load_config_from_file",
+        "file": "src/config/loader.cpp",
+        "version": "1.8.2"
+      },
+      {
+        "name": "load_global_layer",
+        "file": "src/config/loader.cpp",
+        "version": "1"
+      },
+      {
+        "name": "resolve_consumer_defaults",
+        "file": "src/config/loader.cpp",
+        "version": "1"
+      },
+      {
+        "name": "load_consumer_layer",
+        "file": "src/config/loader.cpp",
+        "version": "2.0.6"
+      },
+      {
+        "name": "load_project_layer",
+        "file": "src/config/loader.cpp",
+        "version": "2.0.6"
+      },
+      {
+        "name": "load_layered",
+        "file": "src/config/loader.cpp",
+        "version": "2.0.6"
+      },
+      {
+        "name": "parse_config_string",
+        "file": "src/config/loader.cpp",
+        "version": "2.1.11"
+      },
+      {
+        "name": "load_config_from_string",
+        "file": "src/config/loader.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "do_configure_dir",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.3.13"
+      },
+      {
+        "name": "entropic_configure_dir",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.6"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-CFG-002",
+    "req_name": "Whole-block replace semantics for models and routing across layers",
+    "functions": [
+      {
+        "name": "parse_models_config",
+        "file": "src/config/loader.cpp",
+        "version": "1.8.2"
+      },
+      {
+        "name": "yaml_has_key",
+        "file": "src/config/loader.cpp",
+        "version": "2.0.6"
+      },
+      {
+        "name": "load_consumer_layer",
+        "file": "src/config/loader.cpp",
+        "version": "2.0.6"
+      },
+      {
+        "name": "load_project_layer",
+        "file": "src/config/loader.cpp",
+        "version": "2.0.6"
+      },
+      {
+        "name": "load_layered",
+        "file": "src/config/loader.cpp",
+        "version": "2.0.6"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-CFG-003",
+    "req_name": "Bundled model registry resolution \u2014 keys, selectors, and search order",
+    "functions": [
+      {
+        "name": "BundledModels",
+        "file": "include/entropic/config/bundled_models.h",
+        "version": "2.10.4"
+      },
+      {
+        "name": "share_dir_from_library",
+        "file": "src/config/bundled_models.cpp",
+        "version": "1.0"
+      },
+      {
+        "name": "parse_bundled_entry",
+        "file": "src/config/bundled_models.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "load",
+        "file": "src/config/bundled_models.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "find_by",
+        "file": "src/config/bundled_models.cpp",
+        "version": "2.3.0"
+      },
+      {
+        "name": "resolve",
+        "file": "src/config/bundled_models.cpp",
+        "version": "2.0.5.1"
+      },
+      {
+        "name": "auto_discover_and_load",
+        "file": "src/config/bundled_models.cpp",
+        "version": "2.3.6"
+      },
+      {
+        "name": "resolve_model_path",
+        "file": "src/config/loader.cpp",
+        "version": "2.8.0"
+      },
+      {
+        "name": "parse_model_config",
+        "file": "src/config/loader.cpp",
+        "version": "2.8.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-CFG-005",
+    "req_name": "Per-tier knobs override global defaults without an all-or-nothing switch",
+    "functions": [
+      {
+        "name": "parse_sampler_overrides",
+        "file": "src/config/loader.cpp",
+        "version": "2.8.2"
+      },
+      {
+        "name": "parse_tier_speculative_override",
+        "file": "src/config/loader.cpp",
+        "version": "2.9.4"
+      },
+      {
+        "name": "parse_model_config",
+        "file": "src/config/loader.cpp",
+        "version": "2.8.0"
+      },
+      {
+        "name": "parse_tier_config",
+        "file": "src/config/loader.cpp",
+        "version": "2.10.4"
+      },
+      {
+        "name": "parse_speculative_config",
+        "file": "src/config/loader.cpp",
+        "version": "2.9.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-CFG-006",
+    "req_name": "Fail-loud validation \u2014 reject bad or inert configuration at load time",
+    "functions": [
+      {
+        "name": "resolve_model_path",
+        "file": "src/config/loader.cpp",
+        "version": "2.8.0"
+      },
+      {
+        "name": "parse_config_file",
+        "file": "src/config/loader.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "load_config",
+        "file": "src/config/loader.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "load_config_from_file",
+        "file": "src/config/loader.cpp",
+        "version": "1.8.2"
+      },
+      {
+        "name": "parse_config_string",
+        "file": "src/config/loader.cpp",
+        "version": "2.1.11"
+      },
+      {
+        "name": "load_config_from_string",
+        "file": "src/config/loader.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "validate_allowed_tools",
+        "file": "src/config/validate.cpp",
+        "version": "1.8.2"
+      },
+      {
+        "name": "validate",
+        "file": "src/config/validate.cpp",
+        "version": "1.8.2"
+      },
+      {
+        "name": "validate",
+        "file": "src/config/validate.cpp",
+        "version": "1.8.2"
+      },
+      {
+        "name": "validate",
+        "file": "src/config/validate.cpp",
+        "version": "2.1.3"
+      },
+      {
+        "name": "validate_fallback_tier",
+        "file": "src/config/validate.cpp",
+        "version": "1.8.2"
+      },
+      {
+        "name": "validate_tier_map",
+        "file": "src/config/validate.cpp",
+        "version": "1.8.2"
+      },
+      {
+        "name": "validate_handoff_rules",
+        "file": "src/config/validate.cpp",
+        "version": "1.8.2"
+      },
+      {
+        "name": "validate_classification_routable",
+        "file": "src/config/validate.cpp",
+        "version": "2.8.1"
+      },
+      {
+        "name": "validate_routing",
+        "file": "src/config/validate.cpp",
+        "version": "2.8.1"
+      },
+      {
+        "name": "warn_auto_chain_without_targets",
+        "file": "src/config/validate.cpp",
+        "version": "1.8.2"
+      },
+      {
+        "name": "validate",
+        "file": "src/config/validate.cpp",
+        "version": "1.8.3"
+      },
+      {
+        "name": "validate_model_tiers",
+        "file": "src/config/validate.cpp",
+        "version": "1.8.3"
+      },
+      {
+        "name": "validate_config",
+        "file": "src/config/validate.cpp",
+        "version": "2.0.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-CFG-007",
+    "req_name": "Usable configuration with no user config present",
+    "functions": [
+      {
+        "name": "load_bundled_default",
+        "file": "src/config/loader.cpp",
+        "version": "2.9.5"
+      },
+      {
+        "name": "load_config_layers",
+        "file": "src/config/loader.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "load_config",
+        "file": "src/config/loader.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "load_consumer_layer",
+        "file": "src/config/loader.cpp",
+        "version": "2.0.6"
+      },
+      {
+        "name": "load_layered",
+        "file": "src/config/loader.cpp",
+        "version": "2.0.6"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-CFG-008",
+    "req_name": "Build configuration is frontend-swappable via generated entropic_config.h",
+    "functions": [
+      {
+        "name": "auto_discover_and_load",
+        "file": "src/config/bundled_models.cpp",
+        "version": "2.3.6"
+      },
+      {
+        "name": "share_dir_from_library",
+        "file": "src/config/data_dir.cpp",
+        "version": "1"
+      },
+      {
+        "name": "resolve_data_dir",
+        "file": "src/config/data_dir.cpp",
+        "version": "2.0.5.1"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-COMPACT-001",
+    "req_name": "Threshold compaction preserving task-bearing messages, snapshot first",
+    "functions": [
+      {
+        "name": "count_text",
+        "file": "src/core/compaction.cpp",
+        "version": "1.8.4"
+      },
+      {
+        "name": "count_message",
+        "file": "src/core/compaction.cpp",
+        "version": "1.8.4"
+      },
+      {
+        "name": "count_messages",
+        "file": "src/core/compaction.cpp",
+        "version": "1.8.4"
+      },
+      {
+        "name": "usage_percent",
+        "file": "src/core/compaction.cpp",
+        "version": "1.8.4"
+      },
+      {
+        "name": "check_and_compact",
+        "file": "src/core/compaction.cpp",
+        "version": "1.8.8"
+      },
+      {
+        "name": "compact",
+        "file": "src/core/compaction.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "compact_messages",
+        "file": "src/core/compaction.cpp",
+        "version": "1.9.9"
+      },
+      {
+        "name": "save_snapshot",
+        "file": "src/core/compaction.cpp",
+        "version": "1.8.8"
+      },
+      {
+        "name": "register_compactor",
+        "file": "src/core/compactor_registry.cpp",
+        "version": "1.9.9"
+      },
+      {
+        "name": "deregister_compactor",
+        "file": "src/core/compactor_registry.cpp",
+        "version": "1.9.9"
+      },
+      {
+        "name": "compact",
+        "file": "src/core/compactor_registry.cpp",
+        "version": "1.9.9"
+      },
+      {
+        "name": "run_default",
+        "file": "src/core/compactor_registry.cpp",
+        "version": "1.9.9"
+      },
+      {
+        "name": "run_custom",
+        "file": "src/core/compactor_registry.cpp",
+        "version": "1.9.9"
+      },
+      {
+        "name": "has_custom_compactor",
+        "file": "src/core/compactor_registry.cpp",
+        "version": "1.9.9"
+      },
+      {
+        "name": "check_compaction",
+        "file": "src/core/context_manager.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "fire_pre_compact_hook",
+        "file": "src/core/context_manager.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "fire_post_compact_hooks",
+        "file": "src/core/context_manager.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "context_usage",
+        "file": "src/core/engine.cpp",
+        "version": "1.8.4"
+      },
+      {
+        "name": "entropic_compact",
+        "file": "src/facade/entropic_compaction.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_register_compactor",
+        "file": "src/facade/entropic_compaction.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_deregister_compactor",
+        "file": "src/facade/entropic_compaction.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_get_default_compactor",
+        "file": "src/facade/entropic_compaction.cpp",
+        "version": "2.0.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-COMPACT-002",
+    "req_name": "Fill-gated tool-result pruning and persistent context anchors",
+    "functions": [
+      {
+        "name": "prune_tool_results",
+        "file": "src/core/context_manager.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "prune_old_tool_results",
+        "file": "src/core/context_manager.cpp",
+        "version": "2.1.3-rc2"
+      },
+      {
+        "name": "inject_context_warning",
+        "file": "src/core/context_manager.cpp",
+        "version": "1.8.4"
+      },
+      {
+        "name": "run_loop",
+        "file": "src/core/engine.cpp",
+        "version": "2.4.3"
+      },
+      {
+        "name": "run",
+        "file": "src/core/engine.cpp",
+        "version": "2.8.0"
+      },
+      {
+        "name": "reinject_context_anchors",
+        "file": "src/core/engine.cpp",
+        "version": "1.8.4"
+      },
+      {
+        "name": "dir_prune",
+        "file": "src/core/engine.cpp",
+        "version": "1.8.4"
+      },
+      {
+        "name": "dir_anchor",
+        "file": "src/core/engine.cpp",
+        "version": "1.8.4"
+      },
+      {
+        "name": "remove_anchor_messages",
+        "file": "src/core/engine.cpp",
+        "version": "1.8.4"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-DELEG-001",
+    "req_name": "Delegation admission guards reject before a child loop runs",
+    "functions": [
+      {
+        "name": "is_delegation_cycle",
+        "file": "src/core/engine.cpp",
+        "version": "2.0.6-rc16"
+      },
+      {
+        "name": "is_delegation_repeat_blocked",
+        "file": "src/core/engine.cpp",
+        "version": "2.3.0"
+      },
+      {
+        "name": "push_delegation_rejected",
+        "file": "src/core/engine.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "push_delegation_cycle_rejected",
+        "file": "src/core/engine.cpp",
+        "version": "2.0.6-rc16"
+      },
+      {
+        "name": "push_delegation_repeat_blocked",
+        "file": "src/core/engine.cpp",
+        "version": "2.3.0"
+      },
+      {
+        "name": "reject_delegation_if_guarded",
+        "file": "src/core/engine.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "execute_pending_pipeline",
+        "file": "src/core/engine.cpp",
+        "version": "2.10.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-DELEG-002",
+    "req_name": "Delegation lifecycle from preconditions to result fold-back",
+    "functions": [
+      {
+        "name": "set_delegation_callbacks",
+        "file": "src/core/delegation.cpp",
+        "version": "2.1.5"
+      },
+      {
+        "name": "fire_start_cb",
+        "file": "src/core/delegation.cpp",
+        "version": "2.1.6"
+      },
+      {
+        "name": "invoke_complete_cb",
+        "file": "src/core/delegation.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "check_delegation_preconditions",
+        "file": "src/core/delegation.cpp",
+        "version": "2.1.6"
+      },
+      {
+        "name": "execute_delegation",
+        "file": "src/core/delegation.cpp",
+        "version": "2.1.6"
+      },
+      {
+        "name": "build_resumed_child_context",
+        "file": "src/core/delegation.cpp",
+        "version": "2.1.6"
+      },
+      {
+        "name": "execute_resume_delegation",
+        "file": "src/core/delegation.cpp",
+        "version": "2.1.6"
+      },
+      {
+        "name": "build_child_context",
+        "file": "src/core/delegation.cpp",
+        "version": "2.7.4"
+      },
+      {
+        "name": "extract_summary",
+        "file": "src/core/delegation.cpp",
+        "version": "2.9.10"
+      },
+      {
+        "name": "create_storage_record",
+        "file": "src/core/delegation.cpp",
+        "version": "1.8.8"
+      },
+      {
+        "name": "complete_storage_record",
+        "file": "src/core/delegation.cpp",
+        "version": "1.8.8"
+      },
+      {
+        "name": "run_child",
+        "file": "src/core/delegation.cpp",
+        "version": "2.0.6-rc18"
+      },
+      {
+        "name": "build_child_result",
+        "file": "src/core/delegation.cpp",
+        "version": "2.1.4"
+      },
+      {
+        "name": "set_delegation_callbacks",
+        "file": "src/core/engine.cpp",
+        "version": "2.1.6"
+      },
+      {
+        "name": "delegation_callbacks_snapshot",
+        "file": "src/core/engine.cpp",
+        "version": "2.1.5"
+      },
+      {
+        "name": "init_session_conversation",
+        "file": "src/core/engine.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "dir_delegate",
+        "file": "src/core/engine.cpp",
+        "version": "2.1.6"
+      },
+      {
+        "name": "fire_delegate_pre_hook",
+        "file": "src/core/engine.cpp",
+        "version": "1.9.1"
+      },
+      {
+        "name": "push_delegation_result",
+        "file": "src/core/engine.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "execute_pending_delegation",
+        "file": "src/core/engine.cpp",
+        "version": "2.1.6-gh32"
+      },
+      {
+        "name": "fire_delegation_start",
+        "file": "src/core/engine.cpp",
+        "version": "1.8.6"
+      },
+      {
+        "name": "fire_delegation_complete",
+        "file": "src/core/engine.cpp",
+        "version": "1.8.6"
+      },
+      {
+        "name": "push_resume_failure",
+        "file": "src/core/engine.cpp",
+        "version": "2.1.6"
+      },
+      {
+        "name": "fetch_resume_payload",
+        "file": "src/core/engine.cpp",
+        "version": "2.1.6"
+      },
+      {
+        "name": "resolve_resume_delegation",
+        "file": "src/core/engine.cpp",
+        "version": "2.1.6"
+      },
+      {
+        "name": "run_pending_delegation",
+        "file": "src/core/engine.cpp",
+        "version": "2.1.6"
+      },
+      {
+        "name": "ensure_sandbox_manager",
+        "file": "src/core/engine.cpp",
+        "version": "2.1.6"
+      },
+      {
+        "name": "entropic_set_delegation_callbacks",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.5"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-DELEG-003",
+    "req_name": "Relay-single-delegate promotion with coverage-gap suppression",
+    "functions": [
+      {
+        "name": "build_child_result",
+        "file": "src/core/delegation.cpp",
+        "version": "2.1.4"
+      },
+      {
+        "name": "set_validation_provider",
+        "file": "src/core/engine.cpp",
+        "version": "2.0.6-rc17"
+      },
+      {
+        "name": "dir_complete",
+        "file": "src/core/engine.cpp",
+        "version": "2.1.4"
+      },
+      {
+        "name": "relay_partial_result",
+        "file": "src/core/engine.cpp",
+        "version": "2.1.1-rc1"
+      },
+      {
+        "name": "build_coverage_gap_message",
+        "file": "src/core/engine.cpp",
+        "version": "2.1.4"
+      },
+      {
+        "name": "finalize_delegation_result",
+        "file": "src/core/engine.cpp",
+        "version": "2.9.17"
+      },
+      {
+        "name": "log_relay_status",
+        "file": "src/core/engine.cpp",
+        "version": "2.1.1-rc1"
+      },
+      {
+        "name": "set_relay_single_delegate",
+        "file": "src/core/engine.cpp",
+        "version": "2.0.11"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-DELEG-004",
+    "req_name": "Sequential pipeline with forward carry and per-stage reporting",
+    "functions": [
+      {
+        "name": "fire_start_cb",
+        "file": "src/core/delegation.cpp",
+        "version": "2.1.6"
+      },
+      {
+        "name": "pipeline_context",
+        "file": "src/core/delegation.cpp",
+        "version": "2.1.4"
+      },
+      {
+        "name": "execute_pipeline",
+        "file": "src/core/delegation.cpp",
+        "version": "2.10.0"
+      },
+      {
+        "name": "run_pipeline_stage",
+        "file": "src/core/delegation.cpp",
+        "version": "2.10.0"
+      },
+      {
+        "name": "dir_pipeline",
+        "file": "src/core/engine.cpp",
+        "version": "1.8.6"
+      },
+      {
+        "name": "execute_pending_pipeline",
+        "file": "src/core/engine.cpp",
+        "version": "2.10.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-HOOK-001",
+    "req_name": "Thread-safe hook dispatch with priority, chaining and isolation",
+    "functions": [
+      {
+        "name": "register_hook",
+        "file": "src/core/hook_registry.cpp",
+        "version": "1.9.1"
+      },
+      {
+        "name": "deregister_hook",
+        "file": "src/core/hook_registry.cpp",
+        "version": "1.9.1"
+      },
+      {
+        "name": "fire_pre",
+        "file": "src/core/hook_registry.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "fire_post",
+        "file": "src/core/hook_registry.cpp",
+        "version": "1.9.1"
+      },
+      {
+        "name": "fire_info",
+        "file": "src/core/hook_registry.cpp",
+        "version": "1.9.1"
+      },
+      {
+        "name": "hook_count",
+        "file": "src/core/hook_registry.cpp",
+        "version": "1.9.1"
+      },
+      {
+        "name": "entropic_register_hook",
+        "file": "src/facade/entropic_hooks.cpp",
+        "version": "1.9.1"
+      },
+      {
+        "name": "entropic_deregister_hook",
+        "file": "src/facade/entropic_hooks.cpp",
+        "version": "1.9.1"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-HOOK-002",
+    "req_name": "Engine fires hooks at every lifecycle boundary, including a vetoable completion",
+    "functions": [
+      {
+        "name": "attach",
+        "file": "src/core/constitutional_validator.cpp",
+        "version": "1.9.8"
+      },
+      {
+        "name": "detach",
+        "file": "src/core/constitutional_validator.cpp",
+        "version": "1.9.8"
+      },
+      {
+        "name": "hook_callback",
+        "file": "src/core/constitutional_validator.cpp",
+        "version": "1.9.8"
+      },
+      {
+        "name": "handle_hook",
+        "file": "src/core/constitutional_validator.cpp",
+        "version": "2.1.3"
+      },
+      {
+        "name": "check_compaction",
+        "file": "src/core/context_manager.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "fire_pre_compact_hook",
+        "file": "src/core/context_manager.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "fire_post_compact_hooks",
+        "file": "src/core/context_manager.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "fire_loop_start_hook",
+        "file": "src/core/engine.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "fire_loop_end_hook",
+        "file": "src/core/engine.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "fire_loop_iteration_hook",
+        "file": "src/core/engine.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "fire_context_assemble_hook",
+        "file": "src/core/engine.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "set_hooks",
+        "file": "src/core/engine.cpp",
+        "version": "1.9.1"
+      },
+      {
+        "name": "loop",
+        "file": "src/core/engine.cpp",
+        "version": "2.3.28"
+      },
+      {
+        "name": "execute_iteration",
+        "file": "src/core/engine.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "set_state",
+        "file": "src/core/engine.cpp",
+        "version": "2.1.10"
+      },
+      {
+        "name": "dir_complete",
+        "file": "src/core/engine.cpp",
+        "version": "2.1.4"
+      },
+      {
+        "name": "fire_pre_hook",
+        "file": "src/core/engine.cpp",
+        "version": "1.9.1"
+      },
+      {
+        "name": "fire_post_generate_hook",
+        "file": "src/core/engine.cpp",
+        "version": "2.9.7"
+      },
+      {
+        "name": "dispatch_post_generate",
+        "file": "src/core/engine.cpp",
+        "version": "2.1.1-rc1"
+      },
+      {
+        "name": "fire_complete_hook",
+        "file": "src/core/engine.cpp",
+        "version": "2.9.7"
+      },
+      {
+        "name": "fire_delegate_pre_hook",
+        "file": "src/core/engine.cpp",
+        "version": "1.9.1"
+      },
+      {
+        "name": "fire_delegate_complete_hook",
+        "file": "src/core/engine.cpp",
+        "version": "2.9.9.1"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-IDEN-001",
+    "req_name": "Tier resolution contract and per-tier loop overrides",
+    "functions": [
+      {
+        "name": "set_tier_resolution",
+        "file": "src/core/engine.cpp",
+        "version": "1.8.6"
+      },
+      {
+        "name": "tier_resolution",
+        "file": "src/core/engine.cpp",
+        "version": "1.8.6"
+      },
+      {
+        "name": "apply_identity_overrides",
+        "file": "src/core/engine.cpp",
+        "version": "2.0.6-rc16"
+      },
+      {
+        "name": "resolve_max_iterations",
+        "file": "src/core/engine.cpp",
+        "version": "2.0.6-rc16"
+      },
+      {
+        "name": "resolve_max_tool_calls",
+        "file": "src/core/engine.cpp",
+        "version": "2.0.6-rc16"
+      },
+      {
+        "name": "tier_requires_explicit_completion",
+        "file": "src/core/engine.cpp",
+        "version": "2.0.6-rc16.1"
+      },
+      {
+        "name": "run_turn_as",
+        "file": "src/core/engine.cpp",
+        "version": "2.8.0"
+      },
+      {
+        "name": "seed_system_prompt_for_tier",
+        "file": "src/core/engine.cpp",
+        "version": "2.8.0"
+      },
+      {
+        "name": "set_tier_info",
+        "file": "src/core/engine.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "has_tier",
+        "file": "src/core/engine.cpp",
+        "version": "2.8.0"
+      },
+      {
+        "name": "get_tier_allowed_tools",
+        "file": "src/core/engine.cpp",
+        "version": "2.9.19"
+      },
+      {
+        "name": "tier_system_prompt",
+        "file": "src/core/engine.cpp",
+        "version": "2.8.0"
+      },
+      {
+        "name": "set_handoff_rules",
+        "file": "src/core/engine.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "tri_resolve_tier",
+        "file": "src/core/engine.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "tri_tier_exists",
+        "file": "src/core/engine.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "tri_get_handoff_targets",
+        "file": "src/core/engine.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "tri_get_tier_param",
+        "file": "src/core/engine.cpp",
+        "version": "2.9.20"
+      },
+      {
+        "name": "wire_internal_tier_resolution",
+        "file": "src/core/engine.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "lock_tier_if_needed",
+        "file": "src/core/response_generator.cpp",
+        "version": "1.8.4"
+      },
+      {
+        "name": "build_params_json",
+        "file": "src/core/response_generator.cpp",
+        "version": "2.7.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-IDEN-002",
+    "req_name": "Identity lifecycle separates immutable static from dynamic identities",
+    "functions": [
+      {
+        "name": "validate_phases",
+        "file": "src/core/identity_manager.cpp",
+        "version": "1.9.9"
+      },
+      {
+        "name": "validate_fields",
+        "file": "src/core/identity_manager.cpp",
+        "version": "2.1.0"
+      },
+      {
+        "name": "check_create_preconditions",
+        "file": "src/core/identity_manager.cpp",
+        "version": "1.9.6"
+      },
+      {
+        "name": "check_mutable",
+        "file": "src/core/identity_manager.cpp",
+        "version": "1.9.6"
+      },
+      {
+        "name": "load_static",
+        "file": "src/core/identity_manager.cpp",
+        "version": "2.0.6-rc16"
+      },
+      {
+        "name": "create",
+        "file": "src/core/identity_manager.cpp",
+        "version": "2.0.6-rc16"
+      },
+      {
+        "name": "update",
+        "file": "src/core/identity_manager.cpp",
+        "version": "2.0.6-rc16"
+      },
+      {
+        "name": "destroy",
+        "file": "src/core/identity_manager.cpp",
+        "version": "2.0.6-rc16"
+      },
+      {
+        "name": "is_router_dirty",
+        "file": "src/core/identity_manager.cpp",
+        "version": "1.9.6"
+      },
+      {
+        "name": "validate_name",
+        "file": "src/core/identity_manager.cpp",
+        "version": "1.9.6"
+      },
+      {
+        "name": "validate",
+        "file": "src/core/identity_manager.cpp",
+        "version": "1.9.6"
+      },
+      {
+        "name": "register_mcp_keys",
+        "file": "src/core/identity_manager.cpp",
+        "version": "1.9.6"
+      },
+      {
+        "name": "unregister_mcp_keys",
+        "file": "src/core/identity_manager.cpp",
+        "version": "1.9.6"
+      },
+      {
+        "name": "entropic_create_identity",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_update_identity",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_destroy_identity",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_get_identity_config",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_list_identities",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_identity_count",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_load_identity",
+        "file": "src/facade/entropic_identity.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_get_identity",
+        "file": "src/facade/entropic_identity.cpp",
+        "version": "2.0.2"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-IDEN-003",
+    "req_name": "Handoff rules and auto-chain continuation",
+    "functions": [
+      {
+        "name": "dir_tier_change",
+        "file": "src/core/engine.cpp",
+        "version": "1.8.4"
+      },
+      {
+        "name": "should_auto_chain",
+        "file": "src/core/engine.cpp",
+        "version": "1.8.6"
+      },
+      {
+        "name": "try_auto_chain",
+        "file": "src/core/engine.cpp",
+        "version": "1.8.6"
+      },
+      {
+        "name": "set_handoff_rules",
+        "file": "src/core/engine.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "tri_get_handoff_targets",
+        "file": "src/core/engine.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "is_response_complete",
+        "file": "src/core/response_generator.cpp",
+        "version": "1.8.4"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-INFER-007",
+    "req_name": "Named grammars are registered, validated, and resolved by a fixed precedence",
+    "functions": [
+      {
+        "name": "entropic_grammar_register",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_grammar_register_file",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_grammar_deregister",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_grammar_get",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_grammar_validate",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_grammar_list",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-INFER-016",
+    "req_name": "Speculative decoding is gated on compatibility and must not change the output",
+    "functions": [
+      {
+        "name": "entropic_speculative_compat",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.11"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-INFER-018",
+    "req_name": "Same-prefix batch generation is gated, per-request-constrained and seq-safe",
+    "functions": [
+      {
+        "name": "entropic_run_batch",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.9.5"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-INFER-019",
+    "req_name": "Model pool dedup and VRAM residency policy govern which tier is resident",
+    "functions": [
+      {
+        "name": "entropic_profile_register",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_profile_deregister",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_profile_get",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_profile_list",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_set_residency_observer",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.2.4"
+      },
+      {
+        "name": "entropic_residency_snapshot",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.2.4"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-INFER-021",
+    "req_name": "Per-tier sampler configuration applies only where the caller did not decide",
+    "functions": [
+      {
+        "name": "entropic_throughput_tok_per_sec",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_throughput_reset",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-INFER-023",
+    "req_name": "LoRA adapters hot-swap under a single-HOT-per-context constraint",
+    "functions": [
+      {
+        "name": "entropic_adapter_load",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_adapter_unload",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_adapter_swap",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_adapter_state",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_adapter_info",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_adapter_list",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-INFER-024",
+    "req_name": "Backends declare capabilities and expose state and log-probability introspection",
+    "functions": [
+      {
+        "name": "entropic_get_logprobs",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_compute_perplexity",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-INFER-025",
+    "req_name": "Multimodal input is bounded, tier-gated and degrades gracefully",
+    "functions": [
+      {
+        "name": "entropic_run_messages",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.9.5"
+      },
+      {
+        "name": "entropic_run_messages_streaming",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.9.5"
+      },
+      {
+        "name": "entropic_model_has_vision",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-LOOP-001",
+    "req_name": "Agent state machine with observable, dual-channel transitions",
+    "functions": [
+      {
+        "name": "set_state_observer",
+        "file": "include/entropic/core/response_generator.h",
+        "version": "2.1.10"
+      },
+      {
+        "name": "run_loop",
+        "file": "src/core/engine.cpp",
+        "version": "2.4.3"
+      },
+      {
+        "name": "run",
+        "file": "src/core/engine.cpp",
+        "version": "2.8.0"
+      },
+      {
+        "name": "is_terminal_state",
+        "file": "src/core/engine.cpp",
+        "version": "2.3.28"
+      },
+      {
+        "name": "set_state",
+        "file": "src/core/engine.cpp",
+        "version": "2.1.10"
+      },
+      {
+        "name": "run_turn",
+        "file": "src/core/engine.cpp",
+        "version": "2.8.0"
+      },
+      {
+        "name": "run_turn",
+        "file": "src/core/engine.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "run_streaming",
+        "file": "src/core/engine.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "run_streaming",
+        "file": "src/core/engine.cpp",
+        "version": "2.1.8"
+      },
+      {
+        "name": "set_state_observer",
+        "file": "src/core/engine.cpp",
+        "version": "2.1.10"
+      },
+      {
+        "name": "entropic_set_state_observer",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.10"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-LOOP-002",
+    "req_name": "Bounded loop termination with synthetic completion on cap",
+    "functions": [
+      {
+        "name": "resolve_max_iterations",
+        "file": "src/core/engine.cpp",
+        "version": "2.0.6-rc16"
+      },
+      {
+        "name": "run",
+        "file": "src/core/engine.cpp",
+        "version": "2.8.0"
+      },
+      {
+        "name": "loop",
+        "file": "src/core/engine.cpp",
+        "version": "2.3.28"
+      },
+      {
+        "name": "should_stop",
+        "file": "src/core/engine.cpp",
+        "version": "2.3.28"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-LOOP-003",
+    "req_name": "Fixed per-iteration pipeline with pre-generate cancellation",
+    "functions": [
+      {
+        "name": "execute_iteration",
+        "file": "src/core/engine.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "process_generation_result",
+        "file": "src/core/engine.cpp",
+        "version": "2.9.19"
+      },
+      {
+        "name": "dispatch_pending_or_halt",
+        "file": "src/core/engine.cpp",
+        "version": "2.4.3"
+      },
+      {
+        "name": "parse_tool_calls",
+        "file": "src/core/engine.cpp",
+        "version": "2.9.8"
+      },
+      {
+        "name": "process_tool_results",
+        "file": "src/core/engine.cpp",
+        "version": "2.7.1"
+      },
+      {
+        "name": "fire_pre_hook",
+        "file": "src/core/engine.cpp",
+        "version": "1.9.1"
+      },
+      {
+        "name": "dispatch_post_generate",
+        "file": "src/core/engine.cpp",
+        "version": "2.1.1-rc1"
+      },
+      {
+        "name": "execute_pending_delegation",
+        "file": "src/core/engine.cpp",
+        "version": "2.1.6-gh32"
+      },
+      {
+        "name": "generate_response",
+        "file": "src/core/response_generator.cpp",
+        "version": "1.8.4"
+      },
+      {
+        "name": "generate_batch",
+        "file": "src/core/response_generator.cpp",
+        "version": "2.4.2"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-LOOP-004",
+    "req_name": "Empty-turn allowance and tool-call correction nudge",
+    "functions": [
+      {
+        "name": "evaluate_no_tool_decision",
+        "file": "src/core/engine.cpp",
+        "version": "2.0.6-rc16"
+      },
+      {
+        "name": "record_explicit_completion_failure",
+        "file": "src/core/engine.cpp",
+        "version": "2.9.20"
+      },
+      {
+        "name": "get_tier_allowed_tools",
+        "file": "src/core/engine.cpp",
+        "version": "2.9.19"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-LOOP-005",
+    "req_name": "Opt-in thinking-budget gating with nudge then hard cut",
+    "functions": [
+      {
+        "name": "charge_thinking_budget",
+        "file": "src/core/engine.cpp",
+        "version": "2.5.0"
+      },
+      {
+        "name": "budget_units_consumed",
+        "file": "src/core/engine.cpp",
+        "version": "2.5.0"
+      },
+      {
+        "name": "nudge_budget_completion",
+        "file": "src/core/engine.cpp",
+        "version": "2.5.0"
+      },
+      {
+        "name": "hard_cut_budget",
+        "file": "src/core/engine.cpp",
+        "version": "2.5.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-LOOP-006",
+    "req_name": "Interrupt and pause semantics across nested loops",
+    "functions": [
+      {
+        "name": "run_loop",
+        "file": "src/core/engine.cpp",
+        "version": "2.4.3"
+      },
+      {
+        "name": "dispatch_pending_or_halt",
+        "file": "src/core/engine.cpp",
+        "version": "2.4.3"
+      },
+      {
+        "name": "handle_terminal_finish_reasons",
+        "file": "src/core/engine.cpp",
+        "version": "2.0.6-rc16"
+      },
+      {
+        "name": "interrupt",
+        "file": "src/core/engine.cpp",
+        "version": "2.0.6-rc16.1"
+      },
+      {
+        "name": "set_external_interrupt",
+        "file": "src/core/engine.cpp",
+        "version": "2.0.6-rc16"
+      },
+      {
+        "name": "reset_interrupt",
+        "file": "src/core/engine.cpp",
+        "version": "1.8.4"
+      },
+      {
+        "name": "pause",
+        "file": "src/core/engine.cpp",
+        "version": "1.8.4"
+      },
+      {
+        "name": "cancel_pause",
+        "file": "src/core/engine.cpp",
+        "version": "1.8.4"
+      },
+      {
+        "name": "generate_streaming",
+        "file": "src/core/response_generator.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "dispatch_batch_generate",
+        "file": "src/core/response_generator.cpp",
+        "version": "2.9.6"
+      },
+      {
+        "name": "handle_pause",
+        "file": "src/core/response_generator.cpp",
+        "version": "2.1.10"
+      },
+      {
+        "name": "entropic_interrupt",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-LOOP-007",
+    "req_name": "Engine-authored transcript shaping keeps the system prompt bit-stable",
+    "functions": [
+      {
+        "name": "fold_complete_into_assistant",
+        "file": "src/core/engine.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "defang_meta_action_envelope",
+        "file": "src/core/engine.cpp",
+        "version": "2.7.1"
+      },
+      {
+        "name": "process_tool_results",
+        "file": "src/core/engine.cpp",
+        "version": "2.7.1"
+      },
+      {
+        "name": "capture_validation_feedback",
+        "file": "src/core/engine.cpp",
+        "version": "2.1.1-rc1"
+      },
+      {
+        "name": "fold_delegation_summary",
+        "file": "src/core/engine.cpp",
+        "version": "2.9.17"
+      },
+      {
+        "name": "prepare_prompts",
+        "file": "src/core/response_generator.cpp",
+        "version": "2.7.0"
+      },
+      {
+        "name": "inject_engine_state_reminder",
+        "file": "src/core/response_generator.cpp",
+        "version": "2.1.4"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-LOOP-008",
+    "req_name": "Family-aware streaming reasoning filter with UTF-8 alignment",
+    "functions": [
+      {
+        "name": "run_streaming",
+        "file": "src/core/engine.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "run_streaming",
+        "file": "src/core/engine.cpp",
+        "version": "2.1.8"
+      },
+      {
+        "name": "stream_token_callback",
+        "file": "src/core/response_generator.cpp",
+        "version": "2.1.12"
+      },
+      {
+        "name": "generate_streaming",
+        "file": "src/core/response_generator.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "StreamThinkFilter",
+        "file": "src/core/stream_think_filter.cpp",
+        "version": "2.0.1"
+      },
+      {
+        "name": "StreamThinkFilter",
+        "file": "src/core/stream_think_filter.cpp",
+        "version": "2.10.3"
+      },
+      {
+        "name": "set_raw_callback",
+        "file": "src/core/stream_think_filter.cpp",
+        "version": "2.0.1"
+      },
+      {
+        "name": "emit_utf8_safe",
+        "file": "src/core/stream_think_filter.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "on_token",
+        "file": "src/core/stream_think_filter.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "flush",
+        "file": "src/core/stream_think_filter.cpp",
+        "version": "2.0.2"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-MCP-010",
+    "req_name": "Per-identity MCP key authorization is opt-in but default-deny once enabled",
+    "functions": [
+      {
+        "name": "entropic_grant_mcp_key",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_revoke_mcp_key",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_check_mcp_key",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_list_mcp_keys",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_grant_mcp_key_from",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_serialize_mcp_keys",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_deserialize_mcp_keys",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-MCP-014",
+    "req_name": "A locked tier's allowed_tools list is enforced at dispatch time",
+    "functions": [
+      {
+        "name": "wire_tool_executor",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.6-rc16"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-MCP-025",
+    "req_name": "External servers are discovered safely, directive-stripped, and health-monitored",
+    "functions": [
+      {
+        "name": "entropic_register_mcp_server",
+        "file": "src/facade/entropic_mcp.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "entropic_deregister_mcp_server",
+        "file": "src/facade/entropic_mcp.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_list_mcp_servers",
+        "file": "src/facade/entropic_mcp.cpp",
+        "version": "2.0.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-PROD-001",
+    "req_name": "Single `entropic` command with a closed, stable subcommand surface",
+    "functions": [
+      {
+        "name": "_exec_native",
+        "file": "python/src/entropic/cli.py",
+        "version": "2.1.0"
+      },
+      {
+        "name": "main",
+        "file": "python/src/entropic/cli.py",
+        "version": "2.1.1-rc1"
+      },
+      {
+        "name": "main",
+        "file": "python/src/entropic/install_engine.py",
+        "version": "2.1.0"
+      },
+      {
+        "name": "list_models",
+        "file": "src/cli/download.cpp",
+        "version": "1"
+      },
+      {
+        "name": "parse_download_args",
+        "file": "src/cli/download.cpp",
+        "version": "2.8.0"
+      },
+      {
+        "name": "resolve_selector_key",
+        "file": "src/cli/download.cpp",
+        "version": "2.8.0"
+      },
+      {
+        "name": "resolve_entry",
+        "file": "src/cli/download.cpp",
+        "version": "1"
+      },
+      {
+        "name": "fetch_to",
+        "file": "src/cli/download.cpp",
+        "version": "1"
+      },
+      {
+        "name": "dispatch",
+        "file": "src/cli/download.cpp",
+        "version": "2.8.0"
+      },
+      {
+        "name": "run_download",
+        "file": "src/cli/download.cpp",
+        "version": "2.0.5"
+      },
+      {
+        "name": "main",
+        "file": "src/cli/main.cpp",
+        "version": "2.0.5"
+      },
+      {
+        "name": "run_version",
+        "file": "src/cli/version.cpp",
+        "version": "2.0.3"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-PROD-002",
+    "req_name": "mcp-bridge is a byte-transparent stdio-to-socket relay, never an engine",
+    "functions": [
+      {
+        "name": "emit_no_engine_error",
+        "file": "src/cli/mcp_bridge.cpp",
+        "version": "2.1.7"
+      },
+      {
+        "name": "relay_loop",
+        "file": "src/cli/mcp_bridge.cpp",
+        "version": "2.1.7"
+      },
+      {
+        "name": "run_mcp_bridge",
+        "file": "src/cli/mcp_bridge.cpp",
+        "version": "2.1.7"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-PROD-003",
+    "req_name": "Every release publishes CPU and CUDA tarballs, each with a .sha256 companion",
+    "functions": [
+      {
+        "name": "install",
+        "file": "python/src/entropic/install_engine.py",
+        "version": "2.1.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-SAFE-001",
+    "req_name": "Untrusted bytes are sanitized at ingress, never at egress",
+    "functions": [
+      {
+        "name": "entropic_context_get",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.1"
+      },
+      {
+        "name": "serialize_messages",
+        "file": "src/facade/json_serializers.h",
+        "version": "2.1.1"
+      },
+      {
+        "name": "utf8_safe_substr",
+        "file": "src/facade/utf8_safe.h",
+        "version": "2.2.3"
+      },
+      {
+        "name": "sanitize_storage_utf8",
+        "file": "src/storage/backend.cpp",
+        "version": "2.9.9"
+      },
+      {
+        "name": "delegation_row_to_json",
+        "file": "src/storage/backend.cpp",
+        "version": "2.9.11"
+      },
+      {
+        "name": "delegation_summary_to_json",
+        "file": "src/storage/backend.cpp",
+        "version": "2.9.11"
+      },
+      {
+        "name": "get_delegations",
+        "file": "src/storage/backend.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "get_delegation_by_id",
+        "file": "src/storage/backend.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "search_delegations",
+        "file": "src/storage/backend.cpp",
+        "version": "2.3.7"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-STOR-001",
+    "req_name": "Owned SQLite connection with forward-only schema migration",
+    "functions": [
+      {
+        "name": "entropic_storage_open",
+        "file": "src/facade/entropic_storage.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_storage_close",
+        "file": "src/facade/entropic_storage.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "initialize",
+        "file": "src/storage/backend.cpp",
+        "version": "1.8.8"
+      },
+      {
+        "name": "close",
+        "file": "src/storage/backend.cpp",
+        "version": "1.8.8"
+      },
+      {
+        "name": "entropic_storage_create",
+        "file": "src/storage/c_interface.cpp",
+        "version": "1.8.8"
+      },
+      {
+        "name": "entropic_storage_initialize",
+        "file": "src/storage/c_interface.cpp",
+        "version": "1.8.8"
+      },
+      {
+        "name": "initialize",
+        "file": "src/storage/database.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "close",
+        "file": "src/storage/database.cpp",
+        "version": "1.8.8"
+      },
+      {
+        "name": "is_open",
+        "file": "src/storage/database.cpp",
+        "version": "1.8.8"
+      },
+      {
+        "name": "run_migrations",
+        "file": "src/storage/database.cpp",
+        "version": "2.0.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-STOR-002",
+    "req_name": "Serialized, parameter-bound statement execution",
+    "functions": [
+      {
+        "name": "execute",
+        "file": "src/storage/database.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "execute_raw",
+        "file": "src/storage/database.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "fetch_one",
+        "file": "src/storage/database.cpp",
+        "version": "1.8.8"
+      },
+      {
+        "name": "fetch_all",
+        "file": "src/storage/database.cpp",
+        "version": "1.8.8"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-STOR-003",
+    "req_name": "Conversation and message persistence with generated identity",
+    "functions": [
+      {
+        "name": "create_conversation",
+        "file": "src/storage/backend.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "save_messages",
+        "file": "src/storage/backend.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "load_conversation",
+        "file": "src/storage/backend.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "list_conversations",
+        "file": "src/storage/backend.cpp",
+        "version": "1.8.8"
+      },
+      {
+        "name": "delete_conversation",
+        "file": "src/storage/backend.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "update_title",
+        "file": "src/storage/backend.cpp",
+        "version": "1.8.8"
+      },
+      {
+        "name": "save_snapshot",
+        "file": "src/storage/backend.cpp",
+        "version": "1.8.8"
+      },
+      {
+        "name": "generate_uuid",
+        "file": "src/storage/backend.cpp",
+        "version": "1.8.8"
+      },
+      {
+        "name": "utc_timestamp",
+        "file": "src/storage/backend.cpp",
+        "version": "1.8.8"
+      },
+      {
+        "name": "make_conversation",
+        "file": "src/storage/backend.cpp",
+        "version": "1.8.8"
+      },
+      {
+        "name": "make_delegation",
+        "file": "src/storage/backend.cpp",
+        "version": "1.8.8"
+      },
+      {
+        "name": "entropic_storage_create_conversation",
+        "file": "src/storage/c_interface.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_storage_save_conversation",
+        "file": "src/storage/c_interface.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_storage_load_conversation",
+        "file": "src/storage/c_interface.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_storage_list_conversations",
+        "file": "src/storage/c_interface.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_storage_delete_conversation",
+        "file": "src/storage/c_interface.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_storage_save_snapshot",
+        "file": "src/storage/c_interface.cpp",
+        "version": "2.0.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-STOR-004",
+    "req_name": "Referential integrity, cascade cleanup, and FTS index coherence",
+    "functions": [
+      {
+        "name": "delete_conversation",
+        "file": "src/storage/backend.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "search_conversations",
+        "file": "src/storage/backend.cpp",
+        "version": "1.8.8"
+      },
+      {
+        "name": "get_stats",
+        "file": "src/storage/backend.cpp",
+        "version": "1.8.8"
+      },
+      {
+        "name": "entropic_storage_search_conversations",
+        "file": "src/storage/c_interface.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_storage_delete_conversation",
+        "file": "src/storage/c_interface.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_storage_get_stats",
+        "file": "src/storage/c_interface.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "run_migrations",
+        "file": "src/storage/database.cpp",
+        "version": "2.0.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-STOR-005",
+    "req_name": "Delegation record lifecycle with parent-conversation guard",
+    "functions": [
+      {
+        "name": "create_delegation",
+        "file": "src/storage/backend.cpp",
+        "version": "2.1.12"
+      },
+      {
+        "name": "complete_delegation",
+        "file": "src/storage/backend.cpp",
+        "version": "1.8.8"
+      },
+      {
+        "name": "get_delegations",
+        "file": "src/storage/backend.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "get_delegation_by_id",
+        "file": "src/storage/backend.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "search_delegations",
+        "file": "src/storage/backend.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "make_delegation",
+        "file": "src/storage/backend.cpp",
+        "version": "1.8.8"
+      },
+      {
+        "name": "entropic_storage_create_delegation",
+        "file": "src/storage/c_interface.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_storage_complete_delegation",
+        "file": "src/storage/c_interface.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_storage_get_delegations",
+        "file": "src/storage/c_interface.cpp",
+        "version": "2.0.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-STOR-008",
+    "req_name": "Append-only JSONL audit log with rotation and untruncated payloads",
+    "functions": [
+      {
+        "name": "entropic_audit_flush",
+        "file": "src/facade/entropic_audit.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_audit_count",
+        "file": "src/facade/entropic_audit.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_audit_read",
+        "file": "src/facade/entropic_audit.cpp",
+        "version": "2.1.1"
+      },
+      {
+        "name": "audit_entry_to_json",
+        "file": "src/storage/audit_entry.cpp",
+        "version": "1.9.5"
+      },
+      {
+        "name": "audit_entry_from_json",
+        "file": "src/storage/audit_entry.cpp",
+        "version": "1.9.5"
+      },
+      {
+        "name": "initialize",
+        "file": "src/storage/audit_logger.cpp",
+        "version": "1.9.5"
+      },
+      {
+        "name": "record",
+        "file": "src/storage/audit_logger.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "flush",
+        "file": "src/storage/audit_logger.cpp",
+        "version": "1.9.5"
+      },
+      {
+        "name": "entry_count",
+        "file": "src/storage/audit_logger.cpp",
+        "version": "1.9.5"
+      },
+      {
+        "name": "log_path",
+        "file": "src/storage/audit_logger.cpp",
+        "version": "1.9.5"
+      },
+      {
+        "name": "hook_callback",
+        "file": "src/storage/audit_logger.cpp",
+        "version": "1.9.5"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-TYPE-001",
+    "req_name": "Shared types is the leaf library \u2014 links nothing, everything links it",
+    "functions": [
+      {
+        "name": "HandleLogScope",
+        "file": "include/entropic/types/logging.h",
+        "version": "2.3.1"
+      },
+      {
+        "name": "get",
+        "file": "src/types/logging.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "register_handle_log",
+        "file": "src/types/logging.cpp",
+        "version": "2.3.1"
+      },
+      {
+        "name": "unregister_handle_log",
+        "file": "src/types/logging.cpp",
+        "version": "2.3.1"
+      },
+      {
+        "name": "current_handle_id",
+        "file": "src/types/logging.cpp",
+        "version": "2.3.1"
+      },
+      {
+        "name": "HandleLogScope",
+        "file": "src/types/logging.cpp",
+        "version": "2.3.1"
+      },
+      {
+        "name": "~HandleLogScope",
+        "file": "src/types/logging.cpp",
+        "version": "2.3.1"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-TYPE-002",
+    "req_name": "C ABI enums are append-only and pinned to the Python IntEnum mirrors",
+    "functions": [
+      {
+        "name": "entropic_api_version",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-TYPE-003",
+    "req_name": "Every consumer-facing enum has a total, wire-stable string projection",
+    "functions": [
+      {
+        "name": "result_kind_to_string",
+        "file": "include/entropic/types/tool_result.h",
+        "version": "2.5.2"
+      },
+      {
+        "name": "mcp_access_level_name",
+        "file": "src/types/config.cpp",
+        "version": "1.9.4"
+      },
+      {
+        "name": "parse_mcp_access_level",
+        "file": "src/types/config.cpp",
+        "version": "1.9.4"
+      },
+      {
+        "name": "entropic_error_name",
+        "file": "src/types/error.cpp",
+        "version": "1.8.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-TYPE-005",
+    "req_name": "Config types declare their own defaults; optional means absent, not default",
+    "functions": [
+      {
+        "name": "make_default_draft_model_config",
+        "file": "include/entropic/types/config.h",
+        "version": "2.1.11"
+      },
+      {
+        "name": "parse_sampler_overrides",
+        "file": "src/config/loader.cpp",
+        "version": "2.8.2"
+      },
+      {
+        "name": "parse_tier_speculative_override",
+        "file": "src/config/loader.cpp",
+        "version": "2.9.4"
+      },
+      {
+        "name": "parse_model_config",
+        "file": "src/config/loader.cpp",
+        "version": "2.8.0"
+      },
+      {
+        "name": "parse_tier_config",
+        "file": "src/config/loader.cpp",
+        "version": "2.10.4"
+      },
+      {
+        "name": "parse_speculative_config",
+        "file": "src/config/loader.cpp",
+        "version": "2.9.0"
+      },
+      {
+        "name": "parse_config_file",
+        "file": "src/config/loader.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "extract_tri_state_path",
+        "file": "src/config/yaml_util.cpp",
+        "version": "1.8.2"
+      },
+      {
+        "name": "extract_string_list_opt",
+        "file": "src/config/yaml_util.cpp",
+        "version": "1.8.2"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-TYPE-006",
+    "req_name": "Multimodal message vocabulary keeps text readable to text-only callers",
+    "functions": [
+      {
+        "name": "extract_text",
+        "file": "src/types/content.cpp",
+        "version": "1.9.11"
+      },
+      {
+        "name": "has_images",
+        "file": "src/types/content.cpp",
+        "version": "1.9.11"
+      },
+      {
+        "name": "parse_messages_json",
+        "file": "src/types/messages_json.cpp",
+        "version": "2.1.8"
+      },
+      {
+        "name": "any_message_has_images",
+        "file": "src/types/messages_json.cpp",
         "version": "2.1.8"
       }
     ]
@@ -23,6 +4068,188 @@
         "name": "set_global_enabled",
         "file": "src/core/constitutional_validator.cpp",
         "version": "2.0.4"
+      },
+      {
+        "name": "set_marker_resolver",
+        "file": "src/core/constitutional_validator.cpp",
+        "version": "2.10.3"
+      },
+      {
+        "name": "set_identity_validation",
+        "file": "src/core/constitutional_validator.cpp",
+        "version": "1.9.8"
+      },
+      {
+        "name": "validate",
+        "file": "src/core/constitutional_validator.cpp",
+        "version": "2.10.3"
+      },
+      {
+        "name": "strip_reasoning",
+        "file": "src/core/constitutional_validator.cpp",
+        "version": "2.10.3"
+      },
+      {
+        "name": "is_pure_tool_call",
+        "file": "src/core/constitutional_validator.cpp",
+        "version": "2.0.6"
+      },
+      {
+        "name": "handle_hook",
+        "file": "src/core/constitutional_validator.cpp",
+        "version": "2.1.3"
+      },
+      {
+        "name": "entropic_validation_set_enabled",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "entropic_validation_set_identity",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.0.0"
+      },
+      {
+        "name": "entropic_validation_last_result",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.10.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-VALID-002",
+    "req_name": "Critique-and-revise loop with typed verdicts and content safety valve",
+    "functions": [
+      {
+        "name": "validate",
+        "file": "src/core/constitutional_validator.cpp",
+        "version": "2.10.3"
+      },
+      {
+        "name": "log_verdict",
+        "file": "src/core/constitutional_validator.cpp",
+        "version": "2.1.5"
+      },
+      {
+        "name": "last_result",
+        "file": "src/core/constitutional_validator.cpp",
+        "version": "1.9.8"
+      },
+      {
+        "name": "build_critique_prompt",
+        "file": "src/core/constitutional_validator.cpp",
+        "version": "2.1.3"
+      },
+      {
+        "name": "parse_critique",
+        "file": "src/core/constitutional_validator.cpp",
+        "version": "2.0.6"
+      },
+      {
+        "name": "store_result",
+        "file": "src/core/constitutional_validator.cpp",
+        "version": "1.9.8"
+      },
+      {
+        "name": "run_validation_loop",
+        "file": "src/core/constitutional_validator.cpp",
+        "version": "2.1.5"
+      },
+      {
+        "name": "apply_revisions",
+        "file": "src/core/constitutional_validator.cpp",
+        "version": "2.1.5-hard"
+      },
+      {
+        "name": "attempt_revision",
+        "file": "src/core/constitutional_validator.cpp",
+        "version": "1.9.8"
+      },
+      {
+        "name": "run_critique",
+        "file": "src/core/constitutional_validator.cpp",
+        "version": "2.1.12"
+      },
+      {
+        "name": "revise",
+        "file": "src/core/constitutional_validator.cpp",
+        "version": "2.0.7"
+      },
+      {
+        "name": "entropic_set_critique_callbacks",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.12"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-VALID-003",
+    "req_name": "Consumer-driven pause, resume and accept of a failing validation",
+    "functions": [
+      {
+        "name": "set_auto_retry",
+        "file": "src/core/constitutional_validator.cpp",
+        "version": "2.1.5"
+      },
+      {
+        "name": "auto_retry_enabled",
+        "file": "src/core/constitutional_validator.cpp",
+        "version": "2.1.5"
+      },
+      {
+        "name": "resume_retry",
+        "file": "src/core/constitutional_validator.cpp",
+        "version": "2.1.5"
+      },
+      {
+        "name": "accept_last",
+        "file": "src/core/constitutional_validator.cpp",
+        "version": "2.1.5"
+      },
+      {
+        "name": "set_attempt_boundary_cb",
+        "file": "src/core/constitutional_validator.cpp",
+        "version": "2.1.5-hard"
+      },
+      {
+        "name": "set_critique_callbacks",
+        "file": "src/core/constitutional_validator.cpp",
+        "version": "2.1.12"
+      },
+      {
+        "name": "run_validation_loop",
+        "file": "src/core/constitutional_validator.cpp",
+        "version": "2.1.5"
+      },
+      {
+        "name": "apply_revisions",
+        "file": "src/core/constitutional_validator.cpp",
+        "version": "2.1.5-hard"
+      },
+      {
+        "name": "run_critique",
+        "file": "src/core/constitutional_validator.cpp",
+        "version": "2.1.12"
+      },
+      {
+        "name": "entropic_validation_set_auto_retry",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.5"
+      },
+      {
+        "name": "entropic_validation_resume_retry",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.5"
+      },
+      {
+        "name": "entropic_validation_accept_last",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.5"
+      },
+      {
+        "name": "entropic_set_attempt_boundary_cb",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.1.5"
       }
     ]
   }

@@ -30,7 +30,7 @@ TokenCounter::TokenCounter(int max_tokens)
  * @brief Estimate token count for raw text (~4 chars/token).
  * @param text Input text.
  * @return Estimated token count.
- * @internal
+ * @req REQ-COMPACT-001
  * @version 1.8.4
  */
 int TokenCounter::count_text(const std::string& text) {
@@ -44,7 +44,7 @@ int TokenCounter::count_text(const std::string& text) {
  * @brief Count tokens in a single message.
  * @param msg Message to count.
  * @return Estimated token count (content + role overhead).
- * @internal
+ * @req REQ-COMPACT-001
  * @version 1.8.4
  */
 int TokenCounter::count_message(const Message& msg) const {
@@ -62,7 +62,7 @@ int TokenCounter::count_message(const Message& msg) const {
  * @brief Count total tokens in a message list.
  * @param messages Messages to count.
  * @return Total estimated token count.
- * @internal
+ * @req REQ-COMPACT-001
  * @version 1.8.4
  */
 int TokenCounter::count_messages(
@@ -78,7 +78,7 @@ int TokenCounter::count_messages(
  * @brief Get usage as fraction of context window.
  * @param messages Messages to measure.
  * @return Usage fraction (0.0 if max_tokens is 0).
- * @internal
+ * @req REQ-COMPACT-001
  * @version 1.8.4
  */
 float TokenCounter::usage_percent(
@@ -118,7 +118,7 @@ CompactionManager::CompactionManager(
  * @param messages Message list (modified in place if compacted).
  * @param force Bypass threshold.
  * @return CompactionResult with before/after stats.
- * @internal
+ * @req REQ-COMPACT-001
  * @version 1.8.8
  */
 CompactionResult CompactionManager::check_and_compact(
@@ -230,7 +230,7 @@ static std::vector<Message> assemble_compacted(
  * @param summary Output: generated summary.
  * @param stripped_count Output: messages stripped.
  * @return Compacted message list.
- * @internal
+ * @req REQ-COMPACT-001
  * @version 2.3.7
  */
 std::vector<Message> CompactionManager::compact(
@@ -422,7 +422,7 @@ std::string CompactionManager::format_summary(
  *
  * @param messages Messages to compact.
  * @return CompactionResult with compacted messages and metadata.
- * @internal
+ * @req REQ-COMPACT-001
  * @version 1.9.9
  */
 CompactionResult CompactionManager::compact_messages(
@@ -509,7 +509,7 @@ static std::string serialize_messages_json(
  * @brief Save pre-compaction snapshot via storage interface.
  * @param conversation_id Conversation to snapshot.
  * @param messages Messages before compaction.
- * @internal
+ * @req REQ-COMPACT-001
  * @version 1.8.8
  */
 void CompactionManager::save_snapshot(

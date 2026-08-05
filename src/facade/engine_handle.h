@@ -166,7 +166,7 @@ namespace entropic {
  * Single-call refactor target — every facade entry point that used
  * `std::lock_guard lock(handle->api_mutex)` now uses this.
  *
- * @utility
+ * @req REQ-API-003
  * @version 2.3.1
  */
 class HandleApiLock {

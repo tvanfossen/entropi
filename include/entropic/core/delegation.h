@@ -162,6 +162,7 @@ public:
      * @param on_start    Pre-delegation gate (nullable).
      * @param on_complete Post-delegation result (nullable).
      * @param user_data   Forwarded to both callbacks.
+     * @req REQ-DELEG-002
      * @version 2.1.5
      */
     void set_delegation_callbacks(
@@ -176,6 +177,7 @@ public:
      * @param task Task description for the child.
      * @param max_turns Optional iteration limit for child loop.
      * @return DelegationResult with summary, success, and child messages.
+     * @req REQ-DELEG-002
      * @version 1.8.6
      */
     DelegationResult execute_delegation(
@@ -201,6 +203,7 @@ public:
      * @param seed_history  Pre-loaded conversation messages.
      * @param max_turns     Optional iteration limit.
      * @return DelegationResult.
+     * @req REQ-DELEG-002
      * @version 2.1.6
      */
     DelegationResult execute_resume_delegation(
@@ -217,6 +220,7 @@ public:
      * @param task Task description (shared across stages).
      * @param stage_log [out] Per-stage results appended in order.
      * @return DelegationResult from the final stage.
+     * @req REQ-DELEG-004
      * @version 2.10.0
      */
     DelegationResult execute_pipeline(
@@ -232,6 +236,7 @@ private:
      * @param info Resolved tier info.
      * @param task Task description.
      * @return Fresh child context.
+     * @req REQ-DELEG-002
      * @version 1.8.6
      */
     LoopContext build_child_context(
@@ -251,7 +256,7 @@ private:
      * @param task           New sub-task.
      * @param seed_history   Loaded history (consumed).
      * @return Resumed child context.
-     * @internal
+     * @req REQ-DELEG-002
      * @version 2.1.6
      */
     LoopContext build_resumed_child_context(
@@ -265,6 +270,7 @@ private:
      * @brief Extract the delegation summary from child context.
      * @param child_ctx Completed child context.
      * @return Summary text.
+     * @req REQ-DELEG-002
      * @version 1.8.6
      */
     std::string extract_summary(const LoopContext& child_ctx) const;
@@ -285,6 +291,7 @@ private:
      * @param depth         Parent depth + 1.
      * @param sb_info_out   [out] Sandbox info populated on success.
      * @return DelegationResult to early-return, or nullopt to proceed.
+     * @req REQ-DELEG-002
      * @version 2.1.6
      */
     std::optional<DelegationResult> check_delegation_preconditions(
@@ -302,6 +309,7 @@ private:
      * @param task Task description.
      * @param max_turns Optional turn limit.
      * @return DelegationResult.
+     * @req REQ-DELEG-002
      * @version 1.8.6
      */
     DelegationResult run_child(
@@ -316,7 +324,8 @@ private:
      * @param task Task text.
      * @param child_ctx Terminated child context (messages moved out).
      * @return DelegationResult with terminal_reason/success populated.
-     * @internal
+     * @req REQ-DELEG-002
+     * @req REQ-DELEG-003
      * @version 2.0.6-rc18
      */
     DelegationResult build_child_result(
@@ -356,6 +365,7 @@ private:
      * @param task Task description.
      * @param max_turns Turn limit.
      * @return Delegation ID (empty if no storage).
+     * @req REQ-DELEG-002
      * @version 1.8.8
      */
     std::string create_storage_record(
@@ -366,6 +376,7 @@ private:
      * @brief Complete delegation storage record.
      * @param delegation_id Delegation ID.
      * @param result Delegation result.
+     * @req REQ-DELEG-002
      * @version 1.8.8
      */
     void complete_storage_record(
@@ -402,7 +413,8 @@ private:
      * @param depth         Delegation depth.
      * @param is_pipeline   True if this is a pipeline stage.
      * @return Decision returned by the callback (or ACCEPT if null).
-     * @internal
+     * @req REQ-DELEG-002
+     * @req REQ-DELEG-004
      * @version 2.1.5
      */
     ent_decision_t fire_start_cb(
@@ -440,7 +452,7 @@ private:
      * @param res Filled result struct.
      * @param delegation_id For the warn log on throw.
      * @return The consumer's decision (REJECT on throw).
-     * @internal
+     * @req REQ-DELEG-002
      * @version 2.3.7
      */
     ent_decision_t invoke_complete_cb(const ent_delegation_result_t& res,
@@ -482,7 +494,7 @@ private:
      *                    stage's result on return.
      * @return false if the pipeline should stop (failure or unknown
      *         tier); true to continue to the next stage.
-     * @internal
+     * @req REQ-DELEG-004
      * @version 2.10.0
      */
     bool run_pipeline_stage(

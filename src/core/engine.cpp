@@ -46,7 +46,7 @@ static void fire_hook_info(const HookInterface& hooks,
  * @brief Build + fire the ON_LOOP_START info hook.
  * @param hooks Hook interface.
  * @param ctx Loop context.
- * @internal
+ * @req REQ-HOOK-002
  * @version 2.3.7
  */
 static void fire_loop_start_hook(const HookInterface& hooks,
@@ -62,7 +62,7 @@ static void fire_loop_start_hook(const HookInterface& hooks,
  * @brief Build + fire the ON_LOOP_END info hook.
  * @param hooks Hook interface.
  * @param ctx Loop context.
- * @internal
+ * @req REQ-HOOK-002
  * @version 2.3.7
  */
 static void fire_loop_end_hook(const HookInterface& hooks,
@@ -78,7 +78,7 @@ static void fire_loop_end_hook(const HookInterface& hooks,
  * @brief Build + fire the ON_LOOP_ITERATION info hook.
  * @param hooks Hook interface.
  * @param ctx Loop context.
- * @internal
+ * @req REQ-HOOK-002
  * @version 2.3.7
  */
 static void fire_loop_iteration_hook(const HookInterface& hooks,
@@ -95,7 +95,7 @@ static void fire_loop_iteration_hook(const HookInterface& hooks,
  * @brief Build + fire the ON_CONTEXT_ASSEMBLE info hook.
  * @param hooks Hook interface.
  * @param ctx Loop context.
- * @internal
+ * @req REQ-HOOK-002
  * @version 2.3.7
  */
 static void fire_context_assemble_hook(const HookInterface& hooks,
@@ -175,7 +175,7 @@ void AgentEngine::set_tool_executor(
 /**
  * @brief Set tier resolution interface for delegation.
  * @param tier_res Tier resolution callbacks.
- * @internal
+ * @req REQ-IDEN-001
  * @version 1.8.6
  */
 void AgentEngine::set_tier_resolution(
@@ -197,7 +197,7 @@ void AgentEngine::set_storage(const StorageInterface& storage) {
 /**
  * @brief Set the hook dispatch interface.
  * @param hooks Hook dispatch interface.
- * @internal
+ * @req REQ-HOOK-002
  * @version 1.9.1
  */
 void AgentEngine::set_hooks(const HookInterface& hooks) {
@@ -228,7 +228,7 @@ void AgentEngine::set_stream_observer(
  * @param on_start Pre-delegation gate (nullable).
  * @param on_complete Post-delegation result (nullable).
  * @param user_data Forwarded to both callbacks.
- * @internal
+ * @req REQ-DELEG-002
  * @version 2.1.6
  */
 void AgentEngine::set_delegation_callbacks(
@@ -244,7 +244,7 @@ void AgentEngine::set_delegation_callbacks(
 /**
  * @brief Atomically snapshot the registered delegation callbacks.
  * @return Copy of the current callback triple.
- * @internal
+ * @req REQ-DELEG-002
  * @version 2.1.5
  */
 AgentEngine::DelegationCallbacks
@@ -257,7 +257,7 @@ AgentEngine::delegation_callbacks_snapshot() const {
  * @brief Register validation JSON provider for ON_COMPLETE context.
  * @param provider JSON builder callback (nullable).
  * @param user_data Forwarded to provider.
- * @internal
+ * @req REQ-DELEG-003
  * @version 2.0.6-rc17
  */
 void AgentEngine::set_validation_provider(
@@ -269,7 +269,7 @@ void AgentEngine::set_validation_provider(
 /**
  * @brief Get the tier resolution interface.
  * @return Tier resolution interface.
- * @internal
+ * @req REQ-IDEN-001
  * @version 1.8.6
  */
 const TierResolutionInterface& AgentEngine::tier_resolution() const {
@@ -286,7 +286,7 @@ const TierResolutionInterface& AgentEngine::tier_resolution() const {
  * tier resolver is unset.
  *
  * @param ctx Loop context to update (effective_max_* fields).
- * @internal
+ * @req REQ-IDEN-001
  * @version 2.0.6-rc16
  */
 void AgentEngine::apply_identity_overrides(LoopContext& ctx) {
@@ -313,7 +313,8 @@ void AgentEngine::apply_identity_overrides(LoopContext& ctx) {
  * @brief Resolve effective max_iterations, honouring per-identity override.
  * @param ctx Loop context.
  * @return Per-identity override if set (>=0), otherwise LoopConfig default.
- * @internal
+ * @req REQ-IDEN-001
+ * @req REQ-LOOP-002
  * @version 2.0.6-rc16
  */
 int AgentEngine::resolve_max_iterations(const LoopContext& ctx) const {
@@ -326,7 +327,7 @@ int AgentEngine::resolve_max_iterations(const LoopContext& ctx) const {
  * @brief Resolve effective max_tool_calls_per_turn, honouring override.
  * @param ctx Loop context.
  * @return Per-identity override if set (>=0), otherwise LoopConfig default.
- * @internal
+ * @req REQ-IDEN-001
  * @version 2.0.6-rc16
  */
 int AgentEngine::resolve_max_tool_calls(const LoopContext& ctx) const {
@@ -339,7 +340,9 @@ int AgentEngine::resolve_max_tool_calls(const LoopContext& ctx) const {
  * @brief Run the engine loop on a pre-built context.
  * @param ctx Loop context to execute.
  * @param inherit_interrupt When true, do not reset the interrupt flag.
- * @internal
+ * @req REQ-LOOP-001
+ * @req REQ-LOOP-006
+ * @req REQ-COMPACT-002
  * @version 2.4.3
  */
 void AgentEngine::run_loop(LoopContext& ctx, bool inherit_interrupt) {
@@ -375,7 +378,9 @@ void AgentEngine::run_loop(LoopContext& ctx, bool inherit_interrupt) {
  * @param tier_override gh#99: if non-empty, lock the run to this tier
  *        (lock_tier_if_needed honors a pre-set locked_tier and skips routing).
  * @return Final messages.
- * @internal
+ * @req REQ-LOOP-001
+ * @req REQ-LOOP-002
+ * @req REQ-COMPACT-002
  * @version 2.8.0
  */
 std::vector<Message> AgentEngine::run(std::vector<Message> messages,
@@ -412,7 +417,7 @@ std::vector<Message> AgentEngine::run(std::vector<Message> messages,
 /**
  * @brief Create the root conversation row for a run (gh#48).
  * @param ctx Loop context.
- * @internal
+ * @req REQ-DELEG-002
  * @version 2.3.7
  */
 void AgentEngine::init_session_conversation(LoopContext& ctx) {
@@ -455,7 +460,8 @@ void AgentEngine::accumulate_run_metrics(LoopContext& ctx) {
 /**
  * @brief Main loop.
  * @param ctx Loop context.
- * @internal
+ * @req REQ-LOOP-002
+ * @req REQ-HOOK-002
  * @version 2.3.28
  */
 void AgentEngine::loop(LoopContext& ctx) {
@@ -502,7 +508,8 @@ void AgentEngine::loop(LoopContext& ctx) {
 /**
  * @brief Execute a single loop iteration.
  * @param ctx Loop context.
- * @internal
+ * @req REQ-LOOP-003
+ * @req REQ-HOOK-002
  * @version 2.3.7
  */
 void AgentEngine::execute_iteration(LoopContext& ctx) {
@@ -537,7 +544,7 @@ void AgentEngine::execute_iteration(LoopContext& ctx) {
  * @brief Turn a generation result into the next loop state.
  * @param ctx Loop context.
  * @param result Generation result.
- * @internal
+ * @req REQ-LOOP-003
  * @version 2.9.19
  */
 void AgentEngine::process_generation_result(LoopContext& ctx,
@@ -575,7 +582,7 @@ void AgentEngine::process_generation_result(LoopContext& ctx,
 
 /**
  * @brief Charge the thinking budget — see header. (gh#80, v2.5.0)
- * @internal
+ * @req REQ-LOOP-005
  * @version 2.5.0
  */
 void AgentEngine::charge_thinking_budget(
@@ -603,7 +610,9 @@ void AgentEngine::charge_thinking_budget(
 
 /**
  * @brief Accumulate + return budget units consumed this window. (gh#80)
- * @internal
+ * @return Running total of budget units consumed in the current window,
+ *         including this turn's contribution.
+ * @req REQ-LOOP-005
  * @version 2.5.0
  */
 int AgentEngine::budget_units_consumed(LoopContext& ctx, size_t content_len) {
@@ -626,7 +635,7 @@ int AgentEngine::budget_units_consumed(LoopContext& ctx, size_t content_len) {
 
 /**
  * @brief First-exhaustion nudge: push "emit completion now". (gh#80)
- * @internal
+ * @req REQ-LOOP-005
  * @version 2.5.0
  */
 void AgentEngine::nudge_budget_completion(LoopContext& ctx) {
@@ -648,7 +657,7 @@ void AgentEngine::nudge_budget_completion(LoopContext& ctx) {
 
 /**
  * @brief Second-exhaustion hard cut, failure visible in history. (gh#80)
- * @internal
+ * @req REQ-LOOP-005
  * @version 2.5.0
  */
 void AgentEngine::hard_cut_budget(LoopContext& ctx) {
@@ -676,7 +685,8 @@ void AgentEngine::hard_cut_budget(LoopContext& ctx) {
  *    action instead of running it.
  *
  * @param ctx Loop context.
- * @internal
+ * @req REQ-LOOP-003
+ * @req REQ-LOOP-006
  * @version 2.4.3
  */
 void AgentEngine::dispatch_pending_or_halt(LoopContext& ctx) {
@@ -712,7 +722,7 @@ void AgentEngine::dispatch_pending_or_halt(LoopContext& ctx) {
  * @param ctx Loop context.
  * @param content Response content.
  * @param finish_reason Finish reason from generation.
- * @internal
+ * @req REQ-LOOP-004
  * @version 2.0.6-rc16
  */
 void AgentEngine::evaluate_no_tool_decision(
@@ -741,7 +751,7 @@ void AgentEngine::evaluate_no_tool_decision(
  * @param ctx Loop context.
  * @param finish_reason Generation finish reason.
  * @return true if a terminal reason was handled (caller returns).
- * @utility
+ * @req REQ-LOOP-006
  * @version 2.0.6-rc16
  */
 bool AgentEngine::handle_terminal_finish_reasons(
@@ -765,7 +775,7 @@ bool AgentEngine::handle_terminal_finish_reasons(
  * @param ctx Loop context (metadata is mutated).
  * @param finish_reason Generation finish reason (for logging).
  * @return true if the failure was recorded and state transitioned.
- * @utility
+ * @req REQ-LOOP-004
  * @version 2.9.20
  */
 bool AgentEngine::record_explicit_completion_failure(
@@ -826,7 +836,7 @@ bool AgentEngine::record_explicit_completion_failure(
  *
  * @param tier Tier name.
  * @return true if the tier's explicit_completion flag is set.
- * @utility
+ * @req REQ-IDEN-001
  * @version 2.0.6-rc16.1
  */
 bool AgentEngine::tier_requires_explicit_completion(
@@ -847,7 +857,7 @@ bool AgentEngine::tier_requires_explicit_completion(
  * @param ctx Loop context.
  * @param target Pending delegation target tier name.
  * @return true if target would close a cycle.
- * @utility
+ * @req REQ-DELEG-001
  * @version 2.0.6-rc16
  */
 bool AgentEngine::is_delegation_cycle(
@@ -861,7 +871,9 @@ bool AgentEngine::is_delegation_cycle(
 
 /**
  * @brief gh#64: predicate for the consecutive-failure cap. See header.
- * @utility
+ * @return true when the target matches the last failed delegation target
+ *         and the consecutive-failure cap has been reached.
+ * @req REQ-DELEG-001
  * @version 2.3.0
  */
 bool AgentEngine::is_delegation_repeat_blocked(
@@ -873,7 +885,10 @@ bool AgentEngine::is_delegation_repeat_blocked(
 
 /**
  * @brief gh#68 fold logic — see header.
- * @utility
+ * @return true when the completion summary was folded into a trailing
+ *         empty assistant message; false when the tool result was not
+ *         entropic.complete or the turn was not foldable.
+ * @req REQ-LOOP-007
  * @version 2.3.7
  */
 bool AgentEngine::fold_complete_into_assistant(
@@ -908,7 +923,7 @@ int64_t AgentEngine::seconds_since_last_activity() const {
  * @brief Check if loop should stop.
  * @param ctx Loop context.
  * @return true if termination condition met.
- * @internal
+ * @req REQ-LOOP-002
  * @version 2.3.28
  */
 bool AgentEngine::should_stop(const LoopContext& ctx) const {
@@ -928,7 +943,7 @@ bool AgentEngine::should_stop(const LoopContext& ctx) const {
  *
  * @param ctx Loop context.
  * @return true if state is one of the three terminals.
- * @utility
+ * @req REQ-LOOP-001
  * @version 2.3.28
  */
 bool AgentEngine::is_terminal_state(const LoopContext& ctx) {
@@ -941,7 +956,8 @@ bool AgentEngine::is_terminal_state(const LoopContext& ctx) {
  * @brief Set agent state and fire callback.
  * @param ctx Loop context.
  * @param state New state.
- * @internal
+ * @req REQ-LOOP-001
+ * @req REQ-HOOK-002
  * @version 2.1.10
  */
 void AgentEngine::set_state(LoopContext& ctx, AgentState state) {
@@ -988,7 +1004,7 @@ void AgentEngine::set_state(LoopContext& ctx, AgentState state) {
  * on the 0→1 transition to avoid flooding the session log.
  * (P1-4, 2.0.6-rc16)
  *
- * @internal
+ * @req REQ-LOOP-006
  * @version 2.0.6-rc16.1
  */
 void AgentEngine::interrupt() {
@@ -1012,7 +1028,7 @@ void AgentEngine::interrupt() {
  *
  * @param cb Callback (nullable).
  * @param user_data Forwarded to cb.
- * @internal
+ * @req REQ-LOOP-006
  * @version 2.0.6-rc16
  */
 void AgentEngine::set_external_interrupt(void (*cb)(void*),
@@ -1023,7 +1039,7 @@ void AgentEngine::set_external_interrupt(void (*cb)(void*),
 
 /**
  * @brief Reset interrupt flag.
- * @internal
+ * @req REQ-LOOP-006
  * @version 1.8.4
  */
 void AgentEngine::reset_interrupt() {
@@ -1032,7 +1048,7 @@ void AgentEngine::reset_interrupt() {
 
 /**
  * @brief Pause generation.
- * @internal
+ * @req REQ-LOOP-006
  * @version 1.8.4
  */
 void AgentEngine::pause() {
@@ -1042,7 +1058,7 @@ void AgentEngine::pause() {
 
 /**
  * @brief Cancel pause and interrupt.
- * @internal
+ * @req REQ-LOOP-006
  * @version 1.8.4
  */
 void AgentEngine::cancel_pause() {
@@ -1055,7 +1071,7 @@ void AgentEngine::cancel_pause() {
  * @brief Get context usage.
  * @param messages Message list.
  * @return (tokens_used, max_tokens).
- * @internal
+ * @req REQ-COMPACT-001
  * @version 1.8.4
  */
 std::pair<int, int> AgentEngine::context_usage(
@@ -1067,7 +1083,7 @@ std::pair<int, int> AgentEngine::context_usage(
 /**
  * @brief Reinject all cached context anchors.
  * @param ctx Loop context.
- * @internal
+ * @req REQ-COMPACT-002
  * @version 1.8.4
  */
 void AgentEngine::reinject_context_anchors(LoopContext& ctx) {
@@ -1121,7 +1137,7 @@ void AgentEngine::dir_stop(
 
 /**
  * @brief Handle tier_change directive.
- * @internal
+ * @req REQ-IDEN-003
  * @version 1.8.4
  */
 void AgentEngine::dir_tier_change(
@@ -1134,7 +1150,7 @@ void AgentEngine::dir_tier_change(
 
 /**
  * @brief Handle delegate directive (store pending).
- * @internal
+ * @req REQ-DELEG-002
  * @version 2.1.6
  */
 void AgentEngine::dir_delegate(
@@ -1156,7 +1172,7 @@ void AgentEngine::dir_delegate(
 
 /**
  * @brief Handle pipeline directive (store pending).
- * @internal
+ * @req REQ-DELEG-004
  * @version 1.8.6
  */
 void AgentEngine::dir_pipeline(
@@ -1174,7 +1190,8 @@ void AgentEngine::dir_pipeline(
  * suggested_files into ctx.metadata so DelegationManager can hoist
  * them onto the typed DelegationResult that flows back to the parent.
  *
- * @internal
+ * @req REQ-HOOK-002
+ * @req REQ-DELEG-003
  * @version 2.1.4
  */
 void AgentEngine::dir_complete(
@@ -1244,7 +1261,7 @@ void AgentEngine::dir_inject(
 
 /**
  * @brief Handle prune_messages directive.
- * @internal
+ * @req REQ-COMPACT-002
  * @version 1.8.4
  */
 void AgentEngine::dir_prune(
@@ -1257,7 +1274,7 @@ void AgentEngine::dir_prune(
 
 /**
  * @brief Handle context_anchor directive.
- * @internal
+ * @req REQ-COMPACT-002
  * @version 1.8.4
  */
 void AgentEngine::dir_anchor(
@@ -1369,7 +1386,7 @@ static std::vector<ToolCall> decode_tool_calls_json(
  * @param raw_content Raw model output string.
  * @return Pair of (cleaned content, fully-parsed tool call vector), both
  *         guaranteed valid UTF-8 (gh#111 sanitize boundary).
- * @utility
+ * @req REQ-LOOP-003
  * @version 2.9.8
  */
 std::pair<std::string, std::vector<ToolCall>>
@@ -1421,7 +1438,7 @@ AgentEngine::parse_tool_calls(const std::string& raw_content) {
 
 /**
  * @brief gh#88 de-fang logic — see header.
- * @utility
+ * @req REQ-LOOP-007
  * @version 2.7.1
  */
 void AgentEngine::defang_meta_action_envelope(Message& msg) const {
@@ -1442,7 +1459,8 @@ void AgentEngine::defang_meta_action_envelope(Message& msg) const {
  * @param ctx Loop context.
  * @param tool_calls Parsed tool calls.
  * @return True if any tool genuinely executed (gh#84, v2.5.1).
- * @internal
+ * @req REQ-LOOP-003
+ * @req REQ-LOOP-007
  * @version 2.7.1
  */
 bool AgentEngine::process_tool_results(
@@ -1489,7 +1507,7 @@ bool AgentEngine::process_tool_results(
  * @brief Remove messages with a specific anchor key.
  * @param ctx Loop context.
  * @param key Anchor key to remove.
- * @internal
+ * @req REQ-COMPACT-002
  * @version 1.8.4
  */
 static void remove_anchor_messages(LoopContext& ctx,
@@ -1511,7 +1529,8 @@ static void remove_anchor_messages(LoopContext& ctx,
  * @param point Hook point.
  * @param iteration Current iteration.
  * @return true if cancelled.
- * @internal
+ * @req REQ-HOOK-002
+ * @req REQ-LOOP-003
  * @version 1.9.1
  */
 bool AgentEngine::fire_pre_hook(
@@ -1745,7 +1764,7 @@ static std::string extract_system_prompt(
  * @param result Generation result (mutable — hook may revise content).
  * @param tier Active tier name at the time of generation.
  * @param messages Current conversation messages.
- * @internal
+ * @req REQ-HOOK-002
  * @version 2.9.7
  */
 void AgentEngine::fire_post_generate_hook(
@@ -1805,7 +1824,8 @@ void AgentEngine::fire_post_generate_hook(
  */
 /**
  * @brief Per-iteration post-generate bookkeeping bundle.
- * @internal
+ * @req REQ-HOOK-002
+ * @req REQ-LOOP-003
  * @version 2.1.1-rc1
  */
 void AgentEngine::dispatch_post_generate(
@@ -1824,7 +1844,7 @@ void AgentEngine::dispatch_post_generate(
 
 /**
  * @brief Stash next-turn rejection text on ctx.pending_validation_feedback.
- * @internal
+ * @req REQ-LOOP-007
  * @version 2.1.1-rc1
  */
 void AgentEngine::capture_validation_feedback(LoopContext& ctx) {
@@ -1900,7 +1920,7 @@ static std::string build_tool_results_json(
  * @param summary The entropic.complete summary text.
  * @param ctx Loop context with tool results in messages.
  * @return true if hook cancelled (completion rejected).
- * @internal
+ * @req REQ-HOOK-002
  * @version 2.9.7
  */
 bool AgentEngine::fire_complete_hook(
@@ -1951,7 +1971,8 @@ bool AgentEngine::fire_complete_hook(
  * @param pending Delegation info.
  * @param depth Delegation depth.
  * @return true if cancelled.
- * @internal
+ * @req REQ-HOOK-002
+ * @req REQ-DELEG-002
  * @version 1.9.1
  */
 bool AgentEngine::fire_delegate_pre_hook(
@@ -2014,7 +2035,7 @@ std::string entropic::detail::build_delegate_complete_json(
  * @param target Target tier.
  * @param success Whether delegation succeeded.
  * @param summary Child-loop-produced summary or terminal_reason (verbatim).
- * @internal
+ * @req REQ-HOOK-002
  * @version 2.9.9.1
  */
 void AgentEngine::fire_delegate_complete_hook(
@@ -2050,7 +2071,7 @@ static void run_child_loop_trampoline(LoopContext& ctx, void* user_data) {
 /**
  * @brief Append a delegation rejection message to the loop context.
  * @param ctx Loop context.
- * @internal
+ * @req REQ-DELEG-001
  * @version 2.0.2
  */
 static void push_delegation_rejected(LoopContext& ctx) {
@@ -2070,7 +2091,7 @@ static void push_delegation_rejected(LoopContext& ctx) {
  *
  * @param ctx Loop context.
  * @param target Target tier that would have closed the cycle.
- * @internal
+ * @req REQ-DELEG-001
  * @version 2.0.6-rc16
  */
 static void push_delegation_cycle_rejected(
@@ -2097,7 +2118,7 @@ static void push_delegation_cycle_rejected(
  * @param ctx Loop context.
  * @param target Target tier name.
  * @param result Delegation result.
- * @internal
+ * @req REQ-DELEG-002
  * @version 2.0.2
  */
 static void push_delegation_result(LoopContext& ctx,
@@ -2117,7 +2138,7 @@ static void push_delegation_result(LoopContext& ctx,
  * The lead is told concretely what to do next: respond to the user
  * or try a different target.
  *
- * @internal
+ * @req REQ-DELEG-001
  * @version 2.3.0
  */
 static void push_delegation_repeat_blocked(
@@ -2139,7 +2160,7 @@ static void push_delegation_repeat_blocked(
  * @param ctx Loop context.
  * @param pending The delegation about to run.
  * @return true if rejected (rejection message already pushed).
- * @internal
+ * @req REQ-DELEG-001
  * @version 2.3.7
  */
 bool AgentEngine::reject_delegation_if_guarded(
@@ -2181,7 +2202,8 @@ bool AgentEngine::reject_delegation_if_guarded(
  * rejection the state is always EXECUTING.
  *
  * @param ctx Loop context with pending delegation.
- * @utility
+ * @req REQ-DELEG-002
+ * @req REQ-LOOP-003
  * @version 2.1.6-gh32
  */
 void AgentEngine::execute_pending_delegation(LoopContext& ctx) {
@@ -2245,7 +2267,7 @@ void AgentEngine::execute_pending_delegation(LoopContext& ctx) {
  *
  * @param ctx Loop context.
  * @param summary Content to relay.
- * @internal
+ * @req REQ-DELEG-003
  * @version 2.1.1-rc1
  */
 void AgentEngine::relay_partial_result(
@@ -2263,7 +2285,8 @@ void AgentEngine::relay_partial_result(
 /**
  * @brief Build the [COVERAGE GAP] message body that goes back to lead
  *        when a relay-tier child returns coverage_gap=true (#10, v2.1.4).
- * @internal
+ * @return The [COVERAGE GAP] message body to hand back to the lead tier.
+ * @req REQ-DELEG-003
  * @version 2.1.4
  */
 static std::string build_coverage_gap_message(
@@ -2293,7 +2316,7 @@ static std::string build_coverage_gap_message(
  *
  * @param ctx Loop context (messages mutated in-place).
  * @param summary Child delegation summary text.
- * @internal
+ * @req REQ-LOOP-007
  * @version 2.9.17
  */
 static void fold_delegation_summary(
@@ -2324,7 +2347,7 @@ static void fold_delegation_summary(
  *
  * @param ctx Loop context.
  * @param result Delegation result from DelegationManager.
- * @utility
+ * @req REQ-DELEG-003
  * @version 2.9.17
  */
 void AgentEngine::finalize_delegation_result(
@@ -2378,7 +2401,7 @@ void AgentEngine::finalize_delegation_result(
  *
  * @param ctx Loop context (metadata mutated).
  * @param terminal_reason Non-empty when relaying a budget_exhausted child.
- * @internal
+ * @req REQ-DELEG-003
  * @version 2.1.1-rc1
  */
 void AgentEngine::log_relay_status(LoopContext& ctx,
@@ -2423,7 +2446,8 @@ void AgentEngine::log_relay_status(LoopContext& ctx,
 /**
  * @brief Execute a pending pipeline after tool processing.
  * @param ctx Loop context with pending_pipeline set.
- * @internal
+ * @req REQ-DELEG-004
+ * @req REQ-DELEG-001
  * @version 2.10.0
  */
 void AgentEngine::execute_pending_pipeline(LoopContext& ctx) {
@@ -2482,7 +2506,7 @@ void AgentEngine::execute_pending_pipeline(LoopContext& ctx) {
  * @param ctx Loop context.
  * @param tier Target tier.
  * @param task Task description.
- * @internal
+ * @req REQ-DELEG-002
  * @version 1.8.6
  */
 void AgentEngine::fire_delegation_start(
@@ -2501,7 +2525,7 @@ void AgentEngine::fire_delegation_start(
  * @param ctx Loop context.
  * @param tier Target tier.
  * @param result Delegation result.
- * @internal
+ * @req REQ-DELEG-002
  * @version 1.8.6
  */
 void AgentEngine::fire_delegation_complete(
@@ -2524,7 +2548,7 @@ void AgentEngine::fire_delegation_complete(
  * @param finish_reason Generation finish reason.
  * @param content Response content.
  * @return true if auto-chain conditions met.
- * @internal
+ * @req REQ-IDEN-003
  * @version 1.8.6
  */
 bool AgentEngine::should_auto_chain(
@@ -2553,7 +2577,7 @@ bool AgentEngine::should_auto_chain(
  * @param finish_reason Generation finish reason.
  * @param content Response content.
  * @return true if auto-chain was triggered.
- * @internal
+ * @req REQ-IDEN-003
  * @version 1.8.6
  */
 bool AgentEngine::try_auto_chain(
@@ -2654,7 +2678,7 @@ void AgentEngine::set_project_dir(const std::filesystem::path& project_dir) {
  */
 /**
  * @brief Build a typed failure message for resume_delegation errors.
- * @internal
+ * @req REQ-DELEG-002
  * @version 2.1.6
  */
 static void push_resume_failure(
@@ -2678,7 +2702,7 @@ static void push_resume_failure(
  * @param id           Delegation id.
  * @param[out] parsed  JSON payload on success.
  * @return true on success, false (and pushes failure to ctx) otherwise.
- * @internal
+ * @req REQ-DELEG-002
  * @version 2.1.6
  */
 bool AgentEngine::fetch_resume_payload(
@@ -2708,7 +2732,10 @@ bool AgentEngine::fetch_resume_payload(
 
 /**
  * @brief Resolve a resume_delegation request via storage (gh#32, v2.1.6).
- * @internal
+ * @return true when the stored payload yielded a target tier and seed
+ *         history; false on failure, with the reason already pushed
+ *         into ctx by push_resume_failure.
+ * @req REQ-DELEG-002
  * @version 2.1.6
  */
 bool AgentEngine::resolve_resume_delegation(
@@ -2752,7 +2779,7 @@ bool AgentEngine::resolve_resume_delegation(
  * @param pending         Pending delegation request.
  * @param resume_history  Pre-loaded history (empty for cold delegations).
  * @return DelegationResult from the child loop.
- * @internal
+ * @req REQ-DELEG-002
  * @version 2.1.6
  */
 DelegationResult AgentEngine::run_pending_delegation(
@@ -2781,7 +2808,9 @@ DelegationResult AgentEngine::run_pending_delegation(
 
 /**
  * @brief Lazy accessor for the engine-scoped SandboxManager (gh#33, v2.1.6).
- * @internal
+ * @return The engine-scoped SandboxManager, constructed on first use;
+ *         nullptr when no repo dir is configured.
+ * @req REQ-DELEG-002
  * @version 2.1.6
  */
 SandboxManager* AgentEngine::ensure_sandbox_manager() {
@@ -2828,7 +2857,7 @@ void AgentEngine::set_session_logger(SessionLogger* log) {
  *
  * @param input User input string.
  * @return Result messages from engine.
- * @internal
+ * @req REQ-LOOP-001
  * @version 2.8.0
  */
 std::vector<Message> AgentEngine::run_turn(const std::string& input) {
@@ -2862,7 +2891,7 @@ std::vector<Message> AgentEngine::run_turn(const std::string& input) {
  * @param tier Tier to lock this call to.
  * @param input User input string.
  * @return Result messages.
- * @internal
+ * @req REQ-IDEN-001
  * @version 2.8.0
  */
 std::vector<Message> AgentEngine::run_turn_as(const std::string& tier,
@@ -2883,7 +2912,7 @@ std::vector<Message> AgentEngine::run_turn_as(const std::string& tier,
  * re-seeded mid-session when a later run_turn_as names a different tier (the
  * grammar/samplers still switch; only the prompt persists). See run_turn_as.
  * @param tier Tier whose system prompt to seed.
- * @internal
+ * @req REQ-IDEN-001
  * @version 2.8.0
  */
 void AgentEngine::seed_system_prompt_for_tier(const std::string& tier) {
@@ -2990,7 +3019,7 @@ bool AgentEngine::prepare_next_turn(std::vector<Message>& pending) {
  * @brief Run a stateful turn, draining any queued user messages (gh#40).
  * @param new_messages Messages to add this turn.
  * @return Full result messages from the engine loop.
- * @internal
+ * @req REQ-LOOP-001
  * @version 2.3.7
  */
 std::vector<Message> AgentEngine::run_turn(std::vector<Message> new_messages) {
@@ -3024,7 +3053,8 @@ std::vector<Message> AgentEngine::run_turn(std::vector<Message> new_messages) {
  * @param user_data Consumer context.
  * @param cancel_flag Polled per-token, nullable.
  * @return 0=OK, 1=cancelled, 2=error.
- * @internal
+ * @req REQ-LOOP-001
+ * @req REQ-LOOP-008
  * @version 2.0.2
  */
 int AgentEngine::run_streaming(
@@ -3103,7 +3133,8 @@ static std::string concat_user_echo(
  * @param user_data Consumer context.
  * @param cancel_flag Per-token cancel poll, nullable.
  * @return 0=OK, 1=cancelled, 2=error.
- * @internal
+ * @req REQ-LOOP-001
+ * @req REQ-LOOP-008
  * @version 2.1.8
  */
 int AgentEngine::run_streaming(
@@ -3286,7 +3317,7 @@ void AgentEngine::set_queue_observer(
  * persistent slot. The legacy `EngineCallbacks::on_state_change`
  * remains supported in parallel for in-tree callers (tests etc.).
  *
- * @internal
+ * @req REQ-LOOP-001
  * @version 2.1.10
  */
 void AgentEngine::set_state_observer(
@@ -3324,7 +3355,7 @@ ToolExecutorHooks AgentEngine::build_directive_hooks() {
  * @brief Store pre-resolved tier context info.
  * @param name Tier name.
  * @param info Context info.
- * @internal
+ * @req REQ-IDEN-001
  * @version 2.0.2
  */
 void AgentEngine::set_tier_info(
@@ -3338,7 +3369,7 @@ void AgentEngine::set_tier_info(
  * @brief Whether a tier name is known (gh#99).
  * @param name Tier name.
  * @return true if the tier has resolved context info.
- * @internal
+ * @req REQ-IDEN-001
  * @version 2.8.0
  */
 bool AgentEngine::has_tier(const std::string& name) const {
@@ -3349,7 +3380,8 @@ bool AgentEngine::has_tier(const std::string& name) const {
  * @brief Return allowed tool names for a tier (gh#121 regression test hook).
  * @param name Tier name.
  * @return Allowed tools, empty when tier unknown or no filter registered.
- * @internal
+ * @req REQ-IDEN-001
+ * @req REQ-LOOP-004
  * @version 2.9.19
  */
 std::vector<std::string> AgentEngine::get_tier_allowed_tools(
@@ -3363,7 +3395,7 @@ std::vector<std::string> AgentEngine::get_tier_allowed_tools(
  * @brief A tier's resolved system prompt (gh#98).
  * @param name Tier name.
  * @return The tier's system prompt, or "" if unknown.
- * @internal
+ * @req REQ-IDEN-001
  * @version 2.8.0
  */
 const std::string& AgentEngine::tier_system_prompt(
@@ -3376,7 +3408,7 @@ const std::string& AgentEngine::tier_system_prompt(
 /**
  * @brief Mark a tier as relay-on-single-delegate.
  * @param name Tier name.
- * @internal
+ * @req REQ-DELEG-003
  * @version 2.0.11
  */
 void AgentEngine::set_relay_single_delegate(const std::string& name) {
@@ -3386,7 +3418,8 @@ void AgentEngine::set_relay_single_delegate(const std::string& name) {
 /**
  * @brief Store handoff rules.
  * @param rules Source tier → valid targets.
- * @internal
+ * @req REQ-IDEN-003
+ * @req REQ-IDEN-001
  * @version 2.0.2
  */
 void AgentEngine::set_handoff_rules(
@@ -3399,7 +3432,9 @@ void AgentEngine::set_handoff_rules(
 
 /**
  * @brief Wire internal TierResolutionInterface from stored data.
- * @internal
+ * @return ChildContextInfo for the named tier, resolved from the
+ *         engine's stored tier data; info.valid is false when unknown.
+ * @req REQ-IDEN-001
  * @version 2.0.2
  */
 ChildContextInfo AgentEngine::tri_resolve_tier(
@@ -3420,7 +3455,7 @@ ChildContextInfo AgentEngine::tri_resolve_tier(
  * @param name Tier name.
  * @param ud AgentEngine pointer.
  * @return true if tier exists.
- * @utility
+ * @req REQ-IDEN-001
  * @version 2.0.2
  */
 bool AgentEngine::tri_tier_exists(const std::string& name, void* ud) {
@@ -3433,7 +3468,8 @@ bool AgentEngine::tri_tier_exists(const std::string& name, void* ud) {
  * @param name Source tier name.
  * @param ud AgentEngine pointer.
  * @return List of target tier names.
- * @utility
+ * @req REQ-IDEN-001
+ * @req REQ-IDEN-003
  * @version 2.0.2
  */
 std::vector<std::string> AgentEngine::tri_get_handoff_targets(
@@ -3482,7 +3518,7 @@ static std::string join_csv(const std::vector<std::string>& v) {
  * @param param Parameter key.
  * @param ud Untyped AgentEngine* pointer.
  * @return String value, empty if tier or param unknown.
- * @internal
+ * @req REQ-IDEN-001
  * @version 2.9.20
  */
 std::string AgentEngine::tri_get_tier_param(const std::string& name,
@@ -3514,7 +3550,7 @@ std::string AgentEngine::tri_get_tier_param(const std::string& name,
 
 /**
  * @brief Wire internal tier resolution callbacks into the delegation manager.
- * @utility
+ * @req REQ-IDEN-001
  * @version 2.0.2
  */
 void AgentEngine::wire_internal_tier_resolution() {

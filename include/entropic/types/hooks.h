@@ -29,6 +29,11 @@ extern "C" {
  *
  * New values are appended only — no renumbering (ABI stable).
  *
+ * The trailing ENTROPIC_HOOK_COUNT_ sentinel is NOT a valid hook point:
+ * it bounds registry validation and pins the declared cardinality.
+ *
+ * @req REQ-TYPE-002
+ * @req REQ-TYPE-004
  * @version 2.0.6-rc16
  */
 typedef enum {

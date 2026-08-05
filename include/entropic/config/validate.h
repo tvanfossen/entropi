@@ -27,6 +27,7 @@ namespace entropic::config {
  *
  * @param config Model config to validate.
  * @return Empty string on success, error message on failure.
+ * @req REQ-CFG-006
  * @version 1.8.1
  */
 ENTROPIC_EXPORT std::string validate(const ModelConfig& config);
@@ -38,6 +39,7 @@ ENTROPIC_EXPORT std::string validate(const ModelConfig& config);
  *
  * @param config Models config to validate.
  * @return Empty string on success, error message on failure.
+ * @req REQ-CFG-006
  * @version 1.8.1
  */
 ENTROPIC_EXPORT std::string validate(const ModelsConfig& config);
@@ -51,6 +53,7 @@ ENTROPIC_EXPORT std::string validate(const ModelsConfig& config);
  *
  * @param config Compaction config to validate.
  * @return Empty string on success, error message on failure.
+ * @req REQ-CFG-006
  * @version 1.8.1
  */
 ENTROPIC_EXPORT std::string validate(const CompactionConfig& config);
@@ -64,6 +67,7 @@ ENTROPIC_EXPORT std::string validate(const CompactionConfig& config);
  * @param routing Routing config.
  * @param models Models config (provides tier names).
  * @return Empty string on success, error message on failure.
+ * @req REQ-CFG-006
  * @version 1.8.1
  */
 ENTROPIC_EXPORT std::string validate_routing(
@@ -77,6 +81,7 @@ ENTROPIC_EXPORT std::string validate_routing(
  *
  * @param config Prompt cache config to validate.
  * @return Empty string on success, error message on failure.
+ * @req REQ-CFG-006
  * @version 1.8.3
  */
 ENTROPIC_EXPORT std::string validate(const PromptCacheConfig& config);
@@ -89,6 +94,7 @@ ENTROPIC_EXPORT std::string validate(const PromptCacheConfig& config);
  * @param config Full config to validate.
  * @param[out] warnings Non-fatal warnings (e.g., auto_chain without targets).
  * @return Empty string on success, error message on failure.
+ * @req REQ-CFG-006
  * @version 1.8.1
  */
 ENTROPIC_EXPORT std::string validate_config(
@@ -99,6 +105,7 @@ ENTROPIC_EXPORT std::string validate_config(
  * @brief Validate allowed_tools entries use "server.tool" format.
  * @param tools Tool name list to validate.
  * @return Empty string on success, error message on failure.
+ * @req REQ-CFG-006
  * @version 1.8.1
  */
 ENTROPIC_EXPORT std::string validate_allowed_tools(
@@ -109,6 +116,7 @@ ENTROPIC_EXPORT std::string validate_allowed_tools(
  * @param fallback Fallback tier name.
  * @param tiers Defined tiers.
  * @return Empty string on success, error message on failure.
+ * @req REQ-CFG-006
  * @version 1.8.1
  */
 ENTROPIC_EXPORT std::string validate_fallback_tier(
@@ -120,6 +128,7 @@ ENTROPIC_EXPORT std::string validate_fallback_tier(
  * @param tier_map Classification to tier mapping.
  * @param tiers Defined tiers.
  * @return Empty string on success, error message on failure.
+ * @req REQ-CFG-006
  * @version 1.8.1
  */
 ENTROPIC_EXPORT std::string validate_tier_map(
@@ -131,6 +140,7 @@ ENTROPIC_EXPORT std::string validate_tier_map(
  * @param rules Handoff rules.
  * @param tiers Defined tiers.
  * @return Empty string on success, error message on failure.
+ * @req REQ-CFG-006
  * @version 1.8.1
  */
 ENTROPIC_EXPORT std::string validate_handoff_rules(
@@ -142,6 +152,7 @@ ENTROPIC_EXPORT std::string validate_handoff_rules(
  * @param tiers Tier configs.
  * @param handoff_rules Handoff rules from routing config.
  * @return Warning message (empty if no issues).
+ * @req REQ-CFG-006
  * @version 1.8.1
  */
 ENTROPIC_EXPORT std::string warn_auto_chain_without_targets(

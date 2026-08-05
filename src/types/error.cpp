@@ -79,8 +79,8 @@ static constexpr int s_error_count =
  * @brief Get the human-readable name for an error code.
  * @param code Error code to look up.
  * @return Static string naming the error code. Never NULL.
+ * @req REQ-TYPE-003
  * @version 1.8.0
- * @utility
  */
 extern "C" const char* entropic_error_name(entropic_error_t code) {
     int idx = static_cast<int>(code);

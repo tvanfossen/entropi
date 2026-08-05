@@ -15,7 +15,7 @@ namespace entropic {
  * @brief Convert MCPAccessLevel to string representation.
  * @param level Access level.
  * @return Static string: "NONE", "READ", or "WRITE".
- * @utility
+ * @req REQ-TYPE-003
  * @version 1.9.4
  */
 const char* mcp_access_level_name(MCPAccessLevel level) {
@@ -29,7 +29,7 @@ const char* mcp_access_level_name(MCPAccessLevel level) {
  * @param name String: "NONE", "READ", or "WRITE" (case-sensitive).
  * @param out Parsed access level.
  * @return true if parsed successfully.
- * @utility
+ * @req REQ-TYPE-003
  * @version 1.9.4
  */
 bool parse_mcp_access_level(const std::string& name,

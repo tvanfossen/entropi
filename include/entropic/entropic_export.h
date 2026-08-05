@@ -10,6 +10,7 @@
  *
  * All other symbols are hidden by default (CMAKE_CXX_VISIBILITY_PRESET=hidden).
  *
+ * @req REQ-ABI-001
  * @version 1.8.0
  */
 

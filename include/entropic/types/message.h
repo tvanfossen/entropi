@@ -30,6 +30,7 @@ namespace entropic {
  * the extracted text (for backward compatibility with code that reads
  * content directly).
  *
+ * @req REQ-TYPE-006
  * @version 1.9.11
  */
 struct Message {
