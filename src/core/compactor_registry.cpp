@@ -482,7 +482,7 @@ CompactorRegistry::CompactorRegistry(
  * @param compactor C function pointer.
  * @param user_data Opaque pointer.
  * @return ENTROPIC_OK or ENTROPIC_ERROR_INVALID_CONFIG.
- * @internal
+ * @req REQ-COMPACT-001
  * @version 1.9.9
  */
 entropic_error_t CompactorRegistry::register_compactor(
@@ -511,7 +511,7 @@ entropic_error_t CompactorRegistry::register_compactor(
  * @brief Deregister a compactor for a specific identity.
  * @param identity Identity name ("" for global).
  * @return ENTROPIC_OK (idempotent).
- * @internal
+ * @req REQ-COMPACT-001
  * @version 1.9.9
  */
 entropic_error_t CompactorRegistry::deregister_compactor(
@@ -530,7 +530,7 @@ entropic_error_t CompactorRegistry::deregister_compactor(
  * @param messages Messages to compact.
  * @param config Compaction configuration.
  * @return CompactionResult with metadata.
- * @internal
+ * @req REQ-COMPACT-001
  * @version 1.9.9
  */
 CompactionResult CompactorRegistry::compact(
@@ -571,7 +571,7 @@ CompactionResult CompactorRegistry::compact(
  * @param messages Messages to compact.
  * @param config Compaction configuration.
  * @return CompactionResult from default strategy.
- * @internal
+ * @req REQ-COMPACT-001
  * @version 1.9.9
  */
 CompactionResult CompactorRegistry::run_default(
@@ -593,7 +593,7 @@ CompactionResult CompactorRegistry::run_default(
  * @param messages Messages to compact.
  * @param config Compaction configuration.
  * @return CompactionResult from custom or fallback default.
- * @internal
+ * @req REQ-COMPACT-001
  * @version 1.9.9
  */
 CompactionResult CompactorRegistry::run_custom(
@@ -620,7 +620,7 @@ CompactionResult CompactorRegistry::run_custom(
  * @brief Check if a custom compactor is registered for an identity.
  * @param identity Identity name.
  * @return true if per-identity or global custom registered.
- * @internal
+ * @req REQ-COMPACT-001
  * @version 1.9.9
  */
 bool CompactorRegistry::has_custom_compactor(

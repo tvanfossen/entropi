@@ -75,7 +75,9 @@ static std::optional<GrammarEntry> build_grammar_entry(
 
 /**
  * @brief Load all bundled .gbnf grammars from a directory.
- * @internal
+ * @param dir Directory to scan.
+ * @return Number of grammars loaded; each file's stem becomes its key.
+ * @req REQ-INFER-007
  * @version 2.3.7
  */
 size_t GrammarRegistry::load_bundled(
@@ -111,8 +113,10 @@ size_t GrammarRegistry::load_bundled(
  * @param key Unique grammar name.
  * @param gbnf_content Raw GBNF grammar string.
  * @param source Origin tag.
- * @return true on success. false if key already exists.
- * @internal
+ * @return true on success; false when the key is already registered.
+ *         An invalid GBNF is still registered, flagged via
+ *         GrammarEntry::validated/error rather than silently dropped.
+ * @req REQ-INFER-007
  * @version 1.9.3
  */
 bool GrammarRegistry::register_grammar(
@@ -144,8 +148,9 @@ bool GrammarRegistry::register_grammar(
  * @brief Register a grammar from a file path.
  * @param key Unique grammar name (if empty, uses filename stem).
  * @param path Path to .gbnf file.
- * @return true on success. false if file unreadable or key exists.
- * @internal
+ * @return true on success; false when the file is unreadable or the key
+ *         is already registered. An empty key takes the file stem.
+ * @req REQ-INFER-007
  * @version 1.9.3
  */
 bool GrammarRegistry::register_from_file(
@@ -249,8 +254,10 @@ std::vector<GrammarEntry> GrammarRegistry::list() const {
 /**
  * @brief Validate a GBNF grammar string.
  * @param gbnf_content Raw GBNF string to validate.
- * @return Empty string on success, error description on failure.
- * @internal
+ * @return Empty string on success; an error description otherwise.
+ *         Validation runs through a throwaway llama sampler, so a
+ *         malformed grammar is caught at registration, not at decode.
+ * @req REQ-INFER-007
  * @version 1.9.3
  */
 std::string GrammarRegistry::validate(const std::string& gbnf_content) {

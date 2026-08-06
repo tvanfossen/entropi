@@ -23,6 +23,8 @@ extern "C" {
  *   ^               |                     |
  *   └──unload()─────┘<──deactivate()──────┘
  * @endcode
+ *
+ * @req REQ-TYPE-002
  */
 typedef enum {
     ENTROPIC_MODEL_STATE_COLD = 0, ///< On disk only, no RAM consumed
@@ -32,6 +34,8 @@ typedef enum {
 
 /**
  * @brief Agent execution states.
+ *
+ * @req REQ-TYPE-002
  */
 typedef enum {
     ENTROPIC_AGENT_STATE_IDLE = 0,     ///< No active generation
@@ -48,6 +52,7 @@ typedef enum {
 
 /**
  * @brief Directive types emitted by MCP tool results.
+ * @req REQ-TYPE-002
  * @version 1.8.4
  */
 typedef enum {
@@ -66,6 +71,8 @@ typedef enum {
 
 /**
  * @brief Compute backend types.
+ *
+ * @req REQ-TYPE-002
  */
 typedef enum {
     ENTROPIC_BACKEND_CPU = 0,   ///< CPU-only inference

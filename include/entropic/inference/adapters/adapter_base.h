@@ -154,8 +154,14 @@ public:
      * Default is the `<think>` pair used by Qwen and Nemotron. Override in a
      * family that wraps reasoning differently — Gemma-4 QAT does.
      *
-     * @return Marker pair.
-     * @utility
+     * The single declaration point per family: both consumers read it — the
+     * buffered strip (strip_think_blocks) and the live StreamThinkFilter
+     * that wraps on_token in generate_streaming. Before v2.10.3 these were
+     * two independent hardcoded literals and gemma4 matched neither.
+     *
+     * @return Marker pair; empty for a family that declares none, which
+     *         makes both consumers no-ops.
+     * @req REQ-INFER-011
      * @version 2.10.3
      */
     virtual ThinkMarkers thinking_markers() const { return {}; }

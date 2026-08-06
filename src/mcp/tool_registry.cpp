@@ -17,8 +17,16 @@ namespace entropic {
 
 /**
  * @brief Register a tool instance.
- * @param tool Non-owning pointer to a ToolBase.
- * @internal
+ *
+ * Defensive by design: registration runs inside server constructors,
+ * where a failed load_tool_definition or a copy-paste name collision
+ * would otherwise surface as a crash at the model's first tool call.
+ * A nullptr is a logged no-op (never a stored null entry) and a
+ * duplicate name logs a warning before replacing the entry.
+ *
+ * @param tool Non-owning pointer to a ToolBase; the server retains
+ *             ownership. NULL is tolerated and logged.
+ * @req REQ-MCP-003
  * @version 1.8.5
  */
 void ToolRegistry::register_tool(ToolBase* tool) {
@@ -36,9 +44,10 @@ void ToolRegistry::register_tool(ToolBase* tool) {
 
 /**
  * @brief Check if a tool is registered by name.
- * @param name Tool name.
- * @return true if registered.
- * @internal
+ * @param name Tool name (without server prefix).
+ * @return true when a tool of that name is registered, false for any
+ *         unknown name.
+ * @req REQ-MCP-003
  * @version 1.8.5
  */
 bool ToolRegistry::has_tool(const std::string& name) const {
@@ -47,8 +56,15 @@ bool ToolRegistry::has_tool(const std::string& name) const {
 
 /**
  * @brief Get all registered tool definitions as JSON array.
- * @return JSON array string.
- * @internal
+ *
+ * Emits `inputSchema` (camelCase), matching both the bundled
+ * data/tools/&#42;/&#42;.json descriptors and the plugin C ABI, so the
+ * schema lookup path is uniform across server kinds.
+ *
+ * @return JSON array string with one `{name, description, inputSchema}`
+ *         object per registered tool; "[]" for an empty registry.
+ * @req REQ-MCP-003
+ * @req REQ-MCP-008
  * @version 1.8.5
  */
 std::string ToolRegistry::get_tools_json() const {
@@ -66,8 +82,10 @@ std::string ToolRegistry::get_tools_json() const {
 
 /**
  * @brief Get all registered tool definitions.
- * @return Vector of ToolDefinition pointers.
- * @internal
+ * @return Exactly one non-owning ToolDefinition pointer per registered
+ *         tool; an empty vector for an empty registry. Pointers stay
+ *         valid for as long as the owning server holds its tools.
+ * @req REQ-MCP-003
  * @version 1.8.5
  */
 std::vector<const ToolDefinition*> ToolRegistry::get_definitions() const {
@@ -81,10 +99,17 @@ std::vector<const ToolDefinition*> ToolRegistry::get_definitions() const {
 
 /**
  * @brief Dispatch a tool call to the registered tool.
- * @param name Tool name.
+ *
+ * An unregistered name is answered with an error ServerResponse — the
+ * missing tool is never dereferenced.
+ *
+ * @param name Tool name (without server prefix).
  * @param args_json JSON arguments string.
- * @return ServerResponse from the tool.
- * @internal
+ * @return The tool's own ServerResponse when the name resolves;
+ *         otherwise a response whose `result` is
+ *         "Error: Unknown tool '<name>'" and whose directives are empty.
+ * @req REQ-MCP-003
+ * @req REQ-MCP-002
  * @version 2.0.0
  */
 ServerResponse ToolRegistry::dispatch(
@@ -103,9 +128,10 @@ ServerResponse ToolRegistry::dispatch(
 
 /**
  * @brief Get a registered tool by name.
- * @param name Tool name.
- * @return Tool pointer, or nullptr if not found.
- * @internal
+ * @param name Tool name (without server prefix).
+ * @return Non-owning tool pointer, or nullptr when the name is not
+ *         registered — callers must null-check before use.
+ * @req REQ-MCP-003
  * @version 1.8.5
  */
 ToolBase* ToolRegistry::get_tool(const std::string& name) const {

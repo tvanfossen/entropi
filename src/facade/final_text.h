@@ -49,7 +49,7 @@ namespace facade_text {
  *
  * @param result_json Serialized conversation JSON array.
  * @return Most recent non-empty assistant content, or empty if there is none.
- * @utility
+ * @req REQ-API-012
  * @version 2.10.2
  */
 inline std::string extract_final_text(const char* result_json) {
@@ -87,7 +87,7 @@ inline std::string extract_final_text(const char* result_json) {
  *
  * @param result_json Serialized conversation JSON array.
  * @return Human-readable diagnostic for the empty-answer case.
- * @utility
+ * @req REQ-API-012
  * @version 2.10.2
  */
 inline std::string no_response_reason(const char* result_json) {
@@ -116,7 +116,7 @@ inline std::string no_response_reason(const char* result_json) {
  * @brief Final answer text, or a diagnostic when there is none.
  * @param result_json Serialized conversation JSON array.
  * @return Answer text, else the reason there is none.
- * @utility
+ * @req REQ-API-012
  * @version 2.10.2
  */
 inline std::string final_text_or_reason(const char* result_json) {

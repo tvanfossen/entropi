@@ -200,8 +200,10 @@ void emit_one(const std::string& pattern, size_t& i,
  * regex-meta literals).
  *
  * @param pattern Pattern body (no leading `!` or trailing `/`).
- * @return Regex source.
- * @internal
+ * @return Regex source implementing the supported gitignore syntax —
+ *         filename globs, `?`, character classes, double-star recursion
+ *         — with regex metacharacters in literal text escaped.
+ * @req REQ-MCP-022
  * @version 2.1.4
  */
 std::string IgnoreMatcher::pattern_to_regex(const std::string& pattern) {
@@ -268,7 +270,16 @@ std::string make_base_prefix(const std::string& base) {
 /**
  * @brief Compile a regex source; return a never-match regex on
  *        std::regex_error, with a warning log line.
- * @utility
+ *
+ * Malformed patterns and character classes are tolerated rather than
+ * thrown — one bad line in a workspace .gitignore must not take down
+ * glob/grep/read.
+ *
+ * @param src Regex source built from the pattern body.
+ * @param original_pattern The gitignore line, for the warning log.
+ * @return The compiled regex, or the never-matching `(?!)` regex when
+ *         compilation failed.
+ * @req REQ-MCP-022
  * @version 2.1.4
  */
 std::regex compile_or_never(const std::string& src,
@@ -296,9 +307,13 @@ std::regex compile_or_never(const std::string& src,
  * gitignore directory patterns.
  *
  * @param pattern Gitignore line (already trimmed, non-comment).
- * @param base    Anchor base relative to root.
- * @return Compiled Rule.
- * @internal
+ * @param base    Anchor base relative to root — each `.gitignore` is
+ *                anchored at its own directory, matching git's
+ *                documented behavior.
+ * @return A compiled Rule carrying the negate/dir_only flags and both
+ *         regexes, so a trailing-slash pattern matches the directory
+ *         and its descendants but never a same-named file.
+ * @req REQ-MCP-022
  * @version 2.1.4
  */
 IgnoreMatcher::Rule IgnoreMatcher::compile_pattern(
@@ -331,7 +346,13 @@ IgnoreMatcher::Rule IgnoreMatcher::compile_pattern(
 
 /**
  * @brief Add a pattern programmatically.
- * @internal
+ *
+ * Comments and blank lines are skipped here as well as on the file
+ * path, so a caller cannot inject a rule that matches everything.
+ *
+ * @param pattern Gitignore-syntax line.
+ * @param base Directory the rule is anchored at, relative to the root.
+ * @req REQ-MCP-022
  * @version 2.1.4
  */
 void IgnoreMatcher::add_pattern(const std::string& pattern,
@@ -343,7 +364,14 @@ void IgnoreMatcher::add_pattern(const std::string& pattern,
 
 /**
  * @brief Load and parse one ignore file (gitignore or explorerignore).
- * @internal
+ *
+ * Comments and blank lines are skipped; every other line becomes a rule
+ * anchored at `base`. A file that cannot be opened is a silent no-op.
+ *
+ * @param path Ignore file to read.
+ * @param base Directory the file's rules are anchored at, relative to
+ *             the workspace root ("" for the root file).
+ * @req REQ-MCP-022
  * @version 2.1.4
  */
 void IgnoreMatcher::load_file(const fs::path& path,
@@ -365,7 +393,15 @@ void IgnoreMatcher::load_file(const fs::path& path,
 
 /**
  * @brief Load all .gitignore files (recursive) + .explorerignore.
- * @internal
+ *
+ * Clears any prior rules first, so load() is safe to call again when
+ * the working directory changes. The root `.explorerignore` is layered
+ * LAST, and matching is last-match-wins, so a workspace can both add
+ * exclusions and re-include with `!`.
+ *
+ * @param root Workspace root to load from; a missing or non-directory
+ *             root leaves the matcher empty and is logged.
+ * @req REQ-MCP-022
  * @version 2.3.7
  */
 void IgnoreMatcher::load(const fs::path& root) {
@@ -390,7 +426,7 @@ void IgnoreMatcher::load(const fs::path& root) {
  * @brief Recursively load nested .gitignore files under the root.
  * @param canonical_root Canonical project root.
  * @param root_gi The root .gitignore (skipped during the scan).
- * @internal
+ * @req REQ-MCP-022
  * @version 2.3.7
  */
 void IgnoreMatcher::load_nested_gitignores(
@@ -418,7 +454,18 @@ void IgnoreMatcher::load_nested_gitignores(
 
 /**
  * @brief Test a path against the rule set (last-match-wins for negation).
- * @internal
+ *
+ * Matching is path-relative, never filename-only, and every rule is
+ * evaluated so a later negation can re-include what an earlier rule
+ * excluded — negation is order-sensitive by construction.
+ *
+ * @param rel_path Path relative to the workspace root, forward-slashed.
+ * @param is_dir Whether the path names a directory — a `dir/` pattern
+ *               matches the directory and its descendants but not a
+ *               same-named regular file.
+ * @return true when the LAST matching rule excludes the path; false
+ *         when it re-includes it or nothing matched.
+ * @req REQ-MCP-022
  * @version 2.1.4
  */
 bool IgnoreMatcher::is_ignored(const std::string& rel_path,

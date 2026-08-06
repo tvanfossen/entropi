@@ -58,6 +58,7 @@ public:
      * @brief Generate model response, routing tier first if needed.
      * @param ctx Loop context (mutated: tier locked, system prompt rebuilt).
      * @return Generation result with content and tool calls.
+     * @req REQ-LOOP-003
      * @version 1.8.4
      */
     GenerateResult generate_response(LoopContext& ctx);
@@ -67,6 +68,7 @@ public:
      * @param content Response content.
      * @param tool_calls_json Tool calls JSON (may be "[]").
      * @return true if response is complete.
+     * @req REQ-IDEN-003
      * @version 1.8.4
      */
     bool is_response_complete(const std::string& content,
@@ -76,6 +78,7 @@ private:
     /**
      * @brief Route and lock tier before first generation.
      * @param ctx Loop context.
+     * @req REQ-IDEN-001
      * @version 1.8.4
      */
     void lock_tier_if_needed(LoopContext& ctx);
@@ -84,6 +87,8 @@ private:
      * @brief Generate via streaming with interrupt/pause.
      * @param ctx Loop context.
      * @return Generation result.
+     * @req REQ-LOOP-006
+     * @req REQ-LOOP-008
      * @version 1.8.4
      */
     GenerateResult generate_streaming(LoopContext& ctx);
@@ -92,6 +97,7 @@ private:
      * @brief Generate via batch (non-streaming).
      * @param ctx Loop context.
      * @return Generation result.
+     * @req REQ-LOOP-003
      * @version 1.8.4
      */
     GenerateResult generate_batch(LoopContext& ctx);
@@ -110,7 +116,7 @@ private:
      * @param[out] result_json Backend-allocated result (caller frees).
      * @return Backend return code (0 ok, ENTROPIC_ERROR_CANCELLED on
      *         interrupt, other error codes otherwise).
-     * @internal
+     * @req REQ-LOOP-006
      * @version 2.4.2
      */
     int dispatch_batch_generate(
@@ -128,7 +134,7 @@ private:
      * @param ctx Loop context.
      * @param mode Label for the log line ("stream"/"batch").
      * @return {messages_json, params_json}.
-     * @internal
+     * @req REQ-LOOP-007
      * @version 2.3.7
      */
     std::pair<std::string, std::string> prepare_prompts(
@@ -139,6 +145,7 @@ private:
      * @param ctx Loop context.
      * @param partial Content generated so far.
      * @return Updated content after pause handling.
+     * @req REQ-LOOP-006
      * @version 1.8.4
      */
     std::string handle_pause(LoopContext& ctx,
@@ -157,6 +164,7 @@ private:
      * @brief Build generation params JSON with tier routing.
      * @param tier Locked tier name (embedded in params for orchestrator).
      * @return JSON string {tier, tools?}.
+     * @req REQ-IDEN-001
      * @version 2.7.0
      */
     std::string build_params_json(const std::string& tier);
@@ -182,7 +190,7 @@ private:
      * @return Messages with the reminder line appended to the system
      *         message; original returned unchanged when no system
      *         message exists.
-     * @internal
+     * @req REQ-LOOP-007
      * @version 2.1.0
      */
     std::vector<Message> inject_engine_state_reminder(
@@ -252,7 +260,7 @@ public:
      *
      * @param observer State callback (nullable).
      * @param user_data Forwarded to observer.
-     * @utility
+     * @req REQ-LOOP-001
      * @version 2.1.10
      */
     void set_state_observer(

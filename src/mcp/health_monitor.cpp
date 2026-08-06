@@ -112,7 +112,13 @@ void HealthMonitor::stop() {
 
 /**
  * @brief Drain event queue, invoke callbacks on engine thread.
- * @internal
+ *
+ * The monitor thread only ever ENQUEUES; callbacks fire here, on the
+ * engine thread, so engine state is never mutated cross-thread. The
+ * queue is swapped out under the lock so a callback cannot deadlock
+ * against a concurrent post_event.
+ *
+ * @req REQ-MCP-025
  * @version 1.8.7
  */
 void HealthMonitor::process_events() {
@@ -156,9 +162,13 @@ void HealthMonitor::monitor_loop() {
 
 /**
  * @brief Check one server and handle state transitions.
+ *
+ * Detects connection loss (connected → disconnected), drives the
+ * reconnect attempt while down, and otherwise schedules the next poll.
+ *
  * @param name Server name.
- * @param entry Watch entry.
- * @utility
+ * @param entry Watch entry, mutated in place.
+ * @req REQ-MCP-025
  * @version 1.8.7
  */
 void HealthMonitor::check_server(
@@ -196,9 +206,14 @@ void HealthMonitor::check_server(
 
 /**
  * @brief Attempt reconnection for one server.
+ *
+ * Each failed attempt schedules the next one at the policy's
+ * exponential-backoff-plus-jitter delay; once the policy reports
+ * exhaustion the server is marked "error" and no longer retried.
+ *
  * @param name Server name.
- * @param entry Watch entry.
- * @utility
+ * @param entry Watch entry, mutated in place.
+ * @req REQ-MCP-025
  * @version 2.3.7
  */
 void HealthMonitor::attempt_reconnect(
@@ -244,9 +259,15 @@ void HealthMonitor::attempt_reconnect(
 
 /**
  * @brief Handle a successful reconnect: refresh, mark, enqueue event.
+ *
+ * The tool list is re-queried on every successful reconnect, and the
+ * added/removed diff rides along on the status event so the engine
+ * learns about a server whose surface changed while it was down.
+ *
  * @param name Server name.
- * @param entry Watch entry (mutated to connected).
- * @internal
+ * @param entry Watch entry (mutated to connected, attempt counter
+ *              reset).
+ * @req REQ-MCP-025
  * @version 2.3.7
  */
 void HealthMonitor::on_reconnect_success(const std::string& name,
@@ -272,10 +293,14 @@ void HealthMonitor::on_reconnect_success(const std::string& name,
 
 /**
  * @brief Post a status change event to the queue.
+ *
+ * The monitor thread's only channel to the engine — enqueue here, drain
+ * in process_events() on the engine thread.
+ *
  * @param name Server name.
  * @param old_status Previous status.
  * @param new_status New status.
- * @utility
+ * @req REQ-MCP-025
  * @version 1.8.7
  */
 void HealthMonitor::post_event(

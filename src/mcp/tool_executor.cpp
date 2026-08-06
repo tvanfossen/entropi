@@ -53,10 +53,18 @@ void ToolExecutor::set_permission_persist(
 
 /**
  * @brief Process a batch of tool calls.
+ *
+ * Batch handling before per-call dispatch: entropic.delegate is sorted
+ * last, then the batch is truncated to the effective per-turn limit —
+ * a per-identity override when the context carries one, the global
+ * LoopConfig value otherwise.
+ *
  * @param ctx Loop context (provides effective_max_tool_calls_per_turn, P3-18).
  * @param tool_calls Tool calls from model output.
- * @return Result messages.
- * @internal
+ * @return One result message per processed call, in processing order;
+ *         short of the input count when the batch was truncated or a
+ *         circuit-breaker/directive stopped it early.
+ * @req REQ-MCP-012
  * @version 2.0.6-rc16
  */
 std::vector<Message> ToolExecutor::process_tool_calls(
@@ -89,9 +97,14 @@ std::vector<Message> ToolExecutor::process_tool_calls(
 
 /**
  * @brief Sort tool calls so entropic.delegate is last.
+ *
+ * Stable, so every other call keeps the model's emitted order — only
+ * delegate moves.
+ *
  * @param calls Input tool calls.
- * @return Sorted copy.
- * @internal
+ * @return A copy with entropic.delegate calls moved to the end and all
+ *         other relative ordering preserved.
+ * @req REQ-MCP-012
  * @version 1.8.5
  */
 std::vector<ToolCall> ToolExecutor::sort_tool_calls(
@@ -108,10 +121,17 @@ std::vector<ToolCall> ToolExecutor::sort_tool_calls(
 
 /**
  * @brief Check for duplicate tool call.
- * @param ctx Loop context.
+ *
+ * A tool whose owning server opted out via skip_duplicate_check is
+ * never treated as a duplicate — it must always run for its side effect.
+ *
+ * @param ctx Loop context holding the recent-call cache.
  * @param call Tool call.
- * @return Previous result or empty.
- * @internal
+ * @return The cached previous result when this exact tool+arguments key
+ *         was already seen; an empty string when it is new or the tool
+ *         is opted out. Errored calls are never cached, so a transient
+ *         failure cannot permanently poison the call.
+ * @req REQ-MCP-015
  * @version 1.8.5
  */
 std::string ToolExecutor::check_duplicate(
@@ -130,11 +150,18 @@ std::string ToolExecutor::check_duplicate(
 
 /**
  * @brief Handle duplicate tool call.
- * @param ctx Loop context.
+ *
+ * A bare error invites a retry spiral, so the duplicate path answers
+ * with corrective guidance instead, escalating to a circuit-breaker
+ * message once the model has repeated itself three times.
+ *
+ * @param ctx Loop context (its duplicate-attempt counter is bumped).
  * @param call Duplicate tool call.
- * @param previous_result Previous result.
- * @return Feedback message.
- * @internal
+ * @param previous_result Result the earlier identical call produced.
+ * @return The circuit-breaker "stuck" message from the third
+ *         consecutive duplicate onward; otherwise the previous result
+ *         plus do-not-call-again guidance.
+ * @req REQ-MCP-015
  * @version 1.8.5
  */
 Message ToolExecutor::handle_duplicate(
@@ -153,9 +180,18 @@ Message ToolExecutor::handle_duplicate(
 
 /**
  * @brief Check tool approval.
+ *
+ * The last precondition gate. Auto-approval or an operator allow-list
+ * match short-circuits; otherwise the engine's approval callback is
+ * consulted. Fires the informational ON_PERMISSION_CHECK hook either
+ * way.
+ *
  * @param call Tool call.
- * @return true if approved.
- * @internal
+ * @return true when the call may be dispatched — auto-approved,
+ *         explicitly allowed, or approved via the callback; false only
+ *         when no approval callback is wired, which is logged.
+ * @req REQ-MCP-012
+ * @req REQ-MCP-009
  * @version 1.9.1
  */
 bool ToolExecutor::check_approval(const ToolCall& call) {
@@ -191,8 +227,12 @@ bool ToolExecutor::check_approval(const ToolCall& call) {
  * @brief Check tier allowed_tools restrictions. (gh#83, v2.5.2)
  * @param ctx Loop context.
  * @param call Tool call.
- * @return Rejection message or nullopt.
- * @internal
+ * @return nullopt when the call may proceed — no locked tier, no wired
+ *         map, no allowlist for the tier, or the tool is listed;
+ *         otherwise a rejection Message naming both the tier and the
+ *         tool, logged at warning level.
+ * @req REQ-MCP-014
+ * @req REQ-MCP-012
  * @version 2.5.2
  */
 std::optional<Message> ToolExecutor::check_tier_allowed(
@@ -228,8 +268,10 @@ std::optional<Message> ToolExecutor::check_tier_allowed(
  * @brief Check required fields are present.
  * @param schema Parsed JSON Schema object.
  * @param args Parsed tool arguments.
- * @return Error string, or empty on pass.
- * @utility
+ * @return An empty string when every declared required field is
+ *         present; otherwise "Missing required argument: <name>" for
+ *         the first absent one.
+ * @req REQ-MCP-013
  * @version 2.0.6
  */
 static std::string check_required_fields(
@@ -260,8 +302,10 @@ static std::string check_required_fields(
  * @param key Property name.
  * @param allowed Enum array from schema.
  * @param val Argument value.
- * @return Error string, or empty on pass.
- * @utility
+ * @return An empty string when the value is one of the declared
+ *         options; otherwise a message naming the property, the
+ *         offending value and the full set of valid options.
+ * @req REQ-MCP-013
  * @version 2.0.6
  */
 static std::string check_enum(
@@ -281,8 +325,10 @@ static std::string check_enum(
  * @param key Property name.
  * @param type Expected JSON Schema type string.
  * @param val Argument value.
- * @return Error string, or empty on pass.
- * @utility
+ * @return An empty string when the value matches the declared type;
+ *         otherwise "Type mismatch for '<key>': expected <type>". An
+ *         unrecognised type name reads as a mismatch.
+ * @req REQ-MCP-013
  * @version 2.0.6
  */
 static std::string check_type(
@@ -305,8 +351,10 @@ static std::string check_type(
  * @param key Property name.
  * @param prop Property schema.
  * @param val Argument value.
- * @return Error string, or empty on pass.
- * @utility
+ * @return An empty string when the value satisfies both the enum (if
+ *         declared) and the type (if declared); otherwise the enum
+ *         error, which is checked first, else the type error.
+ * @req REQ-MCP-013
  * @version 2.0.6
  */
 static std::string check_property_constraints(
@@ -330,8 +378,12 @@ static std::string check_property_constraints(
  *
  * @param schema_json The tool's input_schema (JSON Schema string).
  * @param args The parsed arguments from the model.
- * @return Error description, or empty string if valid.
- * @utility
+ * @return An empty string when the arguments satisfy the schema — and
+ *         also when the schema is absent or unparseable, which reads as
+ *         "nothing to validate" rather than throwing; otherwise the
+ *         first violation's description, required fields before
+ *         per-property constraints.
+ * @req REQ-MCP-013
  * @version 2.0.6
  */
 static std::string validate_tool_args(
@@ -355,8 +407,10 @@ static std::string validate_tool_args(
 /**
  * @brief Extract the "result" text from an MCP result JSON envelope.
  * @param result_json Raw result string from the server.
- * @return j["result"] if parseable, else the raw string verbatim.
- * @utility
+ * @return The envelope's `result` field when the string parses as JSON
+ *         carrying one; otherwise the raw string verbatim, so a server
+ *         that answered off-contract still surfaces its text.
+ * @req REQ-MCP-002
  * @version 2.3.7
  */
 static std::string parse_tool_result_text(const std::string& result_json) {
@@ -370,10 +424,20 @@ static std::string parse_tool_result_text(const std::string& result_json) {
 
 /**
  * @brief Execute a single tool call.
- * @param ctx Loop context.
+ *
+ * The dispatch itself, once every precondition has passed. The server's
+ * answer crosses an inbound trust boundary, so it is UTF-8 sanitized
+ * before anything downstream reads it, then unwrapped from the
+ * ServerResponse envelope and recorded in the history ring buffer.
+ *
+ * @param ctx Loop context (tool-call metric incremented).
  * @param call Tool call.
- * @return (result message, raw result string).
- * @internal
+ * @return A pair of the user-role result Message — content is the
+ *         envelope's result text, metadata carries tool_call_id and
+ *         tool_name — and the raw envelope JSON the directive
+ *         extraction later parses.
+ * @req REQ-MCP-002
+ * @req REQ-MCP-020
  * @version 2.3.7
  */
 std::pair<Message, std::string> ToolExecutor::execute_tool(
@@ -424,12 +488,17 @@ std::pair<Message, std::string> ToolExecutor::execute_tool(
 
 /**
  * @brief Stash a finished tool call in the history ring buffer.
+ *
+ * Assigns the monotonic sequence number and reduces the call to the
+ * bounded diagnostic form: argument KEYS only (never values) and a
+ * result summary capped at 200 characters.
+ *
  * @param call The tool call.
  * @param args_json Serialized args.
  * @param result_text Parsed result text.
  * @param ms Elapsed milliseconds.
  * @param iteration Loop iteration.
- * @internal
+ * @req REQ-MCP-020
  * @version 2.3.7
  */
 void ToolExecutor::record_tool_history(const ToolCall& call,
@@ -450,9 +519,14 @@ void ToolExecutor::record_tool_history(const ToolCall& call,
 
 /**
  * @brief Generate duplicate detection key.
+ *
+ * Arguments go through a JSON object, whose keys are ordered, so two
+ * calls that differ only in argument emission order share a key.
+ *
  * @param call Tool call.
- * @return Key string.
- * @internal
+ * @return "<tool name>:<sorted arguments JSON>" — the identity a
+ *         repeated call is recognised by.
+ * @req REQ-MCP-015
  * @version 1.8.5
  */
 std::string ToolExecutor::tool_call_key(const ToolCall& call) {
@@ -466,10 +540,14 @@ std::string ToolExecutor::tool_call_key(const ToolCall& call) {
 
 /**
  * @brief Record tool call for duplicate detection.
- * @param ctx Loop context.
+ *
+ * Error results are deliberately NOT cached, so a transient failure
+ * does not permanently poison the call for the rest of the turn.
+ *
+ * @param ctx Loop context holding the recent-call cache.
  * @param call Tool call.
- * @param result Result string.
- * @internal
+ * @param result Raw ServerResponse envelope (or bare text).
+ * @req REQ-MCP-015
  * @version 1.8.5
  */
 void ToolExecutor::record_tool_call(
@@ -493,10 +571,15 @@ void ToolExecutor::record_tool_call(
 
 /**
  * @brief Create a permission denied message.
+ *
+ * A bare denial invites a retry spiral, so the text names the tool and
+ * the reason and then steers explicitly away from retrying.
+ *
  * @param call Tool call.
  * @param reason Denial reason.
- * @return Feedback message.
- * @internal
+ * @return A user-role Message reading "Tool `X` was denied: <reason>"
+ *         followed by do-NOT-retry / use-a-different-approach guidance.
+ * @req REQ-MCP-015
  * @version 1.8.5
  */
 Message ToolExecutor::create_denied_message(
@@ -515,8 +598,10 @@ Message ToolExecutor::create_denied_message(
  * @brief Create a tool error message.
  * @param call Tool call.
  * @param error Error description.
- * @return Feedback message.
- * @internal
+ * @return A user-role Message reading "Tool `X` failed with error: ..."
+ *         followed by the RECOVERY block — check arguments, try a
+ *         different approach, do not retry with the same arguments.
+ * @req REQ-MCP-015
  * @version 1.8.5
  */
 Message ToolExecutor::create_error_message(
@@ -550,9 +635,11 @@ void ToolExecutor::fire_state_callback(const LoopContext& ctx) {
 
 /**
  * @brief Truncate tool calls to the effective per-turn limit.
- * @param calls Tool call vector (mutated).
- * @param limit Effective limit (after per-identity override, P3-18).
- * @internal
+ * @param calls Tool call vector, resized in place.
+ * @param limit Effective limit (after per-identity override, P3-18) —
+ *              a per-identity value may raise or lower it relative to
+ *              the global LoopConfig setting.
+ * @req REQ-MCP-012
  * @version 2.0.6-rc16
  */
 void ToolExecutor::truncate_to_limit(
@@ -566,10 +653,20 @@ void ToolExecutor::truncate_to_limit(
 
 /**
  * @brief Check MCP authorization for a tool call.
+ *
+ * The tool's own declared access level is what the identity's key set is
+ * measured against, and an unknown tool resolves to WRITE — so a bogus
+ * name cannot slip past a READ-only key set.
+ *
  * @param ctx Loop context (provides identity from locked_tier).
  * @param call Tool call.
- * @return Error message if denied, nullopt if authorized.
- * @internal
+ * @return nullopt when no authorization manager is wired, the identity
+ *         is not enforced, or access is granted; otherwise a rejection
+ *         Message naming the identity and the missing access level,
+ *         steering the model to entropic.delegate.
+ * @req REQ-MCP-011
+ * @req REQ-MCP-010
+ * @req REQ-MCP-012
  * @version 1.9.4
  */
 std::optional<Message> ToolExecutor::check_mcp_authorization(
@@ -603,10 +700,18 @@ std::optional<Message> ToolExecutor::check_mcp_authorization(
 
 /**
  * @brief Check duplicate detection and approval (layers within preconditions).
+ *
+ * The last two gates in the fixed precondition order — duplicate
+ * detection, then operator approval. A non-duplicate resets the
+ * consecutive-duplicate counter.
+ *
  * @param ctx Loop context.
  * @param call Tool call.
- * @return Rejection message if blocked, nullopt if clear.
- * @internal
+ * @return nullopt when the call is neither a duplicate nor unapproved;
+ *         otherwise the duplicate-guidance message (or circuit-breaker
+ *         message) or a permission-denied message.
+ * @req REQ-MCP-012
+ * @req REQ-MCP-015
  * @version 1.9.4
  */
 std::optional<Message> ToolExecutor::check_dup_or_approval(
@@ -632,9 +737,18 @@ std::optional<Message> ToolExecutor::check_dup_or_approval(
  */
 /**
  * @brief Validate tool arguments against schema constraints.
+ *
+ * An empty schema — tool not found, or a plugin descriptor with no
+ * inputSchema — skips validation, and unparseable arguments are treated
+ * as "nothing to validate" rather than throwing through dispatch.
+ *
  * @param call Tool call to validate.
- * @return Rejection message, or nullopt on pass.
- * @internal
+ * @return nullopt when the arguments satisfy the declared schema (or
+ *         there is nothing to check); otherwise a denial Message naming
+ *         the specific violation, logged at warning level. The tool is
+ *         never invoked on the rejection path.
+ * @req REQ-MCP-013
+ * @req REQ-MCP-008
  * @version 2.0.6
  */
 std::optional<Message> ToolExecutor::check_schema(
@@ -658,10 +772,20 @@ std::optional<Message> ToolExecutor::check_schema(
  * schema/auth/duplicate checks. Cheaper and short-circuits any tool
  * the engine has decided to refuse regardless of other outcomes.
  *
+ * The fixed order is: anti-spiral hard block, argument-schema
+ * validation, MCP key authorization, tier allowed_tools, duplicate
+ * detection, operator approval. Whichever gate comes first wins when a
+ * call violates several.
+ *
  * @param ctx Loop context.
  * @param call Tool call.
- * @return PreconditionCheck with rejection + typed kind on failure.
- * @internal
+ * @return A PreconditionCheck whose rejection is empty when every gate
+ *         passed; otherwise the earliest gate's model-facing message
+ *         paired with its categorical kind — rejected_anti_spiral,
+ *         rejected_schema, rejected_precondition, rejected_unauthorized
+ *         or rejected_duplicate — so hook consumers branch on an enum
+ *         rather than on engine-authored prose.
+ * @req REQ-MCP-012
  * @version 2.5.2
  */
 PreconditionCheck ToolExecutor::check_call_preconditions(
@@ -698,8 +822,11 @@ PreconditionCheck ToolExecutor::check_call_preconditions(
  *        chain under the nesting-depth gate.
  * @param ctx Loop context (mutated: duplicate counter reset).
  * @param call Tool call.
- * @return PreconditionCheck with rejection+kind set on denial, empty on pass.
- * @internal
+ * @return An empty PreconditionCheck when the call is approved;
+ *         otherwise a permission-denied Message with kind
+ *         rejected_precondition.
+ * @req REQ-MCP-012
+ * @req REQ-MCP-009
  * @version 2.0.6-rc19
  */
 PreconditionCheck ToolExecutor::check_approval_pc(
@@ -720,10 +847,17 @@ PreconditionCheck ToolExecutor::check_approval_pc(
  * Emits one consolidated [tool_call] log entry after execution with
  * iter, tier, tool, elapsed_ms, result_chars, and status.
  *
+ * Every exit path — pre-hook cancel, precondition rejection, and normal
+ * execution — fires POST_TOOL_CALL with the outcome's typed kind, so no
+ * path drops the hook.
+ *
  * @param ctx Loop context.
  * @param call Tool call.
- * @return Result messages (0 or 1).
- * @internal
+ * @return Exactly one Message: the executed tool's result, the
+ *         hook-cancelled denial, or the precondition rejection — each
+ *         carrying its result_kind in metadata.
+ * @req REQ-MCP-017
+ * @req REQ-MCP-012
  * @version 2.5.1
  */
 std::vector<Message> ToolExecutor::process_single_call(
@@ -764,9 +898,13 @@ std::vector<Message> ToolExecutor::process_single_call(
 
 /**
  * @brief Classify a tool result by its content (error/empty/ok).
- * @param content Result content (already size-capped).
- * @return ToolResultKind — error trumps empty trumps ok (#44).
- * @utility
+ * @param content Result content (already size-capped, so the kind
+ *                describes the bounded form the model saw).
+ * @return ToolResultKind::error for error-shaped content,
+ *         ToolResultKind::ok_empty for byte-level-empty content,
+ *         ToolResultKind::ok otherwise — error trumps empty trumps ok
+ *         (#44).
+ * @req REQ-MCP-019
  * @version 2.3.7
  */
 static ToolResultKind classify_tool_result(const std::string& content) {
@@ -807,10 +945,20 @@ void ToolExecutor::log_tool_call(LoopContext& ctx, const ToolCall& call,
  * @brief Post-execution processing for a tool call.
  * @param ctx Loop context.
  * @param call The tool call.
- * @param[in,out] msg Result message (content may be capped).
+ * The inbound boundary: the size cap is applied FIRST, so the model, the
+ * classifier and the duplicate cache all see the same bounded content;
+ * then the result is classified, recorded and handed to the
+ * POST_TOOL_CALL hook.
+ *
+ * @param ctx Loop context.
+ * @param call The tool call.
+ * @param[in,out] msg Result message (content may be capped, and may be
+ *                rewritten by the POST_TOOL_CALL hook).
  * @param raw_result Raw server result string.
  * @param exec_ms Execution time (ms).
- * @internal
+ * @req REQ-MCP-019
+ * @req REQ-MCP-017
+ * @req REQ-MCP-015
  * @version 2.5.1
  */
 void ToolExecutor::finalize_tool_call(LoopContext& ctx, const ToolCall& call,
@@ -848,10 +996,17 @@ void ToolExecutor::finalize_tool_call(LoopContext& ctx, const ToolCall& call,
 
 /**
  * @brief Fire PRE_TOOL_CALL hook.
+ *
+ * Fires for EVERY attempt, including ones a precondition will go on to
+ * reject, carrying tool name, args, tier and iteration.
+ *
  * @param ctx Loop context.
  * @param call Tool call.
- * @return true if hook cancelled.
- * @internal
+ * @return true when the hook returned non-zero, cancelling the call
+ *         before dispatch; false when no hook is wired or it allowed the
+ *         call. Any string the pre-hook wrote is freed, not applied —
+ *         only POST_TOOL_CALL may rewrite content.
+ * @req REQ-MCP-017
  * @version 2.0.6-rc19
  */
 bool ToolExecutor::fire_pre_tool_hook(
@@ -871,7 +1026,9 @@ bool ToolExecutor::fire_pre_tool_hook(
  *
  * Demo ask #6 (v2.1.0). See header for full contract.
  *
- * @internal
+ * @param content Result content, truncated in place; a configured cap of
+ *                0 disables truncation entirely.
+ * @req REQ-MCP-019
  * @version 2.1.1-rc1
  */
 void ToolExecutor::apply_result_size_cap(std::string& content) const {
@@ -883,7 +1040,14 @@ void ToolExecutor::apply_result_size_cap(std::string& content) const {
  *
  * Demo ask #5 (v2.1.0). See header for full contract.
  *
- * @internal
+ * The soft half of anti-spiral: reaching max_consecutive_same_tool
+ * populates a one-shot pending warning that the next system reminder
+ * delivers, telling the model to pivot tools or complete. A different
+ * tool name resets the counter.
+ *
+ * @param ctx Loop context (counter and pending warning mutated).
+ * @param tool_name Fully-qualified name of the tool just dispatched.
+ * @req REQ-MCP-016
  * @version 2.1.1-rc1
  */
 void ToolExecutor::update_anti_spiral_tracking(
@@ -909,7 +1073,12 @@ void ToolExecutor::update_anti_spiral_tracking(
  *
  * See declaration. Issue #14, v2.1.4.
  *
- * @internal
+ * @return The configured max_consecutive_same_tool_hard_block verbatim
+ *         when non-negative — so an operator can set it high enough to
+ *         effectively disable the hard block while keeping the soft
+ *         advisory; for the negative sentinel, the derived
+ *         max_consecutive_same_tool + 2.
+ * @req REQ-MCP-016
  * @version 2.1.4
  */
 int ToolExecutor::effective_hard_block_threshold() const {
@@ -932,7 +1101,16 @@ int ToolExecutor::effective_hard_block_threshold() const {
  *
  * Issue #14, v2.1.4.
  *
- * @internal
+ * @param ctx Loop context (read-only — the projection does not mutate
+ *            the counter).
+ * @param call Tool call about to be dispatched.
+ * @return An empty PreconditionCheck when the projected consecutive
+ *         count is below the effective threshold; otherwise a rejection
+ *         Message naming the tool, the count and the threshold, with
+ *         kind rejected_anti_spiral — and the tool is not dispatched at
+ *         all.
+ * @req REQ-MCP-016
+ * @req REQ-MCP-012
  * @version 2.1.4
  */
 PreconditionCheck ToolExecutor::check_anti_spiral_hard_block(
@@ -966,11 +1144,17 @@ PreconditionCheck ToolExecutor::check_anti_spiral_hard_block(
  *
  * @param ctx Loop context.
  * @param call Tool call.
+ * @param ctx Loop context.
+ * @param call Tool call.
  * @param raw_result Raw server response (may be empty on reject).
  * @param elapsed_ms Duration.
- * @param kind Typed outcome.
- * @param msg Message produced by this call; mutated if hook transforms.
- * @internal
+ * @param kind Typed outcome — computed BEFORE the hook fires and passed
+ *            as an INPUT, so a transformed content may not match the
+ *            kind downstream code carries. Intentional.
+ * @param msg Message produced by this call; its content is REPLACED
+ *            when the hook writes a non-null string, and left untouched
+ *            when it writes NULL.
+ * @req REQ-MCP-017
  * @version 2.9.7
  */
 void ToolExecutor::fire_post_tool_hook(
@@ -1025,8 +1209,11 @@ void ToolExecutor::run_post_tool_hooks(LoopContext& ctx) {
 
 /**
  * @brief Create circuit breaker "stuck" message.
- * @return Feedback message.
- * @internal
+ * @return A user-role Message telling the model it has repeated the
+ *         same call three times, that this means it is stuck, and to
+ *         try a different approach or explain the blocker — the
+ *         escalation past ordinary duplicate guidance.
+ * @req REQ-MCP-015
  * @version 1.8.5
  */
 Message ToolExecutor::create_circuit_breaker_message() {
@@ -1044,9 +1231,13 @@ Message ToolExecutor::create_circuit_breaker_message() {
 /**
  * @brief Create duplicate notification message.
  * @param call Duplicate tool call.
- * @param previous_result Previous result.
- * @return Feedback message.
- * @internal
+ * @param previous_result Result the earlier identical call produced.
+ * @return A user-role Message: when the earlier result was itself a
+ *         denial, text saying the tool is unavailable and retrying will
+ *         not help; otherwise the previous result echoed back with an
+ *         explicit "Do NOT call this tool again, use the previous
+ *         result" instruction.
+ * @req REQ-MCP-015
  * @version 1.8.5
  */
 Message ToolExecutor::create_duplicate_message(
@@ -1083,8 +1274,11 @@ Message ToolExecutor::create_duplicate_message(
  * get serialized as strings and crash tools that expect typed values.
  *
  * @param call Tool call.
- * @return JSON string.
- * @internal
+ * @return The parse-preserved arguments_json when the call carries one;
+ *         otherwise the string-only arguments map serialised as a JSON
+ *         object. This is the string schema validation, permission
+ *         patterns and duplicate keys are all computed from.
+ * @req REQ-MCP-013
  * @version 2.0.4
  */
 std::string ToolExecutor::serialize_args(const ToolCall& call) {
@@ -1145,8 +1339,11 @@ void ToolExecutor::fire_tool_complete_callback(
  * @param tier Active tier.
  * @param iteration Loop iteration.
  * @param kind Typed outcome.
- * @return JSON: tool_name, args, result, directives, elapsed_ms, tier, iteration, result_kind.
- * @internal
+ * @return The hook's context JSON carrying tool_name, args, result,
+ *         directives, elapsed_ms, tier, iteration and result_kind — the
+ *         typed kind being what lets consumers branch on an enum rather
+ *         than grep engine-authored prose.
+ * @req REQ-MCP-017
  * @version 2.0.6-rc19
  */
 std::string ToolExecutor::build_post_tool_json(
@@ -1178,10 +1375,12 @@ std::string ToolExecutor::build_post_tool_json(
 /**
  * @brief Build PRE_TOOL_CALL hook context JSON.
  * @param call Tool call being attempted.
- * @param tier Active tier.
+ * @param tier Active tier ("lead" when unset).
  * @param iteration Loop iteration.
- * @return JSON string.
- * @internal
+ * @return The hook's context JSON carrying tool_name, args, tier and
+ *         iteration — the four things a pre-hook needs to decide
+ *         whether to cancel.
+ * @req REQ-MCP-017
  * @version 2.0.6-rc19
  */
 std::string ToolExecutor::build_pre_tool_json(
@@ -1241,8 +1440,11 @@ static std::vector<std::string> extract_pipeline_stages(
 /**
  * @brief Build a CompleteDirective from a result JSON (issue #10).
  * @param result_json Tool result JSON.
- * @return CompleteDirective with summary + typed gap/suggested fields.
- * @utility
+ * @return An owned CompleteDirective carrying the summary plus the
+ *         typed coverage_gap / gap_description / suggested_files
+ *         fields; the optional fields default to false/empty when the
+ *         tool did not emit them.
+ * @req REQ-MCP-024
  * @version 2.3.7
  */
 static std::unique_ptr<Directive> build_complete_directive(
@@ -1261,7 +1463,14 @@ static std::unique_ptr<Directive> build_complete_directive(
 
 /**
  * @brief Build a Directive from a parsed directive + result JSON.
- * @internal
+ * @param d Directive descriptor JSON carrying the wire "type" name.
+ * @param result_json Parsed result JSON, source of the directive's
+ *                    typed parameters.
+ * @return An owned typed Directive for stop_processing, delegate,
+ *         complete or pipeline; nullptr for any other wire name, which
+ *         the caller then skips rather than dispatching.
+ * @req REQ-MCP-002
+ * @req REQ-MCP-024
  * @version 2.3.7
  */
 static std::unique_ptr<Directive> build_directive(
@@ -1293,9 +1502,11 @@ static std::unique_ptr<Directive> build_directive(
 /**
  * @brief Pull the "directives" array out of a tool ServerResponse JSON.
  * @param raw_result Raw ServerResponse JSON string.
- * @return Pair of (resp object, directives reference). Returns
- *         (null, null) if the response is missing/empty/invalid.
- * @internal
+ * @return The parsed envelope paired with its non-empty `directives`
+ *         array; nullopt when the string does not parse as an object,
+ *         carries no `directives` key, or the array is empty — the
+ *         no-side-effect case, which needs no dispatch.
+ * @req REQ-MCP-002
  * @version 2.0.2
  */
 static std::optional<std::pair<nlohmann::json, nlohmann::json>>
@@ -1311,9 +1522,15 @@ extract_directive_array(const std::string& raw_result) {
 
 /**
  * @brief Extract directives from tool ServerResponse JSON and dispatch them.
+ *
+ * The consumer side of the envelope contract: whichever server kind
+ * answered, the directives array is read the same way and handed to the
+ * engine's DirectiveProcessor as typed objects.
+ *
  * @param ctx Loop context (mutated by directive handlers).
  * @param raw_result Raw ServerResponse JSON string.
- * @utility
+ * @req REQ-MCP-002
+ * @req REQ-MCP-024
  * @version 2.0.2
  */
 void ToolExecutor::extract_and_process_directives(

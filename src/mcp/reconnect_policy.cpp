@@ -47,8 +47,11 @@ ReconnectPolicy::ReconnectPolicy(const ReconnectConfig& config)
 /**
  * @brief Compute delay with exponential backoff and jitter.
  * @param attempt Zero-based attempt number.
- * @return Delay in milliseconds.
- * @internal
+ * @return `base_delay * factor^attempt`, capped at max_delay, plus a
+ *         uniform jitter of up to 10% of the capped value — so delay
+ *         grows exponentially, saturates at max_delay, and repeated
+ *         reconnects across servers do not synchronise.
+ * @req REQ-MCP-025
  * @version 1.8.7
  */
 uint32_t ReconnectPolicy::delay_ms(uint32_t attempt) const {
@@ -67,8 +70,9 @@ uint32_t ReconnectPolicy::delay_ms(uint32_t attempt) const {
 /**
  * @brief Check if retries are exhausted.
  * @param attempt Zero-based attempt number.
- * @return true if retries exceeded.
- * @internal
+ * @return true once `attempt` reaches max_retries; always false when
+ *         max_retries is 0, which means "retry forever".
+ * @req REQ-MCP-025
  * @version 1.8.7
  */
 bool ReconnectPolicy::exhausted(uint32_t attempt) const {

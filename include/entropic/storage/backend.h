@@ -52,12 +52,14 @@ public:
     /**
      * @brief Initialize storage (open database, run migrations).
      * @return true on success.
+     * @req REQ-STOR-001
      * @version 1.8.8
      */
     bool initialize();
 
     /**
      * @brief Close storage and database connection.
+     * @req REQ-STOR-001
      * @version 1.8.8
      */
     void close();
@@ -70,6 +72,7 @@ public:
      * @param project_path Project path (optional).
      * @param model_id Model identifier (optional).
      * @return Conversation ID (UUID string).
+     * @req REQ-STOR-003
      * @version 1.8.8
      */
     std::string create_conversation(
@@ -82,6 +85,7 @@ public:
      * @param conversation_id Conversation ID.
      * @param messages_json JSON array of message objects.
      * @return true on success.
+     * @req REQ-STOR-003
      * @version 1.8.8
      */
     bool save_messages(const std::string& conversation_id,
@@ -92,6 +96,7 @@ public:
      * @param conversation_id Conversation ID.
      * @param[out] result_json JSON with "conversation" and "messages".
      * @return true if found.
+     * @req REQ-STOR-003
      * @version 1.8.8
      */
     bool load_conversation(const std::string& conversation_id,
@@ -103,6 +108,7 @@ public:
      * @param offset Pagination offset.
      * @param[out] result_json JSON array of conversation summaries.
      * @return true on success.
+     * @req REQ-STOR-003
      * @version 1.8.8
      */
     bool list_conversations(int limit, int offset,
@@ -112,6 +118,8 @@ public:
      * @brief Delete a conversation and all associated records.
      * @param conversation_id Conversation ID.
      * @return true on success.
+     * @req REQ-STOR-003
+     * @req REQ-STOR-004
      * @version 1.8.8
      */
     bool delete_conversation(const std::string& conversation_id);
@@ -121,6 +129,7 @@ public:
      * @param conversation_id Conversation ID.
      * @param title New title.
      * @return true on success.
+     * @req REQ-STOR-003
      * @version 1.8.8
      */
     bool update_title(const std::string& conversation_id,
@@ -134,6 +143,7 @@ public:
      * @param limit Maximum results.
      * @param[out] result_json JSON array of search results with snippets.
      * @return true on success.
+     * @req REQ-STOR-004
      * @version 1.8.8
      */
     bool search_conversations(const std::string& query, int limit,
@@ -151,6 +161,7 @@ public:
      * @param[out] delegation_id Created delegation ID.
      * @param[out] child_conversation_id Created child conversation ID.
      * @return true on success.
+     * @req REQ-STOR-005
      * @version 1.8.8
      */
     bool create_delegation(
@@ -168,6 +179,7 @@ public:
      * @param status "completed" or "failed".
      * @param result_summary Summary text (optional).
      * @return true on success.
+     * @req REQ-STOR-005
      * @version 1.8.8
      */
     bool complete_delegation(
@@ -180,6 +192,8 @@ public:
      * @param conversation_id Parent conversation ID.
      * @param[out] result_json JSON array of delegation records.
      * @return true on success.
+     * @req REQ-STOR-005
+     * @req REQ-SAFE-001
      * @version 1.8.8
      */
     bool get_delegations(const std::string& conversation_id,
@@ -195,6 +209,8 @@ public:
      * @param delegation_id Delegation id.
      * @param[out] result_json Single-object JSON with the delegation row.
      * @return true on success and a row was found; false on absence/error.
+     * @req REQ-STOR-005
+     * @req REQ-SAFE-001
      * @version 2.1.6
      */
     bool get_delegation_by_id(const std::string& delegation_id,
@@ -211,6 +227,8 @@ public:
      * @param max_results  Maximum records to return.
      * @param[out] result_json JSON array of matching delegation rows.
      * @return true on success.
+     * @req REQ-STOR-005
+     * @req REQ-SAFE-001
      * @version 2.1.6
      */
     bool search_delegations(const std::string& query, int max_results,
@@ -223,6 +241,7 @@ public:
      * @param conversation_id Conversation ID.
      * @param messages_json JSON array of all messages before compaction.
      * @return true on success.
+     * @req REQ-STOR-003
      * @version 1.8.8
      */
     bool save_snapshot(const std::string& conversation_id,
@@ -234,6 +253,7 @@ public:
      * @brief Get storage statistics.
      * @param[out] result_json JSON with total_conversations, total_messages, total_tokens.
      * @return true on success.
+     * @req REQ-STOR-004
      * @version 1.8.8
      */
     bool get_stats(std::string& result_json);

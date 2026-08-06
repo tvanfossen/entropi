@@ -36,6 +36,9 @@
  * entropic_alloc(). Strings returned as const char* are owned by
  * the handle and valid until the next call on that handle.
  *
+ * @req REQ-API-014
+ * @req REQ-ABI-001
+ * @req REQ-ABI-002
  * @version 1.9.10
  */
 
@@ -68,6 +71,9 @@ extern "C" {
  *         - ENTROPIC_ERROR_OUT_OF_MEMORY — allocation failed.
  *
  * @threadsafety Single-threaded init/destroy.
+ * @req REQ-API-002
+ * @req REQ-API-003
+ * @req REQ-ABI-001
  * @version 1.8.0
  */
 ENTROPIC_EXPORT entropic_error_t entropic_create(entropic_handle_t* handle);
@@ -92,6 +98,9 @@ ENTROPIC_EXPORT entropic_error_t entropic_create(entropic_handle_t* handle);
  *         - ENTROPIC_ERROR_INVALID_CONFIG — config validation failed.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-API-004
+ * @req REQ-API-005
+ * @req REQ-ABI-001
  * @version 1.8.0
  */
 ENTROPIC_EXPORT entropic_error_t entropic_configure(
@@ -113,6 +122,9 @@ ENTROPIC_EXPORT entropic_error_t entropic_configure(
  *         - ENTROPIC_ERROR_IO — file not found or unreadable.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-API-004
+ * @req REQ-API-005
+ * @req REQ-ABI-001
  * @version 1.8.0
  */
 ENTROPIC_EXPORT entropic_error_t entropic_configure_from_file(
@@ -142,6 +154,10 @@ ENTROPIC_EXPORT entropic_error_t entropic_configure_from_file(
  *         - ENTROPIC_ERROR_INVALID_CONFIG — config validation failed.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-API-004
+ * @req REQ-CFG-001
+ * @req REQ-API-005
+ * @req REQ-ABI-001
  * @version 2.0.1
  */
 ENTROPIC_EXPORT entropic_error_t entropic_configure_dir(
@@ -158,6 +174,9 @@ ENTROPIC_EXPORT entropic_error_t entropic_configure_dir(
  *
  * @threadsafety Single-threaded init/destroy. Must not race with any
  *               other call on the same handle.
+ * @req REQ-API-002
+ * @req REQ-API-003
+ * @req REQ-ABI-001
  * @version 1.8.0
  */
 ENTROPIC_EXPORT void entropic_destroy(entropic_handle_t handle);
@@ -173,6 +192,8 @@ ENTROPIC_EXPORT void entropic_destroy(entropic_handle_t handle);
  * @return Static null-terminated version string. Never NULL. Do NOT free.
  *
  * @threadsafety Thread-safe.
+ * @req REQ-API-008
+ * @req REQ-ABI-001
  * @version 1.8.0
  */
 ENTROPIC_EXPORT const char* entropic_version(void);
@@ -189,6 +210,8 @@ ENTROPIC_EXPORT const char* entropic_version(void);
  * @return API version integer.
  *
  * @threadsafety Thread-safe.
+ * @req REQ-TYPE-002
+ * @req REQ-ABI-001
  * @version 1.8.0
  *
  * @see ENTROPIC_API_VERSION (compile-time constant in entropic_config.h)
@@ -213,6 +236,8 @@ ENTROPIC_EXPORT int entropic_api_version(void);
  * @return Seconds idle, or 0 if handle is NULL / no activity yet.
  *
  * @threadsafety Thread-safe.
+ * @req REQ-API-005
+ * @req REQ-ABI-001
  * @version 2.3.0
  */
 ENTROPIC_EXPORT int64_t entropic_seconds_since_last_activity(
@@ -231,6 +256,8 @@ ENTROPIC_EXPORT int64_t entropic_seconds_since_last_activity(
  * @return Pointer to allocated memory, or NULL on failure.
  *
  * @threadsafety Thread-safe.
+ * @req REQ-API-008
+ * @req REQ-ABI-001
  * @version 1.8.0
  */
 ENTROPIC_EXPORT void* entropic_alloc(size_t size);
@@ -244,6 +271,8 @@ ENTROPIC_EXPORT void* entropic_alloc(size_t size);
  * @param ptr Pointer to free (from engine return value or entropic_alloc).
  *
  * @threadsafety Thread-safe.
+ * @req REQ-API-008
+ * @req REQ-ABI-001
  * @version 1.8.0
  */
 ENTROPIC_EXPORT void entropic_free(void* ptr);
@@ -268,6 +297,10 @@ ENTROPIC_EXPORT void entropic_free(void* ptr);
  *         - ENTROPIC_ERROR_INTERRUPTED — cancelled via entropic_interrupt().
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-API-009
+ * @req REQ-API-010
+ * @req REQ-API-008
+ * @req REQ-API-005
  * @version 1.8.4
  *
  * @par Memory ownership
@@ -300,6 +333,10 @@ ENTROPIC_EXPORT entropic_error_t entropic_run(
  *         - ENTROPIC_ERROR_GENERATE_FAILED — inference error.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-API-009
+ * @req REQ-API-010
+ * @req REQ-API-008
+ * @req REQ-API-005
  * @version 2.8.0
  *
  * @par Memory ownership
@@ -336,6 +373,10 @@ ENTROPIC_EXPORT entropic_error_t entropic_run_as(
  *         - ENTROPIC_ERROR_GENERATE_FAILED — inference error.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-API-009
+ * @req REQ-INFER-018
+ * @req REQ-API-008
+ * @req REQ-API-005
  * @version 2.8.0
  *
  * @par Memory ownership
@@ -370,6 +411,9 @@ ENTROPIC_EXPORT entropic_error_t entropic_run_batch(
  *         - ENTROPIC_ERROR_INTERRUPTED — cancelled via entropic_interrupt().
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-API-009
+ * @req REQ-API-010
+ * @req REQ-API-005
  * @version 1.8.4
  */
 ENTROPIC_EXPORT entropic_error_t entropic_run_streaming(
@@ -413,6 +457,10 @@ ENTROPIC_EXPORT entropic_error_t entropic_run_streaming(
  *         - ENTROPIC_ERROR_GENERATE_FAILED — inference error.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-API-009
+ * @req REQ-INFER-025
+ * @req REQ-API-008
+ * @req REQ-API-005
  * @version 2.1.8
  */
 ENTROPIC_EXPORT entropic_error_t entropic_run_messages(
@@ -436,6 +484,9 @@ ENTROPIC_EXPORT entropic_error_t entropic_run_messages(
  *         error codes.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-API-009
+ * @req REQ-INFER-025
+ * @req REQ-API-005
  * @version 2.1.8
  */
 ENTROPIC_EXPORT entropic_error_t entropic_run_messages_streaming(
@@ -472,6 +523,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_run_messages_streaming(
  * @param observer Token callback (same signature as on_token). NULL to clear.
  * @param user_data Forwarded to observer.
  * @return ENTROPIC_OK on success.
+ * @req REQ-API-010
+ * @req REQ-API-005
  * @version 2.0.6-rc16
  */
 ENTROPIC_EXPORT entropic_error_t entropic_set_stream_observer(
@@ -497,6 +550,9 @@ ENTROPIC_EXPORT entropic_error_t entropic_set_stream_observer(
  * @return ENTROPIC_OK on success.
  *         - ENTROPIC_ERROR_INVALID_HANDLE — handle is NULL.
  *
+ * @req REQ-API-010
+ * @req REQ-LOOP-001
+ * @req REQ-API-005
  * @version 2.0.6-rc16.2
  */
 ENTROPIC_EXPORT entropic_error_t entropic_set_state_observer(
@@ -538,6 +594,9 @@ ENTROPIC_EXPORT entropic_error_t entropic_set_state_observer(
  *               time; the validator snapshots the slot under a
  *               mutex before each fire so an in-flight critique
  *               cannot tear a partial reassignment.
+ * @req REQ-API-010
+ * @req REQ-VALID-002
+ * @req REQ-API-005
  * @version 2.1.12
  */
 ENTROPIC_EXPORT entropic_error_t entropic_set_critique_callbacks(
@@ -560,6 +619,9 @@ ENTROPIC_EXPORT entropic_error_t entropic_set_critique_callbacks(
  *         - ENTROPIC_ERROR_NOT_RUNNING — nothing to interrupt.
  *
  * @threadsafety Thread-safe. Designed for cross-thread cancellation.
+ * @req REQ-API-009
+ * @req REQ-LOOP-006
+ * @req REQ-API-005
  * @version 1.8.4
  */
 ENTROPIC_EXPORT entropic_error_t entropic_interrupt(entropic_handle_t handle);
@@ -602,6 +664,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_interrupt(entropic_handle_t handle);
  *         - ENTROPIC_ERROR_QUEUE_FULL — queue is at
  *           `message_queue_capacity` (default 8). Retry after a turn
  *           completes, or call `entropic_clear_user_message_queue`.
+ * @req REQ-API-005
+ * @req REQ-ABI-001
  * @version 2.1.10
  */
 ENTROPIC_EXPORT entropic_error_t entropic_queue_user_message(
@@ -622,6 +686,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_queue_user_message(
  * @return ENTROPIC_OK on success.
  *         - ENTROPIC_ERROR_INVALID_HANDLE — handle is NULL.
  *         - ENTROPIC_ERROR_INVALID_ARGUMENT — count is NULL.
+ * @req REQ-API-005
+ * @req REQ-ABI-001
  * @version 2.1.10
  */
 ENTROPIC_EXPORT entropic_error_t entropic_user_message_queue_depth(
@@ -639,6 +705,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_user_message_queue_depth(
  * @param handle Engine handle.
  * @return ENTROPIC_OK on success.
  *         - ENTROPIC_ERROR_INVALID_HANDLE — handle is NULL.
+ * @req REQ-API-005
+ * @req REQ-ABI-001
  * @version 2.1.10
  */
 ENTROPIC_EXPORT entropic_error_t entropic_clear_user_message_queue(
@@ -665,6 +733,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_clear_user_message_queue(
  * @param user_data Forwarded to observer.
  * @return ENTROPIC_OK on success.
  *         - ENTROPIC_ERROR_INVALID_HANDLE — handle is NULL.
+ * @req REQ-API-010
+ * @req REQ-API-005
  * @version 2.1.10
  */
 ENTROPIC_EXPORT entropic_error_t entropic_set_queue_observer(
@@ -703,6 +773,9 @@ ENTROPIC_EXPORT entropic_error_t entropic_set_queue_observer(
  * @return ENTROPIC_OK on success.
  *         - ENTROPIC_ERROR_INVALID_HANDLE — handle/compatible is NULL.
  *         - ENTROPIC_ERROR_INVALID_STATE  — engine not configured.
+ * @req REQ-INFER-016
+ * @req REQ-API-008
+ * @req REQ-API-005
  * @version 2.1.11
  */
 ENTROPIC_EXPORT entropic_error_t entropic_speculative_compat(
@@ -765,6 +838,9 @@ typedef void (*entropic_residency_observer_t)(
  * @param user_data Forwarded to observer.
  * @return ENTROPIC_OK on success.
  *         - ENTROPIC_ERROR_INVALID_HANDLE — handle is NULL.
+ * @req REQ-API-010
+ * @req REQ-INFER-019
+ * @req REQ-API-005
  * @version 2.2.4
  */
 ENTROPIC_EXPORT entropic_error_t entropic_set_residency_observer(
@@ -814,6 +890,9 @@ ENTROPIC_EXPORT entropic_error_t entropic_set_residency_observer(
  *         - ENTROPIC_ERROR_INVALID_HANDLE — handle/out_json is NULL.
  *         - ENTROPIC_ERROR_INVALID_STATE — engine not configured.
  *         - ENTROPIC_ERROR_OUT_OF_MEMORY — allocation failed.
+ * @req REQ-INFER-019
+ * @req REQ-API-008
+ * @req REQ-API-005
  * @version 2.2.4
  */
 ENTROPIC_EXPORT entropic_error_t entropic_residency_snapshot(
@@ -834,6 +913,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_residency_snapshot(
  *         - ENTROPIC_ERROR_INVALID_HANDLE — handle is NULL.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-API-005
+ * @req REQ-ABI-001
  * @version 2.0.1
  */
 ENTROPIC_EXPORT entropic_error_t entropic_context_clear(
@@ -854,6 +935,9 @@ ENTROPIC_EXPORT entropic_error_t entropic_context_clear(
  *         - ENTROPIC_ERROR_INVALID_ARGUMENT — messages_json is NULL.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-SAFE-001
+ * @req REQ-API-008
+ * @req REQ-API-005
  * @version 2.0.1
  *
  * @par Memory ownership
@@ -873,6 +957,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_context_get(
  *         - ENTROPIC_ERROR_INVALID_ARGUMENT — count is NULL.
  *
  * @threadsafety Thread-safe (read-only).
+ * @req REQ-API-005
+ * @req REQ-ABI-001
  * @version 2.0.1
  */
 ENTROPIC_EXPORT entropic_error_t entropic_context_count(
@@ -899,6 +985,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_context_count(
  *           (rare; before first tier_lock / configure).
  *
  * @threadsafety Serialized per-handle (api_mutex).
+ * @req REQ-API-005
+ * @req REQ-ABI-001
  * @version 2.1.8
  */
 ENTROPIC_EXPORT entropic_error_t entropic_context_usage(
@@ -931,6 +1019,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_context_usage(
  * `entropic_state_load`.
  *
  * @threadsafety Serialized per-handle (api_mutex).
+ * @req REQ-API-005
+ * @req REQ-ABI-001
  * @version 2.3.25
  */
 ENTROPIC_EXPORT entropic_error_t entropic_state_save(
@@ -956,6 +1046,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_state_save(
  *           (typically a model/format mismatch with the save site).
  *
  * @threadsafety Serialized per-handle (api_mutex).
+ * @req REQ-API-005
+ * @req REQ-ABI-001
  * @version 2.3.25
  */
 ENTROPIC_EXPORT entropic_error_t entropic_state_load(
@@ -977,6 +1069,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_state_load(
  *         - ENTROPIC_ERROR_INVALID_ARGUMENT — out is NULL.
  *
  * @threadsafety Thread-safe (read-only).
+ * @req REQ-API-008
+ * @req REQ-API-005
  * @version 2.0.6-rc16.2
  */
 ENTROPIC_EXPORT entropic_error_t entropic_metrics_json(
@@ -1105,6 +1199,9 @@ typedef ent_decision_t (*ent_delegation_complete_cb)(
  *
  * @threadsafety Serialized per-handle. Callbacks may fire from the
  *        engine thread or a child-loop delegation thread.
+ * @req REQ-API-010
+ * @req REQ-DELEG-002
+ * @req REQ-API-005
  * @version 2.1.5
  */
 ENTROPIC_EXPORT entropic_error_t entropic_set_delegation_callbacks(
@@ -1150,6 +1247,8 @@ typedef void (*ent_validation_attempt_boundary_cb)(
  *         - ENTROPIC_ERROR_INVALID_HANDLE — handle is NULL.
  *
  * @threadsafety Thread-safe.
+ * @req REQ-VALID-003
+ * @req REQ-API-005
  * @version 2.1.5
  */
 ENTROPIC_EXPORT entropic_error_t entropic_validation_set_auto_retry(
@@ -1170,6 +1269,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_validation_set_auto_retry(
  *         - ENTROPIC_ERROR_INVALID_STATE — no paused validation.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-VALID-003
+ * @req REQ-API-005
  * @version 2.1.5
  */
 ENTROPIC_EXPORT entropic_error_t entropic_validation_resume_retry(
@@ -1190,6 +1291,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_validation_resume_retry(
  *         - ENTROPIC_ERROR_INVALID_STATE — no paused validation.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-VALID-003
+ * @req REQ-API-005
  * @version 2.1.5
  */
 ENTROPIC_EXPORT entropic_error_t entropic_validation_accept_last(
@@ -1209,6 +1312,9 @@ ENTROPIC_EXPORT entropic_error_t entropic_validation_accept_last(
  *         - ENTROPIC_ERROR_INVALID_HANDLE — handle is NULL.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-API-010
+ * @req REQ-VALID-003
+ * @req REQ-API-005
  * @version 2.1.5
  */
 ENTROPIC_EXPORT entropic_error_t entropic_set_attempt_boundary_cb(
@@ -1236,6 +1342,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_set_attempt_boundary_cb(
  *         - ENTROPIC_ERROR_CONNECTION_FAILED — transport connect failed.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-MCP-025
+ * @req REQ-API-005
  * @version 1.8.7
  */
 ENTROPIC_EXPORT entropic_error_t entropic_register_mcp_server(
@@ -1257,6 +1365,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_register_mcp_server(
  *         - ENTROPIC_ERROR_SERVER_NOT_FOUND — name not registered.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-MCP-025
+ * @req REQ-API-005
  * @version 1.8.7
  */
 ENTROPIC_EXPORT entropic_error_t entropic_deregister_mcp_server(
@@ -1273,6 +1383,9 @@ ENTROPIC_EXPORT entropic_error_t entropic_deregister_mcp_server(
  *         Caller must free with entropic_free(). NULL on error.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-MCP-025
+ * @req REQ-API-008
+ * @req REQ-API-005
  * @version 1.8.7
  *
  * @par Memory ownership
@@ -1298,6 +1411,8 @@ ENTROPIC_EXPORT char* entropic_list_mcp_servers(
  *         - ENTROPIC_ERROR_STORAGE_FAILED — database open/init failed.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-STOR-001
+ * @req REQ-API-005
  * @version 1.8.8
  */
 ENTROPIC_EXPORT entropic_error_t entropic_storage_open(
@@ -1314,6 +1429,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_storage_open(
  *         - ENTROPIC_ERROR_INVALID_HANDLE — handle is NULL.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-STOR-001
+ * @req REQ-API-005
  * @version 1.8.8
  */
 ENTROPIC_EXPORT entropic_error_t entropic_storage_close(
@@ -1337,6 +1454,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_storage_close(
  *         - ENTROPIC_ERROR_INVALID_CONFIG — identity config malformed.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-IDEN-002
+ * @req REQ-API-005
  * @version 1.8.9
  */
 ENTROPIC_EXPORT entropic_error_t entropic_load_identity(
@@ -1357,6 +1476,9 @@ ENTROPIC_EXPORT entropic_error_t entropic_load_identity(
  *         - ENTROPIC_ERROR_IDENTITY_NOT_FOUND — no identity loaded.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-IDEN-002
+ * @req REQ-API-008
+ * @req REQ-API-005
  * @version 1.8.9
  *
  * @par Memory ownership
@@ -1388,6 +1510,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_get_identity(
  *         - ENTROPIC_ERROR_INVALID_CONFIG — invalid hook_point value.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-HOOK-001
+ * @req REQ-API-005
  * @version 1.9.1
  */
 ENTROPIC_EXPORT entropic_error_t entropic_register_hook(
@@ -1411,6 +1535,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_register_hook(
  *         - ENTROPIC_ERROR_INVALID_HANDLE — handle is NULL.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-HOOK-001
+ * @req REQ-API-005
  * @version 1.9.1
  */
 ENTROPIC_EXPORT entropic_error_t entropic_deregister_hook(
@@ -1436,6 +1562,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_deregister_hook(
  *         - ENTROPIC_ERROR_INVALID_CONFIG — adapter already loaded.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-INFER-023
+ * @req REQ-API-005
  * @version 1.9.2
  */
 ENTROPIC_EXPORT entropic_error_t entropic_adapter_load(
@@ -1454,6 +1582,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_adapter_load(
  *         - ENTROPIC_ERROR_INVALID_HANDLE — handle is NULL.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-INFER-023
+ * @req REQ-API-005
  * @version 1.9.2
  */
 ENTROPIC_EXPORT entropic_error_t entropic_adapter_unload(
@@ -1472,6 +1602,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_adapter_unload(
  *         - ENTROPIC_ERROR_ADAPTER_CANCELLED — hook cancelled.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-INFER-023
+ * @req REQ-API-005
  * @version 1.9.2
  */
 ENTROPIC_EXPORT entropic_error_t entropic_adapter_swap(
@@ -1486,6 +1618,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_adapter_swap(
  * @return State as int: 0=COLD, 1=WARM, 2=HOT. -1 if not found.
  *
  * @threadsafety Thread-safe.
+ * @req REQ-INFER-023
+ * @req REQ-API-005
  * @version 1.9.2
  */
 ENTROPIC_EXPORT int entropic_adapter_state(
@@ -1501,6 +1635,9 @@ ENTROPIC_EXPORT int entropic_adapter_state(
  *         entropic_free(). NULL if adapter not found.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-INFER-023
+ * @req REQ-API-008
+ * @req REQ-API-005
  * @version 1.9.2
  *
  * @par Memory ownership
@@ -1518,6 +1655,9 @@ ENTROPIC_EXPORT char* entropic_adapter_info(
  *         entropic_free().
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-INFER-023
+ * @req REQ-API-008
+ * @req REQ-API-005
  * @version 1.9.2
  *
  * @par Memory ownership
@@ -1539,6 +1679,8 @@ ENTROPIC_EXPORT char* entropic_adapter_list(entropic_handle_t handle);
  *         - ENTROPIC_ERROR_INVALID_CONFIG — key already exists.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-INFER-007
+ * @req REQ-API-005
  * @version 1.9.3
  */
 ENTROPIC_EXPORT entropic_error_t entropic_grammar_register(
@@ -1559,6 +1701,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_grammar_register(
  *         - ENTROPIC_ERROR_LOAD_FAILED — file unreadable.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-INFER-007
+ * @req REQ-API-005
  * @version 1.9.3
  */
 ENTROPIC_EXPORT entropic_error_t entropic_grammar_register_file(
@@ -1577,6 +1721,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_grammar_register_file(
  *         - ENTROPIC_ERROR_GRAMMAR_NOT_FOUND — key not registered.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-INFER-007
+ * @req REQ-API-005
  * @version 1.9.3
  */
 ENTROPIC_EXPORT entropic_error_t entropic_grammar_deregister(
@@ -1592,6 +1738,9 @@ ENTROPIC_EXPORT entropic_error_t entropic_grammar_deregister(
  *         NULL if key not found.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-INFER-007
+ * @req REQ-API-008
+ * @req REQ-API-005
  * @version 1.9.3
  *
  * @par Memory ownership
@@ -1612,6 +1761,9 @@ ENTROPIC_EXPORT char* entropic_grammar_get(
  *       Can be called before engine initialization.
  *
  * @threadsafety Thread-safe.
+ * @req REQ-INFER-007
+ * @req REQ-API-008
+ * @req REQ-ABI-001
  * @version 1.9.3
  *
  * @par Memory ownership
@@ -1629,6 +1781,9 @@ ENTROPIC_EXPORT char* entropic_grammar_validate(const char* gbnf_content);
  *         Caller frees with entropic_free().
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-INFER-007
+ * @req REQ-API-008
+ * @req REQ-API-005
  * @version 1.9.3
  *
  * @par Memory ownership
@@ -1651,6 +1806,8 @@ ENTROPIC_EXPORT char* entropic_grammar_list(entropic_handle_t handle);
  *         - ENTROPIC_ERROR_ALREADY_EXISTS — name already registered.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-INFER-019
+ * @req REQ-API-005
  * @version 1.9.7
  */
 ENTROPIC_EXPORT entropic_error_t entropic_profile_register(
@@ -1667,6 +1824,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_profile_register(
  *         - ENTROPIC_ERROR_PROFILE_NOT_FOUND — name not registered.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-INFER-019
+ * @req REQ-API-005
  * @version 1.9.7
  */
 ENTROPIC_EXPORT entropic_error_t entropic_profile_deregister(
@@ -1685,6 +1844,9 @@ ENTROPIC_EXPORT entropic_error_t entropic_profile_deregister(
  * Caller must free returned string with entropic_free().
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-INFER-019
+ * @req REQ-API-008
+ * @req REQ-API-005
  * @version 1.9.7
  */
 ENTROPIC_EXPORT char* entropic_profile_get(
@@ -1702,6 +1864,9 @@ ENTROPIC_EXPORT char* entropic_profile_get(
  * Caller must free returned string with entropic_free().
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-INFER-019
+ * @req REQ-API-008
+ * @req REQ-API-005
  * @version 1.9.7
  */
 ENTROPIC_EXPORT char* entropic_profile_list(entropic_handle_t handle);
@@ -1716,6 +1881,8 @@ ENTROPIC_EXPORT char* entropic_profile_list(entropic_handle_t handle);
  * @return Tokens per second (EWMA). 0.0 if no data or handle is NULL.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-INFER-021
+ * @req REQ-API-005
  * @version 1.9.7
  */
 ENTROPIC_EXPORT double entropic_throughput_tok_per_sec(
@@ -1729,6 +1896,8 @@ ENTROPIC_EXPORT double entropic_throughput_tok_per_sec(
  * @param model_path Model path. NULL = reset all models.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-INFER-021
+ * @req REQ-API-005
  * @version 1.9.7
  */
 ENTROPIC_EXPORT void entropic_throughput_reset(
@@ -1762,6 +1931,8 @@ typedef enum {
  *         - ENTROPIC_ERROR_INVALID_ARGUMENT — identity_name or pattern is NULL.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-MCP-010
+ * @req REQ-API-005
  * @version 1.9.4
  */
 ENTROPIC_EXPORT entropic_error_t entropic_grant_mcp_key(
@@ -1782,6 +1953,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_grant_mcp_key(
  *         - ENTROPIC_ERROR_IDENTITY_NOT_FOUND — identity not registered.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-MCP-010
+ * @req REQ-API-005
  * @version 1.9.4
  */
 ENTROPIC_EXPORT entropic_error_t entropic_revoke_mcp_key(
@@ -1799,6 +1972,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_revoke_mcp_key(
  * @return 1 if authorized, 0 if denied, -1 on error.
  *
  * @threadsafety Thread-safe.
+ * @req REQ-MCP-010
+ * @req REQ-API-005
  * @version 1.9.4
  */
 ENTROPIC_EXPORT int entropic_check_mcp_key(
@@ -1816,6 +1991,9 @@ ENTROPIC_EXPORT int entropic_check_mcp_key(
  *         NULL if identity not found or error.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-MCP-010
+ * @req REQ-API-008
+ * @req REQ-API-005
  * @version 1.9.4
  *
  * @par Memory ownership
@@ -1841,6 +2019,8 @@ ENTROPIC_EXPORT char* entropic_list_mcp_keys(
  *         - ENTROPIC_ERROR_PERMISSION_DENIED — granter lacks the key.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-MCP-010
+ * @req REQ-API-005
  * @version 1.9.4
  */
 ENTROPIC_EXPORT entropic_error_t entropic_grant_mcp_key_from(
@@ -1857,6 +2037,9 @@ ENTROPIC_EXPORT entropic_error_t entropic_grant_mcp_key_from(
  * @return JSON object string. Caller frees with entropic_free().
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-MCP-010
+ * @req REQ-API-008
+ * @req REQ-API-005
  * @version 1.9.4
  *
  * @par Memory ownership
@@ -1878,6 +2061,8 @@ ENTROPIC_EXPORT char* entropic_serialize_mcp_keys(
  *         - ENTROPIC_ERROR_INVALID_CONFIG — parse failure.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-MCP-010
+ * @req REQ-API-005
  * @version 1.9.4
  */
 ENTROPIC_EXPORT entropic_error_t entropic_deserialize_mcp_keys(
@@ -1894,6 +2079,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_deserialize_mcp_keys(
  *         - ENTROPIC_ERROR_INVALID_CONFIG — no audit logger configured.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-STOR-008
+ * @req REQ-API-005
  * @version 1.9.5
  */
 ENTROPIC_EXPORT entropic_error_t entropic_audit_flush(
@@ -1909,6 +2096,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_audit_flush(
  *         - ENTROPIC_ERROR_INVALID_CONFIG — no audit logger configured.
  *
  * @threadsafety Lock-free read.
+ * @req REQ-STOR-008
+ * @req REQ-API-005
  * @version 1.9.5
  */
 ENTROPIC_EXPORT entropic_error_t entropic_audit_count(
@@ -1934,6 +2123,9 @@ ENTROPIC_EXPORT entropic_error_t entropic_audit_count(
  *         - ENTROPIC_ERROR_INVALID_CONFIG — path cannot be read.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-STOR-008
+ * @req REQ-API-008
+ * @req REQ-API-005
  * @version 1.9.5
  */
 ENTROPIC_EXPORT entropic_error_t entropic_audit_read(
@@ -1963,6 +2155,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_audit_read(
  *         - ENTROPIC_ERROR_ALREADY_EXISTS — name already taken.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-IDEN-002
+ * @req REQ-API-005
  * @version 1.9.6
  */
 ENTROPIC_EXPORT entropic_error_t entropic_create_identity(
@@ -1983,6 +2177,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_create_identity(
  *         - ENTROPIC_ERROR_INVALID_CONFIG — validation failed.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-IDEN-002
+ * @req REQ-API-005
  * @version 1.9.6
  */
 ENTROPIC_EXPORT entropic_error_t entropic_update_identity(
@@ -2003,6 +2199,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_update_identity(
  *         - ENTROPIC_ERROR_IN_USE — identity active in delegation.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-IDEN-002
+ * @req REQ-API-005
  * @version 1.9.6
  */
 ENTROPIC_EXPORT entropic_error_t entropic_destroy_identity(
@@ -2018,6 +2216,9 @@ ENTROPIC_EXPORT entropic_error_t entropic_destroy_identity(
  *         NULL if identity not found or handle is NULL.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-IDEN-002
+ * @req REQ-API-008
+ * @req REQ-API-005
  * @version 1.9.6
  *
  * @par Memory ownership
@@ -2035,6 +2236,9 @@ ENTROPIC_EXPORT char* entropic_get_identity_config(
  *         Caller frees with entropic_free(). NULL on error.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-IDEN-002
+ * @req REQ-API-008
+ * @req REQ-API-005
  * @version 1.9.6
  *
  * @par Memory ownership
@@ -2054,6 +2258,8 @@ ENTROPIC_EXPORT char* entropic_list_identities(
  *         - ENTROPIC_ERROR_INVALID_ARGUMENT — total is NULL.
  *
  * @threadsafety Thread-safe.
+ * @req REQ-IDEN-002
+ * @req REQ-API-005
  * @version 1.9.6
  */
 ENTROPIC_EXPORT entropic_error_t entropic_identity_count(
@@ -2112,6 +2318,9 @@ typedef int (*entropic_compactor_fn)(
  *         - ENTROPIC_ERROR_COMPACTION_FAILED
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-COMPACT-001
+ * @req REQ-API-008
+ * @req REQ-API-005
  * @version 1.9.9
  */
 ENTROPIC_EXPORT entropic_error_t entropic_compact(
@@ -2138,6 +2347,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_compact(
  *         - ENTROPIC_ERROR_INVALID_CONFIG (NULL compactor)
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-COMPACT-001
+ * @req REQ-API-005
  * @version 1.9.9
  */
 ENTROPIC_EXPORT entropic_error_t entropic_register_compactor(
@@ -2158,6 +2369,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_register_compactor(
  *         - ENTROPIC_ERROR_INVALID_HANDLE
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-COMPACT-001
+ * @req REQ-API-005
  * @version 1.9.9
  */
 ENTROPIC_EXPORT entropic_error_t entropic_deregister_compactor(
@@ -2178,6 +2391,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_deregister_compactor(
  *         - ENTROPIC_ERROR_INVALID_ARGUMENT (NULL compactor output)
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-COMPACT-001
+ * @req REQ-API-005
  * @version 1.9.9
  */
 ENTROPIC_EXPORT entropic_error_t entropic_get_default_compactor(
@@ -2234,6 +2449,9 @@ typedef struct entropic_logprob_result {
  *
  * @threadsafety Serialized per-model via eval_mutex. Does not
  *               block generation on the same model.
+ * @req REQ-INFER-024
+ * @req REQ-API-008
+ * @req REQ-API-005
  * @version 1.9.10
  */
 ENTROPIC_EXPORT entropic_error_t entropic_get_logprobs(
@@ -2258,6 +2476,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_get_logprobs(
  *         entropic_get_logprobs().
  *
  * @threadsafety Same as entropic_get_logprobs().
+ * @req REQ-INFER-024
+ * @req REQ-API-005
  * @version 1.9.10
  */
 ENTROPIC_EXPORT entropic_error_t entropic_compute_perplexity(
@@ -2275,6 +2495,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_compute_perplexity(
  * and is NOT freed.
  *
  * @param result Pointer to result struct. NULL-safe (no-op).
+ * @req REQ-API-008
+ * @req REQ-ABI-001
  * @version 1.9.10
  */
 ENTROPIC_EXPORT void entropic_free_logprob_result(
@@ -2294,6 +2516,8 @@ ENTROPIC_EXPORT void entropic_free_logprob_result(
  *         - ENTROPIC_ERROR_INVALID_HANDLE — handle is NULL.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-VALID-001
+ * @req REQ-API-005
  * @version 1.9.8
  */
 ENTROPIC_EXPORT entropic_error_t entropic_validation_set_enabled(
@@ -2311,6 +2535,8 @@ ENTROPIC_EXPORT entropic_error_t entropic_validation_set_enabled(
  *         - ENTROPIC_ERROR_INVALID_ARGUMENT — identity_name is NULL.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-VALID-001
+ * @req REQ-API-005
  * @version 1.9.8
  */
 ENTROPIC_EXPORT entropic_error_t entropic_validation_set_identity(
@@ -2333,6 +2559,9 @@ ENTROPIC_EXPORT entropic_error_t entropic_validation_set_identity(
  * Caller must free returned string with entropic_free().
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-VALID-001
+ * @req REQ-API-008
+ * @req REQ-API-005
  * @version 1.9.8
  */
 ENTROPIC_EXPORT char* entropic_validation_last_result(
@@ -2351,6 +2580,8 @@ ENTROPIC_EXPORT char* entropic_validation_last_result(
  * @return 1 if vision-capable (mmproj loaded), 0 if text-only.
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-INFER-025
+ * @req REQ-API-005
  * @version 1.9.11
  */
 ENTROPIC_EXPORT int entropic_model_has_vision(
@@ -2377,6 +2608,8 @@ ENTROPIC_EXPORT int entropic_model_has_vision(
  * Caller must free returned string with entropic_free().
  *
  * @threadsafety Serialized per-handle.
+ * @req REQ-API-008
+ * @req REQ-API-005
  * @version 1.9.12
  */
 ENTROPIC_EXPORT entropic_error_t entropic_get_diagnostic_prompt(

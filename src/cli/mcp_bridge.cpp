@@ -155,7 +155,7 @@ int connect_unix_socket(const std::string& path)
  * @param socket     Computed socket path.
  * @param why        errno-derived reason text.
  * @return 1 (process exit code).
- * @utility
+ * @req REQ-PROD-002
  * @version 2.1.7
  */
 int emit_no_engine_error(
@@ -235,7 +235,7 @@ void service_revents(struct pollfd* fds, int sock_fd,
  * ExternalBridge observes that and tears down its per-client thread.
  *
  * @param sock_fd Connected unix socket fd.
- * @internal
+ * @req REQ-PROD-002
  * @version 2.1.7
  */
 void relay_loop(int sock_fd)
@@ -269,7 +269,7 @@ void relay_loop(int sock_fd)
  * @param argc Argument count (after the "mcp-bridge" subcommand).
  * @param argv Argument vector. argv[0] is "mcp-bridge".
  * @return 0 on clean exit, 1 if no engine is reachable.
- * @internal
+ * @req REQ-PROD-002
  * @version 2.1.7
  */
 int run_mcp_bridge(int argc, char* argv[])

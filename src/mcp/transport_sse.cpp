@@ -220,10 +220,17 @@ std::string SSETransport::await_response(
 
 /**
  * @brief POST a JSON-RPC request and wait for matching response.
+ *
+ * Request and response are decoupled — the POST goes to the message
+ * endpoint, the answer arrives on the SSE stream — so responses are
+ * matched back by JSON-RPC id.
+ *
  * @param request_json JSON-RPC request string.
- * @param timeout_ms Timeout (0 = default).
- * @return Response string, or empty on error/timeout.
- * @internal
+ * @param timeout_ms Timeout in ms (0 = the transport's default).
+ * @return The matching response; an empty string when disconnected, the
+ *         message endpoint is unknown, the id could not be parsed, the
+ *         POST failed, or the wait timed out — never a hang.
+ * @req REQ-MCP-025
  * @version 2.0.0
  */
 std::string SSETransport::send_request(

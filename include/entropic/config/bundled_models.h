@@ -72,7 +72,7 @@ struct BundledModelEntry {
  *
  * @return A default-constructed BundledModels instance; populate via load().
  * @req REQ-CFG-003
- * @version 2.0.2
+ * @version 2.10.4
  */
 class ENTROPIC_EXPORT BundledModels {
 public:
@@ -80,6 +80,7 @@ public:
      * @brief Load registry from YAML file.
      * @param path Path to bundled_models.yaml.
      * @return Empty string on success, error message on failure.
+     * @req REQ-CFG-003
      * @version 1.8.1
      */
     std::string load(const std::filesystem::path& path);
@@ -108,6 +109,7 @@ public:
      *
      * @param value Registry key or direct path string.
      * @return Resolved filesystem path.
+     * @req REQ-CFG-003
      * @version 1.8.1
      */
     std::filesystem::path resolve(const std::string& value) const;
@@ -137,6 +139,7 @@ public:
      * @param size_label Size label (e.g. "4b").
      * @param quant Quant label (e.g. "Q8_0").
      * @return Flat key string, or empty if no match.
+     * @req REQ-CFG-003
      * @version 2.3.0
      */
     std::string find_by(
@@ -152,6 +155,8 @@ public:
      * one found.
      *
      * @return Empty string on success, error message if not found.
+     * @req REQ-CFG-003
+     * @req REQ-CFG-008
      * @version 2.0.1
      */
     std::string auto_discover_and_load();

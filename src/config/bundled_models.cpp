@@ -34,7 +34,7 @@ namespace {
  * load dies with "Model file not found".
  *
  * @return Resolved share dir, or empty if dladdr fails.
- * @internal
+ * @req REQ-CFG-003
  * @version 1.0
  */
 std::filesystem::path share_dir_from_library()
@@ -60,7 +60,7 @@ std::filesystem::path share_dir_from_library()
  * @param child YAML node for the entry.
  * @param[out] entry Populated entry.
  * @return Empty on success, error message if 'name' is missing.
- * @internal
+ * @req REQ-CFG-003
  * @version 2.3.7
  */
 static std::string parse_bundled_entry(ryml::ConstNodeRef child,
@@ -89,7 +89,7 @@ static std::string parse_bundled_entry(ryml::ConstNodeRef child,
  * @brief Load registry from YAML file.
  * @param path Path to bundled_models.yaml.
  * @return Empty string on success, error message on failure.
- * @internal
+ * @req REQ-CFG-003
  * @version 2.3.7
  */
 std::string BundledModels::load(const std::filesystem::path& path)
@@ -155,7 +155,8 @@ const BundledModelEntry* BundledModels::get(const std::string& key) const
  * string when no entry matches OR when the matching entries haven't
  * been backfilled with structured metadata yet.
  *
- * @internal
+ * @return Flat registry key of the first matching entry, or empty string.
+ * @req REQ-CFG-003
  * @version 2.3.0
  */
 std::string BundledModels::find_by(
@@ -193,7 +194,7 @@ std::string BundledModels::find_by(
  *
  * @param value Registry key or direct path string.
  * @return Resolved filesystem path.
- * @internal
+ * @req REQ-CFG-003
  * @version 2.0.5.1
  */
 std::filesystem::path BundledModels::resolve(const std::string& value) const
@@ -261,7 +262,8 @@ BundledModels::entries() const
  * install prefix, not just the build host.
  *
  * @return Empty string on success, error message if none found.
- * @internal
+ * @req REQ-CFG-003
+ * @req REQ-CFG-008
  * @version 2.3.6
  */
 std::string BundledModels::auto_discover_and_load() {

@@ -31,6 +31,8 @@ extern "C" {
  *
  * ENTROPIC_OK (0) on success. All other values indicate failure.
  * Use entropic_error_name() to get a human-readable string for logging.
+ *
+ * @req REQ-TYPE-002
  */
 typedef enum {
     ENTROPIC_OK = 0,                          ///< Success
@@ -126,6 +128,7 @@ ENTROPIC_EXPORT const char* entropic_last_error(entropic_handle_t handle);
  *         entropic_error_name(err), entropic_last_error(h));
  * }
  * @endcode
+ * @req REQ-TYPE-003
  * @version 1.8.0
  */
 ENTROPIC_EXPORT const char* entropic_error_name(entropic_error_t code);

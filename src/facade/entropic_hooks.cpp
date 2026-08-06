@@ -35,7 +35,8 @@ static entropic::HookRegistry* get_registry(entropic_handle_t handle) {
  * @brief Register a hook callback for a hook point.
  *
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-HOOK-001
+ * @req REQ-API-005
  * @version 1.9.1
  */
 extern "C" ENTROPIC_EXPORT entropic_error_t
@@ -61,7 +62,8 @@ entropic_register_hook(
  * @brief Deregister a previously registered hook callback.
  *
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-HOOK-001
+ * @req REQ-API-005
  * @version 1.9.1
  */
 extern "C" ENTROPIC_EXPORT entropic_error_t

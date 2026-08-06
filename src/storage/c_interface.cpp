@@ -73,7 +73,9 @@ static std::optional<std::string> opt_str(const char* s) {
  * @brief Create a storage backend.
  * @param db_path Database file path.
  * @return Handle or NULL.
- * @internal
+ * @req REQ-ABI-001
+ * @req REQ-ABI-002
+ * @req REQ-STOR-001
  * @version 1.8.8
  */
 entropic_storage_backend_t
@@ -91,7 +93,9 @@ entropic_storage_create(const char* db_path) {
  * @brief Initialize storage.
  * @param storage Handle.
  * @return Error code.
- * @internal
+ * @req REQ-ABI-001
+ * @req REQ-ABI-002
+ * @req REQ-STOR-001
  * @version 1.8.8
  */
 entropic_error_t
@@ -109,7 +113,7 @@ entropic_storage_initialize(entropic_storage_backend_t storage) {
 /**
  * @brief Destroy storage.
  * @param storage Handle (NULL-safe).
- * @internal
+ * @req REQ-ABI-001
  * @version 1.8.8
  */
 void entropic_storage_destroy(entropic_storage_backend_t storage) {
@@ -125,7 +129,9 @@ void entropic_storage_destroy(entropic_storage_backend_t storage) {
  * @param project_path Optional project path.
  * @param model_id Optional model ID.
  * @return Conversation ID (caller frees) or NULL.
- * @internal
+ * @req REQ-ABI-001
+ * @req REQ-ABI-002
+ * @req REQ-STOR-003
  * @version 2.0.0
  */
 char* entropic_storage_create_conversation(
@@ -150,7 +156,9 @@ char* entropic_storage_create_conversation(
  * @param conversation_id Conversation ID.
  * @param messages_json JSON array.
  * @return Error code.
- * @internal
+ * @req REQ-ABI-001
+ * @req REQ-ABI-002
+ * @req REQ-STOR-003
  * @version 2.0.0
  */
 entropic_error_t entropic_storage_save_conversation(
@@ -175,7 +183,9 @@ entropic_error_t entropic_storage_save_conversation(
  * @param conversation_id Conversation ID.
  * @param result_json Output JSON.
  * @return Error code.
- * @internal
+ * @req REQ-ABI-001
+ * @req REQ-ABI-002
+ * @req REQ-STOR-003
  * @version 2.0.0
  */
 entropic_error_t entropic_storage_load_conversation(
@@ -204,7 +214,9 @@ entropic_error_t entropic_storage_load_conversation(
  * @param offset Offset.
  * @param result_json Output JSON.
  * @return Error code.
- * @internal
+ * @req REQ-ABI-001
+ * @req REQ-ABI-002
+ * @req REQ-STOR-003
  * @version 2.0.0
  */
 entropic_error_t entropic_storage_list_conversations(
@@ -232,7 +244,9 @@ entropic_error_t entropic_storage_list_conversations(
  * @param limit Max results.
  * @param result_json Output JSON.
  * @return Error code.
- * @internal
+ * @req REQ-ABI-001
+ * @req REQ-ABI-002
+ * @req REQ-STOR-004
  * @version 2.0.0
  */
 entropic_error_t entropic_storage_search_conversations(
@@ -258,7 +272,10 @@ entropic_error_t entropic_storage_search_conversations(
  * @param storage Handle.
  * @param conversation_id Conversation ID.
  * @return Error code.
- * @internal
+ * @req REQ-ABI-001
+ * @req REQ-ABI-002
+ * @req REQ-STOR-003
+ * @req REQ-STOR-004
  * @version 2.0.0
  */
 entropic_error_t entropic_storage_delete_conversation(
@@ -288,7 +305,9 @@ entropic_error_t entropic_storage_delete_conversation(
  * @param max_turns Turn limit.
  * @param result_json Output JSON.
  * @return Error code.
- * @internal
+ * @req REQ-ABI-001
+ * @req REQ-ABI-002
+ * @req REQ-STOR-005
  * @version 2.0.0
  */
 entropic_error_t entropic_storage_create_delegation(
@@ -327,7 +346,9 @@ entropic_error_t entropic_storage_create_delegation(
  * @param status Status string.
  * @param result_summary Optional summary.
  * @return Error code.
- * @internal
+ * @req REQ-ABI-001
+ * @req REQ-ABI-002
+ * @req REQ-STOR-005
  * @version 2.0.0
  */
 entropic_error_t entropic_storage_complete_delegation(
@@ -354,7 +375,9 @@ entropic_error_t entropic_storage_complete_delegation(
  * @param conversation_id Parent conversation.
  * @param result_json Output JSON.
  * @return Error code.
- * @internal
+ * @req REQ-ABI-001
+ * @req REQ-ABI-002
+ * @req REQ-STOR-005
  * @version 2.0.0
  */
 entropic_error_t entropic_storage_get_delegations(
@@ -383,7 +406,9 @@ entropic_error_t entropic_storage_get_delegations(
  * @param conversation_id Conversation ID.
  * @param messages_json JSON messages.
  * @return Error code.
- * @internal
+ * @req REQ-ABI-001
+ * @req REQ-ABI-002
+ * @req REQ-STOR-003
  * @version 2.0.0
  */
 entropic_error_t entropic_storage_save_snapshot(
@@ -409,7 +434,9 @@ entropic_error_t entropic_storage_save_snapshot(
  * @param storage Handle.
  * @param result_json Output JSON.
  * @return Error code.
- * @internal
+ * @req REQ-ABI-001
+ * @req REQ-ABI-002
+ * @req REQ-STOR-004
  * @version 2.0.0
  */
 entropic_error_t entropic_storage_get_stats(

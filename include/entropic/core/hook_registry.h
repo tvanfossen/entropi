@@ -55,6 +55,7 @@ public:
      * @param priority Execution order (0 = first, ascending).
      * @return ENTROPIC_OK or ENTROPIC_ERROR_INVALID_CONFIG.
      * @threadsafety Write-locks the hook point's mutex.
+     * @req REQ-HOOK-001
      * @version 1.9.1
      */
     entropic_error_t register_hook(
@@ -74,6 +75,7 @@ public:
      * @param user_data user_data from registration.
      * @return ENTROPIC_OK or ENTROPIC_ERROR_INVALID_CONFIG.
      * @threadsafety Write-locks the hook point's mutex.
+     * @req REQ-HOOK-001
      * @version 1.9.1
      */
     entropic_error_t deregister_hook(
@@ -88,6 +90,7 @@ public:
      * @param out_json Output: modified JSON (caller frees), or NULL.
      * @return 0 = proceed, non-zero = cancelled.
      * @threadsafety Read-locks, then dispatches on snapshot.
+     * @req REQ-HOOK-001
      * @version 1.9.1
      */
     int fire_pre(
@@ -101,6 +104,7 @@ public:
      * @param context_json Input result JSON.
      * @param out_json Output: transformed JSON (caller frees), or NULL.
      * @threadsafety Read-locks, then dispatches on snapshot.
+     * @req REQ-HOOK-001
      * @version 1.9.1
      */
     void fire_post(
@@ -113,6 +117,7 @@ public:
      * @param point The hook point.
      * @param context_json Context JSON.
      * @threadsafety Read-locks, then dispatches on snapshot.
+     * @req REQ-HOOK-001
      * @version 1.9.1
      */
     void fire_info(
@@ -124,6 +129,7 @@ public:
      * @param point Hook point.
      * @return Entry count, or 0 if invalid point.
      * @threadsafety Read-locks the hook point's mutex.
+     * @req REQ-HOOK-001
      * @version 1.9.1
      */
     size_t hook_count(entropic_hook_point_t point) const;

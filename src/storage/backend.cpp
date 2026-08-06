@@ -77,7 +77,7 @@ size_t su8_seq_len(const uint8_t* p, const uint8_t* end) {
  * @brief Replace invalid UTF-8 byte sequences with U+FFFD (gh#112/gh#113).
  * @param s Raw bytes from SQLite (possibly invalid UTF-8).
  * @return Valid UTF-8 string; bad sequences replaced with U+FFFD.
- * @internal
+ * @req REQ-SAFE-001
  * @version 2.9.9
  */
 std::string sanitize_storage_utf8(const std::string& s) {
@@ -192,7 +192,7 @@ SqliteStorageBackend::SqliteStorageBackend(
 /**
  * @brief Initialize storage.
  * @return true on success.
- * @internal
+ * @req REQ-STOR-001
  * @version 1.8.8
  */
 bool SqliteStorageBackend::initialize() {
@@ -201,7 +201,7 @@ bool SqliteStorageBackend::initialize() {
 
 /**
  * @brief Close storage.
- * @internal
+ * @req REQ-STOR-001
  * @version 1.8.8
  */
 void SqliteStorageBackend::close() {
@@ -216,7 +216,7 @@ void SqliteStorageBackend::close() {
  * @param project_path Optional project path.
  * @param model_id Optional model identifier.
  * @return Conversation ID.
- * @internal
+ * @req REQ-STOR-003
  * @version 2.0.0
  */
 std::string SqliteStorageBackend::create_conversation(
@@ -310,7 +310,7 @@ void bind_message_insert(sqlite3_stmt* s, const std::string& conversation_id,
  * @param conversation_id Conversation ID.
  * @param messages_json JSON array of message objects.
  * @return true on success.
- * @internal
+ * @req REQ-STOR-003
  * @version 2.3.7
  */
 bool SqliteStorageBackend::save_messages(
@@ -394,7 +394,7 @@ json message_row_to_json(sqlite3_stmt* s) {
  * @param conversation_id Conversation ID.
  * @param[out] result_json JSON result.
  * @return true if found.
- * @internal
+ * @req REQ-STOR-003
  * @version 2.3.7
  */
 bool SqliteStorageBackend::load_conversation(
@@ -434,7 +434,7 @@ bool SqliteStorageBackend::load_conversation(
  * @param offset Pagination offset.
  * @param[out] result_json JSON array of summaries.
  * @return true on success.
- * @internal
+ * @req REQ-STOR-003
  * @version 1.8.8
  */
 bool SqliteStorageBackend::list_conversations(
@@ -470,7 +470,8 @@ bool SqliteStorageBackend::list_conversations(
  * @brief Delete a conversation and all cascading records.
  * @param conversation_id Conversation ID.
  * @return true on success.
- * @internal
+ * @req REQ-STOR-003
+ * @req REQ-STOR-004
  * @version 2.0.0
  */
 bool SqliteStorageBackend::delete_conversation(
@@ -489,7 +490,7 @@ bool SqliteStorageBackend::delete_conversation(
  * @param conversation_id Conversation ID.
  * @param title New title.
  * @return true on success.
- * @internal
+ * @req REQ-STOR-003
  * @version 1.8.8
  */
 bool SqliteStorageBackend::update_title(
@@ -511,7 +512,7 @@ bool SqliteStorageBackend::update_title(
  * @param limit Max results.
  * @param[out] result_json JSON array of search results.
  * @return true on success.
- * @internal
+ * @req REQ-STOR-004
  * @version 1.8.8
  */
 bool SqliteStorageBackend::search_conversations(
@@ -625,7 +626,7 @@ static bool guard_parent_conversation(
  * @param[out] delegation_id Created delegation ID.
  * @param[out] child_conversation_id Created child conversation ID.
  * @return true on success.
- * @internal
+ * @req REQ-STOR-005
  * @version 2.1.12
  */
 bool SqliteStorageBackend::create_delegation(
@@ -687,7 +688,7 @@ bool SqliteStorageBackend::create_delegation(
  * @param status "completed" or "failed".
  * @param result_summary Optional summary text.
  * @return true on success.
- * @internal
+ * @req REQ-STOR-005
  * @version 1.8.8
  */
 bool SqliteStorageBackend::complete_delegation(
@@ -713,7 +714,7 @@ namespace {
  * @brief Map a full delegations row to its JSON object.
  * @param s Stepped statement (SELECT * FROM delegations).
  * @return JSON delegation object (all columns).
- * @utility
+ * @req REQ-SAFE-001
  * @version 2.9.11
  */
 json delegation_row_to_json(sqlite3_stmt* s) {
@@ -740,7 +741,7 @@ json delegation_row_to_json(sqlite3_stmt* s) {
  *
  * @param s Stepped statement (SELECT * FROM delegations).
  * @return JSON summary object.
- * @utility
+ * @req REQ-SAFE-001
  * @version 2.9.11
  */
 json delegation_summary_to_json(sqlite3_stmt* s) {
@@ -764,7 +765,8 @@ json delegation_summary_to_json(sqlite3_stmt* s) {
  * @param conversation_id Parent conversation ID.
  * @param[out] result_json JSON array of delegation records.
  * @return true on success.
- * @internal
+ * @req REQ-STOR-005
+ * @req REQ-SAFE-001
  * @version 2.3.7
  */
 bool SqliteStorageBackend::get_delegations(
@@ -791,7 +793,8 @@ bool SqliteStorageBackend::get_delegations(
  * @param delegation_id Delegation id.
  * @param[out] result_json Object JSON of the delegation row.
  * @return true if found and parsed.
- * @internal
+ * @req REQ-STOR-005
+ * @req REQ-SAFE-001
  * @version 2.3.7
  */
 bool SqliteStorageBackend::get_delegation_by_id(
@@ -827,7 +830,8 @@ bool SqliteStorageBackend::get_delegation_by_id(
  * @param max_results  Cap on returned rows.
  * @param[out] result_json JSON array of delegation rows.
  * @return true on success.
- * @internal
+ * @req REQ-STOR-005
+ * @req REQ-SAFE-001
  * @version 2.3.7
  */
 bool SqliteStorageBackend::search_delegations(
@@ -857,7 +861,7 @@ bool SqliteStorageBackend::search_delegations(
  * @param conversation_id Conversation ID.
  * @param messages_json JSON array of all messages.
  * @return true on success.
- * @internal
+ * @req REQ-STOR-003
  * @version 1.8.8
  */
 bool SqliteStorageBackend::save_snapshot(
@@ -890,7 +894,7 @@ bool SqliteStorageBackend::save_snapshot(
  * @brief Get storage statistics.
  * @param[out] result_json JSON with counts.
  * @return true on success.
- * @internal
+ * @req REQ-STOR-004
  * @version 1.8.8
  */
 bool SqliteStorageBackend::get_stats(std::string& result_json) {
@@ -923,7 +927,7 @@ bool SqliteStorageBackend::get_stats(std::string& result_json) {
 /**
  * @brief Generate a UUID v4 string.
  * @return UUID string.
- * @internal
+ * @req REQ-STOR-003
  * @version 1.8.8
  */
 std::string generate_uuid() {
@@ -952,7 +956,7 @@ std::string generate_uuid() {
 /**
  * @brief Get current UTC time as ISO 8601 string.
  * @return Timestamp string.
- * @internal
+ * @req REQ-STOR-003
  * @version 1.8.8
  */
 std::string utc_timestamp() {
@@ -972,7 +976,7 @@ std::string utc_timestamp() {
  * @param project_path Optional project path.
  * @param model_id Optional model ID.
  * @return Populated record.
- * @internal
+ * @req REQ-STOR-003
  * @version 1.8.8
  */
 ConversationRecord make_conversation(
@@ -991,7 +995,8 @@ ConversationRecord make_conversation(
  * @param target_tier Target tier.
  * @param task Task description.
  * @return Populated record.
- * @internal
+ * @req REQ-STOR-003
+ * @req REQ-STOR-005
  * @version 1.8.8
  */
 DelegationRecord make_delegation(

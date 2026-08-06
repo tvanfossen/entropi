@@ -49,8 +49,11 @@ constexpr int kSpecVocabCheckStartTokenId = 5;
  * a diagnostic naming the offending classification.
  *
  * @param target Target llama_model.
- * @return Diagnostic string if rejected, empty optional otherwise.
- * @internal
+ * @return Diagnostic string if rejected, empty optional otherwise. Hybrid
+ *         SSM targets are refused because the chunked scan does not carry
+ *         recurrent state across ubatch boundaries, so logits diverge at
+ *         the first speculative-batch boundary.
+ * @req REQ-INFER-016
  * @version 2.1.11 [reviewed]
  */
 std::optional<std::string> check_arch_gate(
@@ -262,10 +265,15 @@ std::string build_compat_diagnostic(
 /**
  * @brief Compatibility orchestrator.
  *
+ * Metadata-only: no llama_context is allocated just to learn viability.
+ *
  * @param target Target (verifier) model.
  * @param draft  Draft (proposer) model.
- * @return CompatResult.
- * @utility
+ * @return CompatResult — compatible with an empty reason, or incompatible
+ *         carrying the diagnostic for the FIRST rule that failed
+ *         (recurrent/hybrid arch, vocab type, BOS/EOS, vocab size delta,
+ *         token text).
+ * @req REQ-INFER-016
  * @version 2.1.11
  */
 CompatResult check_compat(

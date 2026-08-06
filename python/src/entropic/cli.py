@@ -29,7 +29,9 @@ from entropic import _loader, install_engine
 
 
 ## @brief Replace this process with bin/entropic argv...; return on failure.
-## @utility
+## @return 2 if no native binary is installed; 1 if execvp fails (it does not
+##         return on success — the process image is replaced).
+## @req REQ-PROD-001
 ## @version 2.1.0
 def _exec_native(argv: list[str]) -> int:
     """Replace this process with ``bin/entropic argv...``; return on failure."""
@@ -60,7 +62,10 @@ _INSTALL_ENGINE_HELP = (
 
 
 ## @brief Console-script entry point. argv excludes the program name.
-## @utility
+## @return 0 for `install-engine --help`, the install-engine exit code for that
+##         subcommand, else the _exec_native() failure code (argv is otherwise
+##         handed to the native binary verbatim and never returns).
+## @req REQ-PROD-001
 ## @version 2.1.1-rc1
 def main(argv: list[str] | None = None) -> int:
     """Console-script entry point. argv excludes the program name."""

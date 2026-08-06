@@ -61,6 +61,7 @@ public:
      * @param ctx Loop context.
      * @param keep_recent Number of recent results to keep.
      * @return (pruned_count, freed_chars).
+     * @req REQ-COMPACT-002
      * @version 1.8.4
      */
     std::pair<int, int> prune_tool_results(
@@ -70,6 +71,7 @@ public:
     /**
      * @brief Auto-prune tool results older than TTL iterations.
      * @param ctx Loop context.
+     * @req REQ-COMPACT-002
      * @version 1.8.4
      */
     void prune_old_tool_results(LoopContext& ctx);
@@ -77,6 +79,7 @@ public:
     /**
      * @brief Inject context usage warning if over threshold.
      * @param ctx Loop context.
+     * @req REQ-COMPACT-002
      * @version 1.8.4
      */
     void inject_context_warning(LoopContext& ctx);
@@ -85,6 +88,8 @@ public:
      * @brief Check and perform compaction if needed.
      * @param ctx Loop context.
      * @param force Bypass threshold check.
+     * @req REQ-COMPACT-001
+     * @req REQ-HOOK-002
      * @version 1.8.4
      */
     void check_compaction(LoopContext& ctx, bool force = false);
@@ -97,7 +102,8 @@ public:
      * @param ctx Loop context.
      * @param force Whether this is a forced compaction.
      * @return true if a hook cancelled compaction.
-     * @internal
+     * @req REQ-COMPACT-001
+     * @req REQ-HOOK-002
      * @version 2.3.7
      */
     bool fire_pre_compact_hook(LoopContext& ctx, bool force);
@@ -110,7 +116,8 @@ public:
      * @param ctx Loop context.
      * @param old_count Token count before compaction.
      * @param new_count Token count after compaction.
-     * @internal
+     * @req REQ-COMPACT-001
+     * @req REQ-HOOK-002
      * @version 2.3.7
      */
     void fire_post_compact_hooks(LoopContext& ctx, int old_count,

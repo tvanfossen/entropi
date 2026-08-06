@@ -198,7 +198,8 @@ static void send_progress(int fd, const std::string& token_text,
  *
  * @param handle Engine handle.
  * @return MCP tool result JSON.
- * @utility
+ * @req REQ-API-012
+ * @req REQ-BRIDGE-001
  * @version 2.10.2
  */
 static json final_answer_from_context(entropic_handle_t handle) {
@@ -220,7 +221,8 @@ static json final_answer_from_context(entropic_handle_t handle) {
  * @param handle Engine handle.
  * @param args Tool arguments (must contain "prompt" string).
  * @return MCP tool result JSON (final clean text from entropic_run).
- * @internal
+ * @req REQ-API-012
+ * @req REQ-BRIDGE-001
  * @version 2.10.2
  */
 static json handle_ask_plain(entropic_handle_t handle, const json& args) {
@@ -255,7 +257,8 @@ static json handle_ask_plain(entropic_handle_t handle, const json& args) {
  * @param client_fd Socket fd for streaming progress notifications.
  * @param call_id JSON-RPC request id (for progress token correlation).
  * @return MCP tool result JSON (final clean text).
- * @internal
+ * @req REQ-API-012
+ * @req REQ-BRIDGE-001
  * @version 2.10.2
  */
 static json handle_ask(entropic_handle_t handle, const json& args,
@@ -287,7 +290,7 @@ static json handle_ask(entropic_handle_t handle, const json& args,
  * @brief Handle entropic.status.
  * @param handle Engine handle.
  * @return MCP tool result JSON.
- * @internal
+ * @req REQ-BRIDGE-001
  * @version 2.0.6-rc16.2
  */
 static json handle_status(entropic_handle_t handle) {
@@ -352,7 +355,7 @@ struct AsyncFinalState {
  * @param err Return code from entropic_run.
  * @param result_json JSON result (owned; freed on success, else NULL).
  * @return AsyncFinalState ready to be stored on the task.
- * @utility
+ * @req REQ-BRIDGE-001
  * @version 2.10.2
  */
 static AsyncFinalState derive_async_final_state(
@@ -430,7 +433,7 @@ static bool any_cancelling_left(ExternalBridge* bridge) {
  *
  * @param handle Engine handle (for interrupt).
  * @param bridge Bridge whose tasks_ registry is being canceled.
- * @internal
+ * @req REQ-BRIDGE-001
  * @version 2.1.0
  */
 static void cancel_inflight_async_tasks(
@@ -453,7 +456,7 @@ static void cancel_inflight_async_tasks(
  * @param handle Engine handle.
  * @param bridge Bridge instance (used to reach the task registry).
  * @return MCP tool result JSON.
- * @internal
+ * @req REQ-BRIDGE-001
  * @version 2.0.6-rc16
  */
 static json handle_clear(entropic_handle_t handle,
@@ -470,7 +473,7 @@ static json handle_clear(entropic_handle_t handle,
  * @brief Handle entropic.context_count.
  * @param handle Engine handle.
  * @return MCP tool result JSON.
- * @internal
+ * @req REQ-BRIDGE-001
  * @version 2.0.8
  */
 static json handle_count(entropic_handle_t handle) {
@@ -489,7 +492,7 @@ static json handle_count(entropic_handle_t handle) {
  *
  * @param args Tool arguments (must contain "task_id").
  * @return MCP tool result JSON with status/phase/result/error.
- * @internal
+ * @req REQ-BRIDGE-001
  * @version 2.0.6-rc16
  */
 json ExternalBridge::handle_ask_status(const json& args) {
@@ -535,7 +538,7 @@ static std::string generate_task_id() {
  * @param client_fd Socket fd.
  * @param call_id Request id.
  * @return MCP tool result JSON.
- * @internal
+ * @req REQ-BRIDGE-001
  * @version 2.9.12
  */
 static json dispatch_ask(entropic_handle_t handle,
@@ -566,7 +569,7 @@ static json dispatch_ask(entropic_handle_t handle,
  * @param client_fd Socket fd for streaming (entropic.ask only).
  * @param call_id JSON-RPC request id for progress correlation.
  * @return MCP tool result JSON.
- * @internal
+ * @req REQ-BRIDGE-001
  * @version 2.0.6-rc16
  */
 static json dispatch_tool(entropic_handle_t handle,
@@ -595,6 +598,7 @@ static json dispatch_tool(entropic_handle_t handle,
  * @param handle Engine handle (must outlive the bridge).
  * @param config External MCP configuration.
  * @param project_dir Project directory (for socket path derivation).
+ * @req REQ-BRIDGE-001
  * @version 2.0.8
  */
 ExternalBridge::ExternalBridge(
@@ -609,6 +613,7 @@ ExternalBridge::ExternalBridge(
 
 /**
  * @brief Destructor — stop if running.
+ * @req REQ-BRIDGE-001
  * @version 2.0.8
  */
 ExternalBridge::~ExternalBridge() {
@@ -623,7 +628,7 @@ ExternalBridge::~ExternalBridge() {
  * (gh#34): explicit perms rather than relying on umask.
  *
  * @param parent Directory path.
- * @utility
+ * @req REQ-BRIDGE-001
  * @version 2.1.7
  */
 static void prepare_socket_dir(const std::filesystem::path& parent) {
@@ -642,7 +647,7 @@ static void prepare_socket_dir(const std::filesystem::path& parent) {
  *
  * @param path Socket path.
  * @return true if safe to bind (path absent or is a socket).
- * @utility
+ * @req REQ-BRIDGE-001
  * @version 2.1.7
  */
 static bool socket_path_safe(const std::filesystem::path& path) {
@@ -666,7 +671,7 @@ static bool socket_path_safe(const std::filesystem::path& path) {
  * @param fd Pre-created socket fd.
  * @param path Bind path (already validated by socket_path_safe).
  * @return true on success.
- * @utility
+ * @req REQ-BRIDGE-001
  * @version 2.1.7
  */
 static bool bind_and_listen(int fd, const std::filesystem::path& path) {
@@ -695,7 +700,7 @@ static bool bind_and_listen(int fd, const std::filesystem::path& path) {
  *
  * @param path Socket filesystem path.
  * @return Listening fd, or -1 on failure.
- * @utility
+ * @req REQ-BRIDGE-001
  * @version 2.1.7
  */
 static int create_listen_socket(const std::filesystem::path& path) {
@@ -728,7 +733,7 @@ static int create_listen_socket(const std::filesystem::path& path) {
  *
  * @param client_fd Newly accepted client fd.
  * @return true if peer uid matches our euid.
- * @utility
+ * @req REQ-BRIDGE-001
  * @version 2.1.7
  */
 static bool peer_uid_matches(int client_fd) {
@@ -752,7 +757,7 @@ static bool peer_uid_matches(int client_fd) {
 /**
  * @brief Start the background accept loop.
  * @return true if the socket was created and listening.
- * @internal
+ * @req REQ-BRIDGE-001
  * @version 2.0.8
  */
 bool ExternalBridge::start() {
@@ -822,7 +827,7 @@ bool ExternalBridge::start() {
  *   6. close client fds (the threads' RAII guards do this too, but
  *      we run it again as a defensive measure on shutdown errors)
  *
- * @internal
+ * @req REQ-BRIDGE-001
  * @version 2.1.2
  */
 void ExternalBridge::stop() {
@@ -913,7 +918,7 @@ void ExternalBridge::reap_finished_clients_locked() {
  * v2.1.7 (gh#34): every accepted fd is gated by SO_PEERCRED — non-
  * matching uid is closed before a serve thread is spawned.
  *
- * @internal
+ * @req REQ-BRIDGE-001
  * @version 2.1.7
  */
 void ExternalBridge::accept_loop() {
@@ -984,7 +989,7 @@ static std::string read_line(int fd) {
  * (no id) produce an empty response — nothing is written back.
  *
  * @param client_fd Connected socket file descriptor.
- * @internal
+ * @req REQ-BRIDGE-001
  * @version 2.0.6-rc16
  */
 void ExternalBridge::serve_client(int client_fd) {
@@ -1034,7 +1039,7 @@ static json initialize_result() {
  * @param request Raw JSON-RPC request string.
  * @param client_fd Socket fd for streaming progress (entropic.ask).
  * @return JSON-RPC response string, or empty for notifications.
- * @internal
+ * @req REQ-BRIDGE-001
  * @version 2.0.11
  */
 std::string ExternalBridge::dispatch(
@@ -1095,7 +1100,7 @@ static void phase_observer_cb(int state, void* ud) {
  * fires via a simple generation comparison. (E5+E6, 2.1.0)
  *
  * @param task_id Task whose phase transitions the observer tracks.
- * @internal
+ * @req REQ-BRIDGE-001
  * @version 2.1.0
  */
 void ExternalBridge::attach_phase_observer(const std::string& task_id) {
@@ -1116,7 +1121,7 @@ void ExternalBridge::attach_phase_observer(const std::string& task_id) {
  * stale state. entropic_set_state_observer(nullptr) is called after
  * the lock is released. (E5+E6, 2.1.0)
  *
- * @internal
+ * @req REQ-BRIDGE-001
  * @version 2.1.0
  */
 void ExternalBridge::detach_phase_observer() {
@@ -1138,7 +1143,7 @@ void ExternalBridge::detach_phase_observer() {
  * @param prompt User prompt.
  * @param task_id Assigned task ID.
  * @param client_fd Socket fd for completion notification.
- * @internal
+ * @req REQ-BRIDGE-001
  * @version 2.1.4
  */
 void ExternalBridge::run_async_ask(
@@ -1232,7 +1237,7 @@ void ExternalBridge::run_async_ask(
 /**
  * @brief Add a connected fd to the subscriber set.
  * @param fd Client socket fd.
- * @internal
+ * @req REQ-BRIDGE-001
  * @version 2.0.6-rc16
  */
 void ExternalBridge::subscribe(int fd) {
@@ -1243,7 +1248,7 @@ void ExternalBridge::subscribe(int fd) {
 /**
  * @brief Remove an fd from the subscriber set.
  * @param fd Client socket fd being closed.
- * @internal
+ * @req REQ-BRIDGE-001
  * @version 2.0.6-rc16
  */
 void ExternalBridge::unsubscribe(int fd) {
@@ -1281,7 +1286,7 @@ void ExternalBridge::unsubscribe(int fd) {
  * initiated.
  *
  * @param notif JSON-RPC notification object.
- * @internal
+ * @req REQ-BRIDGE-001
  * @version 2.1.2
  */
 void ExternalBridge::broadcast_notification(const json& notif) {
@@ -1323,7 +1328,7 @@ void ExternalBridge::broadcast_notification(const json& notif) {
  * @param task_id Task identifier.
  * @param status New coarse status string.
  * @param phase New granular phase string.
- * @internal
+ * @req REQ-BRIDGE-001
  * @version 2.0.6-rc16
  */
 void ExternalBridge::update_task_phase(const std::string& task_id,
@@ -1345,7 +1350,7 @@ void ExternalBridge::update_task_phase(const std::string& task_id,
  * in-memory registry so an external monitor that consumed the
  * sentinel within 15 minutes still sees a consistent picture.
  *
- * @internal
+ * @req REQ-BRIDGE-001
  * @version 2.1.4
  */
 void ExternalBridge::cleanup_expired_tasks() {
@@ -1377,7 +1382,9 @@ void ExternalBridge::cleanup_expired_tasks() {
  * back to `<handle_->config.log_dir>/async`. Returns an empty path if
  * neither source is configured. Issue #12 (v2.1.4).
  *
- * @internal
+ * @return Sentinel directory path, or an empty path when neither an
+ *        override nor a configured log_dir is available.
+ * @req REQ-BRIDGE-001
  * @version 2.1.4
  */
 std::filesystem::path ExternalBridge::async_sentinel_dir() const {
@@ -1390,7 +1397,7 @@ std::filesystem::path ExternalBridge::async_sentinel_dir() const {
 
 /**
  * @brief Override the async sentinel root directory. Issue #12 (v2.1.4).
- * @internal
+ * @req REQ-BRIDGE-001
  * @version 2.1.4
  */
 void ExternalBridge::set_async_sentinel_root(
@@ -1426,7 +1433,7 @@ static const char* sentinel_suffix_for_status(
  * primary signal and a missing sentinel is non-fatal for callers
  * that don't depend on it.
  *
- * @internal
+ * @req REQ-BRIDGE-001
  * @version 2.1.4
  */
 void ExternalBridge::write_sentinel(const std::string& task_id,

@@ -29,9 +29,14 @@ void MCPAuthorizationManager::register_identity(
 
 /**
  * @brief Check if an identity has enforcement enabled.
+ *
+ * Enforcement is opt-in per identity: registering a key set is what
+ * turns it on, which allows incremental adoption.
+ *
  * @param identity_name Identity/tier name.
- * @return true if registered.
- * @internal
+ * @return true when a key set is registered for the identity; false
+ *         when none is, in which case every authorization check passes.
+ * @req REQ-MCP-010
  * @version 1.9.4
  */
 bool MCPAuthorizationManager::is_enforced(
@@ -84,11 +89,20 @@ entropic_error_t MCPAuthorizationManager::revoke(
 
 /**
  * @brief Check if a tool call is authorized for an identity.
+ *
+ * Opt-in but default-deny once enabled: an unregistered identity passes
+ * everything, a registered one passes only what its key set grants at
+ * the tool's own declared level.
+ *
  * @param identity_name Caller identity.
  * @param tool_name Fully-qualified tool name.
- * @param required_level Minimum access level.
- * @return true if authorized or no enforcement.
- * @internal
+ * @param required_level Minimum access level, from the tool's
+ *                       required_access_level().
+ * @return true when the identity has no registered key set, or its key
+ *         set grants at least `required_level` for the tool; false
+ *         otherwise. Both outcomes are logged.
+ * @req REQ-MCP-010
+ * @req REQ-MCP-011
  * @version 2.0.0
  */
 bool MCPAuthorizationManager::check_access(

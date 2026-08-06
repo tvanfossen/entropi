@@ -16,7 +16,7 @@ namespace entropic::config {
  * @brief Validate allowed_tools entries use "server.tool" format.
  * @param tools Tool name list to validate.
  * @return Empty string on success, error message on failure.
- * @internal
+ * @req REQ-CFG-006
  * @version 1.8.2
  */
 std::string validate_allowed_tools(const std::vector<std::string>& tools)
@@ -34,7 +34,7 @@ std::string validate_allowed_tools(const std::vector<std::string>& tools)
  * @brief Validate a ModelConfig.
  * @param config Model config to validate.
  * @return Empty string on success, error message on failure.
- * @internal
+ * @req REQ-CFG-006
  * @version 1.8.2
  */
 std::string validate(const ModelConfig& config)
@@ -60,7 +60,7 @@ std::string validate(const ModelConfig& config)
  * @brief Validate ModelsConfig.
  * @param config Models config to validate.
  * @return Empty string on success, error message on failure.
- * @internal
+ * @req REQ-CFG-006
  * @version 1.8.2
  */
 std::string validate(const ModelsConfig& config)
@@ -77,7 +77,7 @@ std::string validate(const ModelsConfig& config)
  * @brief Validate CompactionConfig.
  * @param config Compaction config to validate.
  * @return Empty string on success, error message on failure.
- * @internal
+ * @req REQ-CFG-006
  * @version 2.1.3
  */
 std::string validate(const CompactionConfig& config)
@@ -120,7 +120,7 @@ std::string validate(const CompactionConfig& config)
  * @param tiers Defined tiers.
  * @return Empty string on success, error message on failure.
  * @version 1.8.2
- * @utility
+ * @req REQ-CFG-006
  */
 std::string validate_fallback_tier(
     const std::string& fallback,
@@ -138,7 +138,7 @@ std::string validate_fallback_tier(
  * @param tiers Defined tiers.
  * @return Empty string on success, error message on failure.
  * @version 1.8.2
- * @utility
+ * @req REQ-CFG-006
  */
 std::string validate_tier_map(
     const std::unordered_map<std::string, std::string>& tier_map,
@@ -159,7 +159,7 @@ std::string validate_tier_map(
  * @param tiers Defined tiers.
  * @return Empty string on success, error message on failure.
  * @version 1.8.2
- * @utility
+ * @req REQ-CFG-006
  */
 std::string validate_handoff_rules(
     const std::unordered_map<std::string, std::vector<std::string>>& rules,
@@ -194,7 +194,7 @@ std::string validate_handoff_rules(
  * @param routing Routing config.
  * @return Error string if a classification_prompt is set with an empty tier_map.
  * @version 2.8.1
- * @utility
+ * @req REQ-CFG-006
  */
 std::string validate_classification_routable(const RoutingConfig& routing) {
     bool has_prompt = routing.classification_prompt.has_value()
@@ -213,7 +213,7 @@ std::string validate_classification_routable(const RoutingConfig& routing) {
  * @param models Models config.
  * @return Empty string on success, error message on failure.
  * @version 2.8.1
- * @utility
+ * @req REQ-CFG-006
  */
 std::string validate_routing(
     const RoutingConfig& routing,
@@ -247,7 +247,7 @@ std::string validate_routing(
  * @param tiers Tier configs.
  * @param handoff_rules Handoff rules.
  * @return Warning message (empty if no issues).
- * @internal
+ * @req REQ-CFG-006
  * @version 1.8.2
  */
 std::string warn_auto_chain_without_targets(
@@ -273,7 +273,7 @@ std::string warn_auto_chain_without_targets(
  * @brief Validate PromptCacheConfig.
  * @param config Prompt cache config to validate.
  * @return Empty string on success, error message on failure.
- * @internal
+ * @req REQ-CFG-006
  * @version 1.8.3
  */
 std::string validate(const PromptCacheConfig& config)
@@ -288,7 +288,7 @@ std::string validate(const PromptCacheConfig& config)
  * @brief Validate model tiers and router.
  * @param models Models config.
  * @return Empty string on success, error message on failure.
- * @internal
+ * @req REQ-CFG-006
  * @version 1.8.3
  */
 static std::string validate_model_tiers(const ModelsConfig& models)
@@ -320,7 +320,7 @@ static std::string validate_model_tiers(const ModelsConfig& models)
  * @param config Full config to validate.
  * @param[out] warnings Non-fatal warnings.
  * @return Empty string on success, error message on failure.
- * @internal
+ * @req REQ-CFG-006
  * @version 2.0.0
  */
 std::string validate_config(

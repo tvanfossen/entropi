@@ -50,7 +50,7 @@ ConstitutionalValidator::ConstitutionalValidator(
  * @param hook_iface HookInterface with registry pointer.
  * @param inference InferenceInterface for critique generation.
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-HOOK-002
  * @version 1.9.8
  */
 entropic_error_t ConstitutionalValidator::attach(
@@ -74,7 +74,7 @@ entropic_error_t ConstitutionalValidator::attach(
 /**
  * @brief Deregister the POST_GENERATE hook.
  * @param hook_iface HookInterface with registry pointer.
- * @internal
+ * @req REQ-HOOK-002
  * @version 1.9.8
  */
 void ConstitutionalValidator::detach(HookInterface* hook_iface) {
@@ -115,7 +115,7 @@ bool ConstitutionalValidator::should_validate(
 /**
  * @brief Toggle the global validation gate at runtime.
  * @param enabled New global enable state.
- * @req REQ-VALID-004
+ * @req REQ-VALID-001
  * @version 2.0.4
  */
 void ConstitutionalValidator::set_global_enabled(bool enabled) {
@@ -126,7 +126,7 @@ void ConstitutionalValidator::set_global_enabled(bool enabled) {
 /**
  * @brief Register a per-tier reasoning-delimiter resolver (gh#108).
  * @param resolver Maps tier name → {open, close}.
- * @internal
+ * @req REQ-VALID-001
  * @version 2.10.3
  */
 void ConstitutionalValidator::set_marker_resolver(
@@ -141,7 +141,7 @@ void ConstitutionalValidator::set_marker_resolver(
 /**
  * @brief Toggle auto-revision.
  * @param enabled True to enable auto-revision.
- * @internal
+ * @req REQ-VALID-003
  * @version 2.1.5
  */
 void ConstitutionalValidator::set_auto_retry(bool enabled) {
@@ -151,7 +151,7 @@ void ConstitutionalValidator::set_auto_retry(bool enabled) {
 /**
  * @brief Read auto-revision flag.
  * @return Current state.
- * @utility
+ * @req REQ-VALID-003
  * @version 2.1.5
  */
 bool ConstitutionalValidator::auto_retry_enabled() const {
@@ -166,7 +166,7 @@ bool ConstitutionalValidator::auto_retry_enabled() const {
  * final result. Returns INVALID_STATE if no pending state exists.
  *
  * @return ENTROPIC_OK on success, INVALID_STATE if nothing paused.
- * @internal
+ * @req REQ-VALID-003
  * @version 2.1.5
  */
 entropic_error_t ConstitutionalValidator::resume_retry() {
@@ -196,7 +196,7 @@ entropic_error_t ConstitutionalValidator::resume_retry() {
  * Returns INVALID_STATE if no pending state exists.
  *
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-VALID-003
  * @version 2.1.5
  */
 entropic_error_t ConstitutionalValidator::accept_last() {
@@ -221,7 +221,7 @@ entropic_error_t ConstitutionalValidator::accept_last() {
  * @brief Register the attempt-boundary callback.
  * @param cb Callback fn pointer.
  * @param user_data Forwarded to cb.
- * @internal
+ * @req REQ-VALID-003
  * @version 2.1.5-hard
  */
 void ConstitutionalValidator::set_attempt_boundary_cb(
@@ -242,7 +242,7 @@ void ConstitutionalValidator::set_attempt_boundary_cb(
  * @param start_cb Pre-generate hook.
  * @param end_cb Post-generate hook.
  * @param user_data Forwarded to both.
- * @internal
+ * @req REQ-VALID-003
  * @version 2.1.12
  */
 void ConstitutionalValidator::set_critique_callbacks(
@@ -259,7 +259,7 @@ void ConstitutionalValidator::set_critique_callbacks(
  * @brief Set per-identity validation override.
  * @param identity_name Identity name.
  * @param enabled Whether validation is enabled.
- * @internal
+ * @req REQ-VALID-001
  * @version 1.9.8
  */
 void ConstitutionalValidator::set_identity_validation(
@@ -294,7 +294,8 @@ void ConstitutionalValidator::set_tier_rules(
  * @param tier The tier/identity that produced the content.
  * @param messages_json Original conversation context.
  * @return ValidationResult with final content and critique metadata.
- * @internal
+ * @req REQ-VALID-001
+ * @req REQ-VALID-002
  * @version 2.10.3
  */
 ValidationResult ConstitutionalValidator::validate(
@@ -339,7 +340,7 @@ ValidationResult ConstitutionalValidator::validate(
 /**
  * @brief Emit a disambiguating log line per verdict. (E5, 2.0.6-rc17)
  * @param result Validation result with verdict set.
- * @internal
+ * @req REQ-VALID-002
  * @version 2.1.5
  */
 void ConstitutionalValidator::log_verdict(
@@ -380,7 +381,7 @@ void ConstitutionalValidator::log_verdict(
 /**
  * @brief Get the last validation result.
  * @return Most recent ValidationResult.
- * @internal
+ * @req REQ-VALID-002
  * @version 1.9.8
  */
 ValidationResult ConstitutionalValidator::last_result() const {
@@ -397,7 +398,7 @@ ValidationResult ConstitutionalValidator::last_result() const {
  * @param modified_json Output: revised JSON or NULL.
  * @param user_data ValidationContext pointer.
  * @return 0 (post-hooks cannot cancel).
- * @callback
+ * @req REQ-HOOK-002
  * @version 1.9.8
  */
 int ConstitutionalValidator::hook_callback(
@@ -434,7 +435,7 @@ int ConstitutionalValidator::hook_callback(
  *
  * @param content Text to critique (think blocks already stripped).
  * @return Formatted critique prompt string.
- * @utility
+ * @req REQ-VALID-002
  * @version 2.1.3
  */
 std::string ConstitutionalValidator::build_critique_prompt(
@@ -496,7 +497,7 @@ std::string ConstitutionalValidator::build_critique_prompt(
  * @param json_str Raw JSON from grammar-constrained generation.
  * @return Parsed CritiqueResult. On parse failure, returns default
  *         (compliant=true) with raw_json set for diagnostics.
- * @utility
+ * @req REQ-VALID-002
  * @version 2.0.6
  */
 CritiqueResult ConstitutionalValidator::parse_critique(
@@ -524,7 +525,7 @@ CritiqueResult ConstitutionalValidator::parse_critique(
 /**
  * @brief Store a validation result (thread-safe).
  * @param result Result to store.
- * @internal
+ * @req REQ-VALID-002
  * @version 1.9.8
  */
 void ConstitutionalValidator::store_result(
@@ -539,7 +540,8 @@ void ConstitutionalValidator::store_result(
  * @param tier Identity/tier name.
  * @param messages_json Conversation context.
  * @return ValidationResult after critique/revision.
- * @internal
+ * @req REQ-VALID-002
+ * @req REQ-VALID-003
  * @version 2.1.5
  */
 ValidationResult ConstitutionalValidator::run_validation_loop(
@@ -591,7 +593,8 @@ ValidationResult ConstitutionalValidator::run_validation_loop(
  * @param initial_critique First critique result.
  * @param messages_json Conversation context.
  * @return Updated ValidationResult.
- * @internal
+ * @req REQ-VALID-002
+ * @req REQ-VALID-003
  * @version 2.1.5-hard
  */
 ValidationResult ConstitutionalValidator::apply_revisions(
@@ -662,7 +665,7 @@ ValidationResult ConstitutionalValidator::apply_revisions(
  * @param critique Critique with violations.
  * @param messages_json Conversation context for Path B.
  * @return Revised content string.
- * @internal
+ * @req REQ-VALID-002
  * @version 1.9.8
  */
 std::string ConstitutionalValidator::attempt_revision(
@@ -679,7 +682,8 @@ std::string ConstitutionalValidator::attempt_revision(
  * @brief Generate a critique of the given content.
  * @param content Text to critique.
  * @return Parsed CritiqueResult.
- * @internal
+ * @req REQ-VALID-002
+ * @req REQ-VALID-003
  * @version 2.1.12
  */
 CritiqueResult ConstitutionalValidator::run_critique(
@@ -780,7 +784,7 @@ std::string ConstitutionalValidator::build_critique_params() const {
  * @param critique The critique result with violations.
  * @param messages_json Original conversation context.
  * @return Revised content string.
- * @internal
+ * @req REQ-VALID-002
  * @version 2.0.7
  */
 std::string ConstitutionalValidator::revise(
@@ -962,7 +966,7 @@ std::string ConstitutionalValidator::inject_feedback_into_messages(
  * @param open Opening delimiter.
  * @param close Closing delimiter.
  * @return Content with reasoning blocks removed.
- * @utility
+ * @req REQ-VALID-001
  * @version 2.10.3
  */
 static std::string strip_reasoning(const std::string& content,
@@ -992,7 +996,7 @@ static std::string strip_reasoning(const std::string& content,
  *
  * @param content Content with think blocks already stripped.
  * @return true if content is only whitespace and tool_call XML.
- * @utility
+ * @req REQ-VALID-001
  * @version 2.0.6
  */
 static bool is_pure_tool_call(const std::string& content) {
@@ -1020,7 +1024,8 @@ static bool is_pure_tool_call(const std::string& content) {
  * @param context_json JSON context from engine.
  * @param modified_json Output: revised JSON or NULL.
  * @return 0 (post-hooks cannot cancel).
- * @internal
+ * @req REQ-HOOK-002
+ * @req REQ-VALID-001
  * @version 2.1.3
  */
 int ConstitutionalValidator::handle_hook(

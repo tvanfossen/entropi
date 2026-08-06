@@ -47,7 +47,15 @@ inline std::string_view ltrim(std::string_view s) {
 
 /**
  * @brief True if input is empty or contains only ASCII whitespace.
- * @utility
+ *
+ * Byte-level emptiness: whitespace-only content counts as empty, so a
+ * tool that "succeeded" with nothing to say is classified ok_empty
+ * rather than ok.
+ *
+ * @param s Tool result content (already truncated to the cap).
+ * @return true for an empty or whitespace-only view, false as soon as
+ *         any non-space byte is seen.
+ * @req REQ-MCP-019
  * @version 2.1.0
  */
 bool is_effectively_empty(std::string_view s) {
@@ -59,7 +67,14 @@ bool is_effectively_empty(std::string_view s) {
 
 /**
  * @brief True if input begins with a JSON top-level "error" key.
- * @utility
+ *
+ * Deliberately shallow — a leading '{' plus an "error" key inside the
+ * first 32 bytes — so a nested "error" deep in a large payload does not
+ * reclassify an otherwise successful result.
+ *
+ * @param trimmed Left-trimmed tool result content.
+ * @return true for a `{"error": ...}`-shaped object, false otherwise.
+ * @req REQ-MCP-019
  * @version 2.1.0
  */
 inline bool starts_with_json_error(std::string_view trimmed) {
@@ -70,7 +85,18 @@ inline bool starts_with_json_error(std::string_view trimmed) {
 
 /**
  * @brief Truncate content in place when it exceeds the byte cap.
- * @utility
+ *
+ * Applied at the inbound boundary, BEFORE classification, duplicate
+ * recording and history, so the model, the classifier and the dedup
+ * cache all see the same bounded form and can tell bytes were lost.
+ *
+ * @param content Result content, truncated in place.
+ * @param cap Maximum bytes; a cap of 0 (or negative) disables
+ *            truncation.
+ * @return Nothing — content is left untouched when it is already within
+ *         cap, otherwise resized to at most `cap` bytes ending in a
+ *         `[... truncated, N more bytes]` marker.
+ * @req REQ-MCP-019
  * @version 2.1.1-rc1
  */
 void truncate_to_cap(std::string& content, int cap) {
@@ -88,7 +114,14 @@ void truncate_to_cap(std::string& content, int cap) {
 
 /**
  * @brief Heuristic match for an error-shaped tool result string.
- * @utility
+ *
+ * Anchored at the first non-space byte, so the word "error" appearing
+ * mid-string does NOT classify the result as an error.
+ *
+ * @param content Tool result content (already truncated to the cap).
+ * @return true when the content leads with `Error`/`ERROR`, `[error]`,
+ *         or a top-level `{"error": ...}` object; false otherwise.
+ * @req REQ-MCP-019
  * @version 2.1.0
  */
 bool looks_like_tool_error(std::string_view content) {

@@ -19,6 +19,7 @@ namespace entropic {
 
 /**
  * @brief Content part type discriminant.
+ * @req REQ-TYPE-006
  * @version 1.9.11
  */
 enum class ContentPartType {
@@ -34,6 +35,7 @@ enum class ContentPartType {
  * preserves part ordering — image position relative to text matters
  * for some models.
  *
+ * @req REQ-TYPE-006
  * @version 1.9.11
  */
 struct ContentPart {
@@ -49,6 +51,7 @@ struct ContentPart {
  * @brief Extract concatenated text from content parts.
  * @param parts Content parts array.
  * @return All text parts joined with spaces, images skipped.
+ * @req REQ-TYPE-006
  * @version 1.9.11
  */
 std::string extract_text(const std::vector<ContentPart>& parts);
@@ -57,6 +60,7 @@ std::string extract_text(const std::vector<ContentPart>& parts);
  * @brief Check if content parts contain any image parts.
  * @param parts Content parts array.
  * @return true if at least one IMAGE part exists.
+ * @req REQ-TYPE-006
  * @version 1.9.11
  */
 bool has_images(const std::vector<ContentPart>& parts);

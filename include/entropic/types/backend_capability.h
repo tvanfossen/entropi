@@ -27,7 +27,11 @@ namespace entropic {
  * @par Design rationale:
  * Enum rather than string tags for compile-time exhaustiveness checking.
  * New capabilities are appended (never reordered) for ABI stability.
+ * The trailing `_COUNT` sentinel is NOT a capability — it sizes the
+ * dispatch table and pins the declared cardinality so an appended
+ * capability fails the test until it is wired everywhere.
  *
+ * @req REQ-TYPE-004
  * @version 1.9.13
  */
 enum class BackendCapability : int {

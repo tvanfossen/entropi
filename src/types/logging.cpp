@@ -205,8 +205,8 @@ void add_file_sink(const std::filesystem::path& path) {
  *
  * @param name Logger name.
  * @return Shared pointer to the logger.
+ * @req REQ-TYPE-001
  * @version 2.3.7
- * @internal
  */
 std::shared_ptr<spdlog::logger> get(const std::string& name) {
     auto logger = spdlog::get(name);
@@ -464,7 +464,7 @@ void log_decision(
 
 /**
  * @brief gh#59 public entry — see header.
- * @utility
+ * @req REQ-TYPE-001
  * @version 2.3.1
  */
 void register_handle_log(
@@ -494,7 +494,7 @@ void register_handle_log(
 
 /**
  * @brief gh#59 public entry — see header.
- * @utility
+ * @req REQ-TYPE-001
  * @version 2.3.1
  */
 void unregister_handle_log(int handle_id) {
@@ -504,7 +504,8 @@ void unregister_handle_log(int handle_id) {
 
 /**
  * @brief gh#59 public entry — see header.
- * @utility
+ * @return The calling thread's current handle id, 0 if unscoped.
+ * @req REQ-TYPE-001
  * @version 2.3.1
  */
 int current_handle_id() {
@@ -513,7 +514,7 @@ int current_handle_id() {
 
 /**
  * @brief gh#59 RAII enter — see header.
- * @utility
+ * @req REQ-TYPE-001
  * @version 2.3.1
  */
 HandleLogScope::HandleLogScope(int handle_id)
@@ -523,7 +524,7 @@ HandleLogScope::HandleLogScope(int handle_id)
 
 /**
  * @brief gh#59 RAII exit — see header.
- * @utility
+ * @req REQ-TYPE-001
  * @version 2.3.1
  */
 HandleLogScope::~HandleLogScope() {

@@ -71,6 +71,7 @@ ENTROPIC_EXPORT void add_file_sink(const std::filesystem::path& path);
  * log->info("Model loaded: {} ({:.1f} GB)", path, size_gb);
  * log->error("Load failed: {}", entropic_error_name(err));
  * @endcode
+ * @req REQ-TYPE-001
  * @version 1.8.0
  */
 ENTROPIC_EXPORT std::shared_ptr<spdlog::logger> get(const std::string& name);
@@ -119,6 +120,7 @@ ENTROPIC_EXPORT void set_console_enabled(bool enabled);
  *
  * @param handle_id Monotonic handle identifier (engine_handle::log_id).
  * @param log_dir Directory containing session.log + session_model.log.
+ * @req REQ-TYPE-001
  * @version 2.3.1
  */
 ENTROPIC_EXPORT void register_handle_log(
@@ -132,6 +134,7 @@ ENTROPIC_EXPORT void register_handle_log(
  * Safe to call on unregistered ids.
  *
  * @param handle_id Identifier previously passed to register_handle_log.
+ * @req REQ-TYPE-001
  * @version 2.3.1
  */
 ENTROPIC_EXPORT void unregister_handle_log(int handle_id);
@@ -148,7 +151,9 @@ ENTROPIC_EXPORT void unregister_handle_log(int handle_id);
  * a handle's behalf (external_bridge serve threads), wrap the thread
  * body in another HandleLogScope.
  *
- * @internal
+ * @return An RAII guard binding this thread to `handle_id` until it
+ *         goes out of scope, at which point the previous id is restored.
+ * @req REQ-TYPE-001
  * @version 2.3.1
  */
 class ENTROPIC_EXPORT HandleLogScope {
@@ -178,6 +183,8 @@ private:
  * Returns 0 if no `HandleLogScope` is active on this thread. Mostly
  * for tests; production code should rely on the dispatcher routing.
  *
+ * @return The calling thread's current handle id, 0 if unscoped.
+ * @req REQ-TYPE-001
  * @version 2.3.1
  */
 ENTROPIC_EXPORT int current_handle_id();

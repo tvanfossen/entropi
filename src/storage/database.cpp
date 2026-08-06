@@ -177,7 +177,7 @@ SqliteDatabase::~SqliteDatabase() {
 /**
  * @brief Initialize database and run pending migrations.
  * @return true on success.
- * @internal
+ * @req REQ-STOR-001
  * @version 2.0.0
  */
 bool SqliteDatabase::initialize() {
@@ -215,7 +215,7 @@ bool SqliteDatabase::initialize() {
 
 /**
  * @brief Close database connection.
- * @internal
+ * @req REQ-STOR-001
  * @version 1.8.8
  */
 void SqliteDatabase::close() {
@@ -229,7 +229,7 @@ void SqliteDatabase::close() {
 /**
  * @brief Check if database is open.
  * @return true if connection is active.
- * @internal
+ * @req REQ-STOR-001
  * @version 1.8.8
  */
 bool SqliteDatabase::is_open() const {
@@ -263,7 +263,7 @@ sqlite3_stmt* SqliteDatabase::prepare(std::string_view sql) {
  * @param sql SQL statement with ? placeholders.
  * @param binder Function to bind parameters.
  * @return true on success.
- * @internal
+ * @req REQ-STOR-002
  * @version 2.0.0
  */
 bool SqliteDatabase::execute(std::string_view sql,
@@ -289,7 +289,7 @@ bool SqliteDatabase::execute(std::string_view sql,
  * @brief Execute raw SQL (multiple statements, no binding).
  * @param sql SQL text.
  * @return true on success.
- * @internal
+ * @req REQ-STOR-002
  * @version 2.0.0
  */
 bool SqliteDatabase::execute_raw(std::string_view sql) {
@@ -316,7 +316,7 @@ bool SqliteDatabase::execute_raw(std::string_view sql) {
  * @param binder Function to bind parameters.
  * @param extractor Function to extract columns from result row.
  * @return true if row found.
- * @internal
+ * @req REQ-STOR-002
  * @version 1.8.8
  */
 bool SqliteDatabase::fetch_one(
@@ -347,7 +347,7 @@ bool SqliteDatabase::fetch_one(
  * @param binder Function to bind parameters.
  * @param row_handler Called for each result row.
  * @return Number of rows fetched.
- * @internal
+ * @req REQ-STOR-002
  * @version 1.8.8
  */
 size_t SqliteDatabase::fetch_all(
@@ -456,8 +456,14 @@ static bool is_applied(const std::vector<std::string>& applied,
 
 /**
  * @brief Run all pending migrations sequentially.
+ *
+ * Applies the forward-only migration set (schema tables, FK constraints
+ * with ON DELETE CASCADE, and the FTS5 external-content index plus its
+ * INSERT/UPDATE/DELETE triggers), skipping already-recorded names.
+ *
  * @return true on success.
- * @internal
+ * @req REQ-STOR-001
+ * @req REQ-STOR-004
  * @version 2.0.0
  */
 bool SqliteDatabase::run_migrations() {

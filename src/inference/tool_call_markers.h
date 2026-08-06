@@ -42,8 +42,11 @@ namespace entropic {
  * other formats return "" (no reliable per-call marker → batch-safe fallback).
  *
  * @param fmt Resolved common_chat format (from the last tool render).
- * @return Close marker string, or "" when none applies.
- * @utility
+ * @return `</tool_call>` for the PEG native/simple families,
+ *         `<tool_call|>` for gemma4, and "" for CONTENT_ONLY or any unknown
+ *         format — "" is always safe: it injects no stop, so batch behaviour
+ *         stays byte-identical and no parse can be corrupted.
+ * @req REQ-INFER-013
  * @version 2.8.2
  */
 inline std::string close_marker_for_format(common_chat_format fmt) {
@@ -84,7 +87,7 @@ inline std::string close_marker_for_format(common_chat_format fmt) {
  *
  * @param params Generation params (stop list mutated).
  * @param marker Family close marker (from close_marker_for_format / the backend).
- * @utility
+ * @req REQ-INFER-013
  * @version 2.8.2
  */
 inline void append_sequential_stop(GenerationParams& params,

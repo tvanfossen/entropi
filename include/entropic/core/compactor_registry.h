@@ -89,6 +89,7 @@ public:
      * Replaces any previously registered compactor for this identity.
      *
      * @threadsafety Write-locks the registry.
+     * @req REQ-COMPACT-001
      * @version 1.9.9
      */
     entropic_error_t register_compactor(
@@ -105,6 +106,7 @@ public:
      * custom compactor (if any), then to the built-in default.
      *
      * @threadsafety Write-locks the registry.
+     * @req REQ-COMPACT-001
      * @version 1.9.9
      */
     entropic_error_t deregister_compactor(
@@ -121,6 +123,7 @@ public:
      * On custom compactor failure, falls back to default with WARNING.
      *
      * @threadsafety Read-locks to snapshot, releases before calling.
+     * @req REQ-COMPACT-001
      * @version 1.9.9
      */
     CompactionResult compact(
@@ -134,6 +137,7 @@ public:
      * @return true if a non-default compactor will be used.
      *
      * @threadsafety Read-locks the registry.
+     * @req REQ-COMPACT-001
      * @version 1.9.9
      */
     bool has_custom_compactor(const std::string& identity) const;
@@ -153,6 +157,7 @@ private:
      * @param messages Messages to compact.
      * @param config Compaction configuration.
      * @return CompactionResult from default strategy.
+     * @req REQ-COMPACT-001
      * @version 1.9.9
      */
     CompactionResult run_default(
@@ -168,6 +173,7 @@ private:
      * @param messages Messages to compact.
      * @param config Compaction configuration.
      * @return CompactionResult from custom or fallback default.
+     * @req REQ-COMPACT-001
      * @version 1.9.9
      */
     CompactionResult run_custom(

@@ -70,7 +70,7 @@ struct DelegationRecord {
 /**
  * @brief Generate a UUID v4 string.
  * @return UUID string (e.g., "550e8400-e29b-41d4-a716-446655440000").
- * @utility
+ * @req REQ-STOR-003
  * @version 1.8.8
  */
 std::string generate_uuid();
@@ -78,7 +78,7 @@ std::string generate_uuid();
 /**
  * @brief Get current UTC time as ISO 8601 string.
  * @return Timestamp string (e.g., "2026-03-23T12:00:00").
- * @utility
+ * @req REQ-STOR-003
  * @version 1.8.8
  */
 std::string utc_timestamp();
@@ -89,7 +89,7 @@ std::string utc_timestamp();
  * @param project_path Project path (optional).
  * @param model_id Model identifier (optional).
  * @return Populated record ready for INSERT.
- * @utility
+ * @req REQ-STOR-003
  * @version 1.8.8
  */
 ConversationRecord make_conversation(
@@ -105,7 +105,8 @@ ConversationRecord make_conversation(
  * @param target_tier Target tier for child loop.
  * @param task Task description.
  * @return Populated record ready for INSERT.
- * @utility
+ * @req REQ-STOR-003
+ * @req REQ-STOR-005
  * @version 1.8.8
  */
 DelegationRecord make_delegation(

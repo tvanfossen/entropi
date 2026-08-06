@@ -14,7 +14,7 @@ namespace entropic::cli {
 /**
  * @brief Print the engine version and exit.
  * @return 0.
- * @internal
+ * @req REQ-PROD-001
  * @version 2.0.3
  */
 int run_version()

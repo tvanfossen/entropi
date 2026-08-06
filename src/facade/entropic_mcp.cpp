@@ -25,7 +25,7 @@ static auto logger = entropic::log::get("facade.mcp");
  * @brief Check handle prerequisites for MCP server APIs.
  * @param h Engine handle.
  * @return ENTROPIC_OK if valid, error code otherwise.
- * @internal
+ * @req REQ-API-005
  * @version 2.0.0
  */
 static entropic_error_t check_server_mgr(entropic_handle_t h) {
@@ -98,7 +98,13 @@ static entropic::ExternalServerConfig parse_external_server_spec(
 
 /**
  * @brief Register an external MCP server from JSON config (C ABI).
- * @internal
+ * @return ENTROPIC_OK on success; the check_server_mgr code for a
+ *        bad handle/state, INVALID_ARGUMENT for NULL
+ *        name/config_json, CONNECTION_FAILED when the transport
+ *        connect throws.
+ * @req REQ-MCP-025
+ * @req REQ-API-005
+ * @req REQ-ABI-002
  * @version 2.3.7
  */
 extern "C" ENTROPIC_EXPORT entropic_error_t
@@ -131,7 +137,9 @@ entropic_register_mcp_server(
  * @param handle Engine handle returned by entropic_create.
  * @param name MCP server name (must be unique).
  * @return ENTROPIC_OK or error code.
- * @internal
+ * @req REQ-MCP-025
+ * @req REQ-API-005
+ * @req REQ-ABI-002
  * @version 2.0.0
  */
 extern "C" ENTROPIC_EXPORT entropic_error_t
@@ -159,7 +167,10 @@ entropic_deregister_mcp_server(
  *
  * @param handle Engine handle returned by entropic_create.
  * @return JSON string (caller frees), or NULL.
- * @internal
+ * @req REQ-MCP-025
+ * @req REQ-API-008
+ * @req REQ-API-005
+ * @req REQ-ABI-002
  * @version 2.0.0
  */
 extern "C" ENTROPIC_EXPORT char*
