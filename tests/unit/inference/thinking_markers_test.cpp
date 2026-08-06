@@ -218,3 +218,63 @@ SCENARIO("gh#108 StreamThinkFilter suppresses the family's marker live",
         }
     }
 }
+
+SCENARIO("gh#137 an unclosed reasoning marker discards only what follows it",
+         "[inference][gh137][thinking][cpu]")
+{
+    // gh#137 reported v2.10.3 discarding an ENTIRE 77-154 char generation on
+    // enable_thinking:false tiers — 0 chars, 0 tool calls, delegation failed
+    // having done nothing. The reporter could not isolate the mechanism and
+    // explicitly noted that a sibling tier with the SAME enable_thinking:false
+    // was unaffected, which argues against "thinking-disabled tiers emit
+    // nothing".
+    //
+    // The strip erases from the open marker to end-of-string when no close is
+    // found. That is deliberate — an unterminated block means generation
+    // stopped mid-reasoning, so no answer was ever produced and surfacing raw
+    // reasoning would be worse. But it makes the POSITION of the marker decide
+    // everything, and nothing pinned that. These cases fix the semantics so a
+    // future "just keep the tail" "fix" cannot silently start leaking
+    // reasoning into content.
+    entropic::Gemma4Adapter adapter("lead", "");
+
+    GIVEN("an answer followed by an unterminated reasoning block") {
+        const std::string raw =
+            "The file is src/main.cpp.<|channel>now let me double check by";
+
+        THEN("the answer survives — only the reasoning tail is dropped") {
+            auto out = adapter.strip_think_blocks(raw);
+            CHECK(out == "The file is src/main.cpp.");
+        }
+    }
+
+    GIVEN("a generation that is reasoning from the very first token") {
+        // This is gh#137's actual shape: content.find(open) == 0, so erasing
+        // to end leaves nothing. Empty content here is CORRECT — the model
+        // genuinely produced no answer — and the engine must not paper over
+        // it by surfacing the reasoning as if it were the answer.
+        const std::string raw =
+            "<|channel>I should search for the symbol first, then read";
+
+        THEN("content is empty because no answer was ever produced") {
+            CHECK(adapter.strip_think_blocks(raw).empty());
+        }
+    }
+
+    GIVEN("a properly terminated reasoning block with an answer after it") {
+        const std::string raw =
+            "<|channel>think think<channel|>The answer is 42.";
+
+        THEN("the reasoning goes and the answer stays") {
+            CHECK(adapter.strip_think_blocks(raw) == "The answer is 42.");
+        }
+    }
+
+    GIVEN("no reasoning marker at all") {
+        const std::string raw = "Plain answer, no channel markers.";
+
+        THEN("content passes through untouched") {
+            CHECK(adapter.strip_think_blocks(raw) == raw);
+        }
+    }
+}

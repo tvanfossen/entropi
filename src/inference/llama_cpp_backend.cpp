@@ -1278,7 +1278,7 @@ void LlamaCppBackend::set_active_tools(const std::string& tools_json) {
  * @return Formatted prompt string; the low-level template render when
  *         common_chat could not be applied (no capture is written then).
  * @req REQ-INFER-009
- * @version 2.10.5
+ * @version 2.10.6
  */
 std::string LlamaCppBackend::render_with_tools(
     const std::vector<Message>& messages,
@@ -1326,6 +1326,22 @@ std::string LlamaCppBackend::render_with_tools(
                 tools.size(), last_chat_format_);
         }
     } else {
+        // gh#137: this fallback CANNOT honor enable_thinking — the low-level
+        // llama_chat_apply_template API has no slot for it. Saying so is the
+        // difference between a diagnosable config problem and a mystery: a
+        // tier that set enable_thinking:false still reasons here, and on
+        // gemma4 the whole generation can be one unterminated <|channel>
+        // block, which the reasoning strip then correctly reduces to zero
+        // characters. The consumer sees "0 chars, 0 tool calls" and no cause.
+        if (!params.enable_thinking) {
+            logger->warn(
+                "Falling back to the low-level chat template, which cannot "
+                "honor enable_thinking:false — this tier WILL still emit "
+                "reasoning, and a generation that is entirely reasoning is "
+                "stripped to empty content. The jinja render was unavailable "
+                "for this turn (no tools staged, or the template could not be "
+                "applied).");
+        }
         prompt = apply_chat_template_lowlevel(messages);
     }
     return prompt;
