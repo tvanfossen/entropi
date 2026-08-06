@@ -1278,7 +1278,7 @@ void LlamaCppBackend::set_active_tools(const std::string& tools_json) {
  * @return Formatted prompt string; the low-level template render when
  *         common_chat could not be applied (no capture is written then).
  * @req REQ-INFER-009
- * @version 2.10.4
+ * @version 2.10.5
  */
 std::string LlamaCppBackend::render_with_tools(
     const std::vector<Message>& messages,
@@ -1308,8 +1308,23 @@ std::string LlamaCppBackend::render_with_tools(
         tool_grammar_lazy_ = rendered->grammar_lazy;
         prompt = rendered->prompt;
         logger->info("render_with_tools: format={}, {} tool(s), captured "
-                     "parser ({} bytes)", last_chat_format_, tools.size(),
-                     last_parser_.size());
+                     "parser ({} bytes), grammar ({} bytes, lazy={})",
+                     last_chat_format_, tools.size(), last_parser_.size(),
+                     tool_grammar_.size(), tool_grammar_lazy_);
+        // gh#138: the silent failure a consumer cannot see. A tier asking for
+        // tool_choice=REQUIRED whose render yields no grammar is unconstrained
+        // — the flag is set, tools are staged, and nothing enforces the call.
+        // Loud, because the alternative is what gh#138 actually experienced:
+        // prose-only turns with no diagnostic anywhere.
+        if (require_tool_call_ && tool_grammar_.empty()) {
+            logger->error(
+                "require_tool_call is set for this tier but the chat template "
+                "derived NO tool-call grammar from {} staged tool(s) "
+                "(format={}). The turn will decode unconstrained and may end "
+                "in prose with no tool call. This template may not support "
+                "tool_choice=REQUIRED.",
+                tools.size(), last_chat_format_);
+        }
     } else {
         prompt = apply_chat_template_lowlevel(messages);
     }
@@ -2933,38 +2948,26 @@ GenerationResult LlamaCppBackend::do_generate_speculative(
 namespace {
 
 /**
- * @brief Map entropic GenerationParams → common_params_sampling.
+ * @brief Resolve which grammar constrains this decode and apply it.
  *
- * The speculative path uses common_sampler (not llama_sampler) so it
- * can call common_sampler_sample_and_accept_n. Sampler config flows
- * through entropic's GenerationParams.
+ * Extracted from to_common_sampling to keep that function inside the knots
+ * SLOC/ABC gate once gh#138 added the tool-grammar observables.
  *
- * The chain this produces must mirror the plain path's stage order and
- * gating exactly (LlamaCppSamplerFactory::create), or speculative output
- * stops being distribution-identical to plain decode. It is also the
- * speculative half of grammar-source resolution: request beats tool-call,
- * a collision is logged at ERROR here rather than silently resolved, and
- * the tool-call grammar is applied as COMMON_GRAMMAR_TYPE_TOOL_CALLS with
- * generation_prompt prefilled — never as _USER.
- *
- * @param params Entropic generation params.
- * @param tool_grammar Render-derived tool-call GBNF ("" when none).
- * @param tool_grammar_lazy Whether the tool grammar arms on trigger.
+ * @param cps Sampling params (mutated).
+ * @param params Incoming generation params (carries a request grammar).
+ * @param tool_grammar GBNF the render derived from the staged tool schemas.
+ * @param tool_grammar_lazy Whether that grammar arms on a trigger.
  * @param generation_prompt Render prefill, required by the TOOL_CALLS type.
- * @return Populated common_params_sampling carrying the winning grammar (if
- *         any) plus every sampler knob, gated so defaults leave the chain
- *         shape unchanged.
- * @req REQ-INFER-006
  * @req REQ-INFER-008
- * @version 2.10.4
+ * @version 2.10.5
+ * @internal
  */
-common_params_sampling to_common_sampling(
+static void apply_grammar_source(
+    common_params_sampling& cps,
     const GenerationParams& params,
     const std::string& tool_grammar,
     bool tool_grammar_lazy,
     const std::string& generation_prompt) {
-    common_params_sampling cps;
-    cps.temp = params.temperature;
     // gh#108 (v2.10.0): propagate GBNF grammar to the MTP sampler chain so
     // grammar-constrained tiers are correctly enforced under speculative.mtp.
     //
@@ -3002,7 +3005,64 @@ common_params_sampling to_common_sampling(
         // content rather than as a grammar error. Measured exactly that on
         // gemma4 before this line existed.
         cps.generation_prompt = generation_prompt;
+        // gh#138: the ONLY observable that the tool-call grammar is in force.
+        // The orchestration line reports params.grammar, which is the REQUEST
+        // grammar — it prints "unconstrained" even when this grammar is
+        // active, so a consumer reading logs cannot tell the difference
+        // between "tool grammar applied" and "nothing constrained the
+        // decode". INFO, not DEBUG: this is the diagnostic that would have
+        // answered gh#138 from the reporter's own logs.
+        logger->info(
+            "Tool-call grammar applied: {} bytes, lazy={}, prefill={} bytes",
+            tool_grammar.size(), tool_grammar_lazy,
+            generation_prompt.size());
+    } else if (!tool_grammar.empty()) {
+        // Tools were staged and a grammar derived, but the request grammar
+        // won the precedence rule — say so rather than letting the tool
+        // grammar vanish silently.
+        logger->warn(
+            "Tool-call grammar ({} bytes) NOT applied — an explicit request "
+            "grammar takes precedence. Tool calls are not structurally "
+            "enforced this turn.",
+            tool_grammar.size());
     }
+}
+
+/**
+ * @brief Map entropic GenerationParams → common_params_sampling.
+ *
+ * The speculative path uses common_sampler (not llama_sampler) so it
+ * can call common_sampler_sample_and_accept_n. Sampler config flows
+ * through entropic's GenerationParams.
+ *
+ * The chain this produces must mirror the plain path's stage order and
+ * gating exactly (LlamaCppSamplerFactory::create), or speculative output
+ * stops being distribution-identical to plain decode. It is also the
+ * speculative half of grammar-source resolution: request beats tool-call,
+ * a collision is logged at ERROR here rather than silently resolved, and
+ * the tool-call grammar is applied as COMMON_GRAMMAR_TYPE_TOOL_CALLS with
+ * generation_prompt prefilled — never as _USER.
+ *
+ * @param params Entropic generation params.
+ * @param tool_grammar Render-derived tool-call GBNF ("" when none).
+ * @param tool_grammar_lazy Whether the tool grammar arms on trigger.
+ * @param generation_prompt Render prefill, required by the TOOL_CALLS type.
+ * @return Populated common_params_sampling carrying the winning grammar (if
+ *         any) plus every sampler knob, gated so defaults leave the chain
+ *         shape unchanged.
+ * @req REQ-INFER-006
+ * @req REQ-INFER-008
+ * @version 2.10.4
+ */
+common_params_sampling to_common_sampling(
+    const GenerationParams& params,
+    const std::string& tool_grammar,
+    bool tool_grammar_lazy,
+    const std::string& generation_prompt) {
+    common_params_sampling cps;
+    cps.temp = params.temperature;
+    apply_grammar_source(cps, params, tool_grammar, tool_grammar_lazy,
+                         generation_prompt);
     cps.top_k = params.top_k;
     cps.top_p = params.top_p;
     cps.penalty_repeat = params.repeat_penalty;
