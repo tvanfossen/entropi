@@ -95,6 +95,30 @@ repos:
         files: '^(include/entropic/.*\.h|python/src/entropic/_bindings(_manifest)?\.py|scripts/gen_bindings\.py)$'
         pass_filenames: false
 
+  # ── Requirements traceability ───────────────────────
+  - repo: local
+    hooks:
+      - id: check-requirements
+        name: Requirements traceability (docs/requirements.yaml)
+        # Three checks the other gates cannot make:
+        #   - a @req naming a requirement that no longer exists. The
+        #     doxygen-guard hook above checks this too, but SKIPS bodiless
+        #     header declarations — that is how a dead REQ-INFER-003 lived
+        #     in i_inference_backend.h unseen by any gate.
+        #   - a catalog entry nothing implements.
+        #   - exemption creep. doxygen-guard never collects a function whose
+        #     only tag is @internal/@utility/@callback, so a slide back
+        #     toward blanket exemption is invisible to it. The repo sat at
+        #     0.9% @req with every gate green.
+        # A missing catalog fails CLOSED — docs/requirements.yaml was
+        # deleted as collateral in 2edfb4e and nothing noticed for 15
+        # months because all three of its consumers fail open.
+        # Fix: run ``inv check-requirements`` for the specific violations.
+        entry: .venv/bin/inv check-requirements
+        language: system
+        always_run: true
+        pass_filenames: false
+
   # ── Build & Test Gates ──────────────────────────────
   - repo: local
     hooks:
