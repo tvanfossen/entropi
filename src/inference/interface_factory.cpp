@@ -526,7 +526,16 @@ static void parse_via_adapter(ModelOrchestrator* orch,
  * args-only object (no name key), match against the staged tool schemas —
  * synthesise the call when exactly one tool's required params are all present.
  *
- * @callback
+ * The agent-loop half of the shared template-first / adapter-second rule —
+ * this branch used to be a byte-for-byte duplicate of the orchestrator's,
+ * which is how gh#108's fix could land on one path and miss the other.
+ *
+ * @param raw Raw model output (may be NULL, treated as empty).
+ * @param[out] cleaned Newly allocated cleaned content; caller frees.
+ * @param[out] tool_calls_json Newly allocated JSON array of calls.
+ * @param user_data InterfaceContext carrying the orchestrator.
+ * @return 0 always — parse failure degrades to zero calls, never an error.
+ * @req REQ-INFER-010
  * @version 2.10.3
  */
 static int iface_parse_tool_calls(const char* raw,

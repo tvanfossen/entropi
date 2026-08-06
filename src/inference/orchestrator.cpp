@@ -98,8 +98,12 @@ bool ModelOrchestrator::create_tier_backends(const ParsedConfig& config) {
 
 /**
  * @brief Build digit-to-tier and handoff rule maps from config.
+ *
+ * An absent `handoff_rules` block leaves the map empty, which is what makes
+ * can_handoff deny every pair rather than allow them.
+ *
  * @param config Parsed engine config.
- * @utility
+ * @req REQ-INFER-020
  * @version 2.0.2
  */
 void ModelOrchestrator::build_routing_tables(const ParsedConfig& config) {
@@ -140,7 +144,7 @@ bool ModelOrchestrator::activate_default_tier(const ParsedConfig& config) {
  * router still loads at init when `models.router` is configured.
  *
  * @param config Parsed engine config.
- * @utility
+ * @req REQ-INFER-020
  * @version 2.1.11
  */
 void ModelOrchestrator::activate_router(const ParsedConfig& config) {
@@ -160,7 +164,7 @@ void ModelOrchestrator::activate_router(const ParsedConfig& config) {
  * (degrades to plain decode) rather than blocking engine init.
  *
  * @param config Parsed engine config.
- * @internal
+ * @req REQ-INFER-020
  * @version 2.9.0
  */
 void ModelOrchestrator::activate_draft(const ParsedConfig& config) {
@@ -244,7 +248,8 @@ bool ModelOrchestrator::initialize(const ParsedConfig& config) {
  * Main-tier pool is unloaded directly; secondary roles (router, draft,
  * etc.) are released through `secondary_loader_.shutdown()` (v2.1.11).
  *
- * @internal
+ * @req REQ-INFER-002
+ * @req REQ-INFER-020
  * @version 2.1.11
  */
 void ModelOrchestrator::shutdown() {
@@ -261,7 +266,12 @@ void ModelOrchestrator::shutdown() {
 
 /**
  * @brief Orchestrate teardown order (gh#58 close-out). See header.
- * @utility
+ *
+ * Backends first (frees the llama_contexts), LoRA handles second — a LoRA
+ * handle must outlive every context that referenced it, so the reverse
+ * order is a use-after-free.
+ *
+ * @req REQ-INFER-002
  * @version 2.3.0
  */
 ModelOrchestrator::~ModelOrchestrator() {
@@ -277,7 +287,11 @@ ModelOrchestrator::~ModelOrchestrator() {
  * @brief Resolve whether MTP should be attempted for this tier (gh#108,
  *        v2.9.4): `TierConfig::speculative_mtp` overrides the global
  *        `speculative.mtp` flag when set, else inherits it.
- * @internal
+ * @param tier_name Tier whose override to consult.
+ * @return The per-tier `speculative_mtp` value when the tier sets one —
+ *         it wins over the global flag in both directions — else the global
+ *         `inference.speculative.mtp`.
+ * @req REQ-INFER-015
  * @version 2.9.4
  */
 bool ModelOrchestrator::resolve_mtp_effective(const std::string& tier_name) const {
@@ -319,7 +333,17 @@ GenerationResult ModelOrchestrator::run_generate_dispatch(
  * (ENTROPIC_ERROR_SPECULATIVE_INCOMPATIBLE_CONFIG for an out-of-envelope
  * request), which is propagated so the consumer corrects the config rather
  * than getting silent plain decode that masks MTP never engaging.
- * @internal
+ *
+ * @param model Active backend; a non-llama.cpp target yields NOT_SUPPORTED
+ *        with "disable speculative.mtp" rather than a fallback.
+ * @param messages Conversation history.
+ * @param params Generation parameters.
+ * @param on_token Per-token callback (may be empty).
+ * @param cancel Cancel flag.
+ * @param[out] result The MTP outcome — kernel result or typed loud error.
+ * @return Always true: MTP owns the outcome, so the caller never falls
+ *         through to plain decode.
+ * @req REQ-INFER-015
  * @version 2.9.1
  */
 bool ModelOrchestrator::try_mtp_route(
@@ -357,9 +381,11 @@ bool ModelOrchestrator::try_mtp_route(
  * Fail loud with INCOMPATIBLE_CONFIG instead of crashing.
  *
  * @param draft  Draft LlamaCppBackend (model must be loaded for the check).
- * @param result [out] Populated on true return.
+ * @param result [out] Populated on true return with
+ *        SPECULATIVE_INCOMPATIBLE_CONFIG naming the layer count and the
+ *        `speculative.mtp: true` knob.
  * @return True when the guard fires and result is populated; false otherwise.
- * @internal
+ * @req REQ-INFER-015
  * @version 2.10.0
  */
 static bool mtp_head_guard_fires(LlamaCppBackend* draft,
@@ -481,7 +507,9 @@ bool ModelOrchestrator::try_speculative_route(
  *
  * @param model Active backend (may be null / non-LlamaCpp).
  * @param params Resolved generation params (carries `tools`).
- * @utility
+ * @param require_tool_call Per-tier mandatory-tool flag staged alongside the
+ *        defs; drives the render's tool_choice.
+ * @req REQ-INFER-009
  * @version 2.10.4
  */
 static void stage_active_tools(InferenceBackend* model,
@@ -506,7 +534,7 @@ static void stage_active_tools(InferenceBackend* model,
  * @param model Backend that produced the result (for common_chat routing).
  * @param adapter Tier adapter for the autoparser/fallback path (may be null).
  * @param[in,out] result Generation result (content split, tools set).
- * @utility
+ * @req REQ-INFER-010
  * @version 2.10.3
  */
 static void apply_adapter_parse(InferenceBackend* model,
@@ -577,8 +605,10 @@ static void warn_if_budget_starved_required_turn(
  * @param model Active backend (tools staged here).
  * @param params Incoming generation params.
  * @param tier_name Selected tier.
- * @return Resolved params.
- * @internal
+ * @return Resolved params — grammar_key resolved, per-tier sampler defaults
+ *         applied — with the turn's tools and require_tool_call flag already
+ *         staged on the backend.
+ * @req REQ-INFER-009
  * @version 2.10.4
  */
 GenerationParams ModelOrchestrator::resolve_and_stage(
@@ -811,7 +841,20 @@ static void stream_token_trampoline(const char* data, std::size_t len,
  * enables MTP streaming (the streaming guard in mtp_unsupported_reason
  * is removed in the same gh#108 v2.10.0 change).
  *
- * @internal
+ * gh#108 (v2.10.3): the filter's markers come from the resolved adapter, the
+ * same source the buffered strip uses — v2.10.0 left it on a hardcoded
+ * `<think>` pair that gemma4 never emits.
+ *
+ * @param messages Conversation history.
+ * @param params Generation parameters.
+ * @param on_token Per-token callback, wrapped by the reasoning filter.
+ * @param cancel Cancel flag, polled by the backend once per token.
+ * @param tier_name Explicit tier, or empty to route.
+ * @return GenerationResult with content parsed by the shared rule; an
+ *         ENTROPIC_ERROR_GENERATE_FAILED result when no model resolves for
+ *         the tier.
+ * @req REQ-INFER-011
+ * @req REQ-INFER-005
  * @version 2.10.4
  */
 GenerationResult ModelOrchestrator::generate_streaming(
@@ -880,9 +923,14 @@ GenerationResult ModelOrchestrator::generate_streaming(
  * configured (was: `router_` non-null). The slot is owned by
  * `secondary_loader_` since gh#27.
  *
+ * Every decision is recorded in `last_routing_result_` — selected tier,
+ * previous tier, raw model output, swap action — and pushed onto a tier
+ * history bounded at 5 entries.
+ *
  * @param messages Current conversation.
- * @return Selected tier name.
- * @internal
+ * @return Selected tier name; the default tier when routing is disabled, no
+ *         router is configured, or classification found no mapped digit.
+ * @req REQ-INFER-020
  * @version 2.1.11
  */
 std::string ModelOrchestrator::route(const std::vector<Message>& messages) {
@@ -924,8 +972,10 @@ std::string ModelOrchestrator::route(const std::vector<Message>& messages) {
  * behavior for back-compat.
  *
  * @param messages Conversation history.
- * @return Pair of (tier_name, raw_digit), or ("","") on miss.
- * @internal
+ * @return Pair of (tier_name, raw_digit): the mapped tier and the digit that
+ *         selected it; ("","") when the router slot is not loaded; and
+ *         (default_tier_, "") when the router emitted no mapped digit.
+ * @req REQ-INFER-020
  * @version 2.8.1
  */
 std::pair<std::string, std::string> ModelOrchestrator::classify_task(
@@ -1250,7 +1300,10 @@ void ModelOrchestrator::unload_or_warm_current(InferenceBackend* current) {
 
 /**
  * @brief Last routing result.
- * @internal
+ * @return The RoutingResult recorded by the most recent route() — selected
+ *         tier, previous tier, raw router output, swap action and timings.
+ *         Default-constructed before the first route.
+ * @req REQ-INFER-020
  * @version 1.8.2
  */
 RoutingResult ModelOrchestrator::last_routing_result() const {
@@ -1272,7 +1325,10 @@ std::string ModelOrchestrator::last_used_tier() const {
  * Includes `"router"` when the secondary loader reports the role as
  * loaded (v2.1.11, gh#27 — previously checked the raw `router_` field).
  *
- * @internal
+ * @return Tier names whose backend reports is_loaded(), plus `"router"` when
+ *         the secondary loader holds that role; a role whose load failed is
+ *         absent.
+ * @req REQ-INFER-020
  * @version 2.1.11
  */
 std::vector<std::string> ModelOrchestrator::loaded_models() const {
@@ -1320,7 +1376,11 @@ InferenceBackend* ModelOrchestrator::get_backend(
 
 /**
  * @brief Check if handoff is permitted.
- * @internal
+ * @param from Source tier name.
+ * @param to Candidate destination tier name.
+ * @return true only when `from` has an explicit rule set listing `to`; an
+ *         empty rule set denies every pair.
+ * @req REQ-INFER-020
  * @version 1.8.2
  */
 bool ModelOrchestrator::can_handoff(
@@ -1518,7 +1578,7 @@ size_t ModelOrchestrator::load_grammars_from(
  * against the new system prompt. (P1-7, 2.0.6-rc16). Fans out to
  * secondary roles (router, draft) via SecondaryModelLoader (v2.1.11).
  *
- * @utility
+ * @req REQ-INFER-020
  * @version 2.1.11
  */
 void ModelOrchestrator::clear_all_prompt_caches() {
@@ -1532,8 +1592,10 @@ void ModelOrchestrator::clear_all_prompt_caches() {
 
 /**
  * @brief Vision-capability lookup (gh#41, v2.1.8).
- * @return true if any configured tier declares "vision".
- * @internal
+ * @return true if any configured tier declares "vision"; false lets the
+ *         facade short-circuit with ENTROPIC_ERROR_NO_VISION_TIER instead
+ *         of dispatching a turn no tier can handle.
+ * @req REQ-INFER-025
  * @version 2.1.8
  */
 bool ModelOrchestrator::has_vision_capable_tier() const {
@@ -1545,8 +1607,9 @@ bool ModelOrchestrator::has_vision_capable_tier() const {
 
 /**
  * @brief First vision-capable tier name (gh#41, v2.1.8).
- * @return Tier name, or "" if none configured.
- * @internal
+ * @return The canonical vision tier's name, or "" when no configured tier
+ *         declares the capability.
+ * @req REQ-INFER-025
  * @version 2.1.8
  */
 std::string ModelOrchestrator::select_vision_tier() const {
@@ -1669,9 +1732,12 @@ static std::string normalize_grammar_key(const std::string& grammar_value) {
  * 3. Identity frontmatter grammar: field — normalize and lookup
  * 4. None — unconstrained generation
  *
+ * An unresolvable key logs a warning and leaves the decode unconstrained
+ * rather than failing the turn.
+ *
  * @param params Generation parameters (mutated: grammar field may be set).
  * @param tier_name Active tier for frontmatter grammar resolution.
- * @internal
+ * @req REQ-INFER-007
  * @version 2.0.0
  */
 void ModelOrchestrator::resolve_grammar_key(
@@ -1722,7 +1788,14 @@ inline void apply_if_default(T& field, const std::optional<T>& ov, T dflt) {
 
 /**
  * @brief Pure precedence helper — see header. (gh#82/gh#85)
- * @utility
+ *
+ * Each field takes the tier's value only when the tier set one AND the
+ * caller left that field at its GenerationParams default — so a per-call
+ * knob is never overwritten by tier config.
+ *
+ * @param params Generation parameters (mutated in place).
+ * @param ov The tier's optional sampler overrides.
+ * @req REQ-INFER-021
  * @version 2.8.2
  */
 void apply_tier_sampler_overrides(
@@ -1745,9 +1818,14 @@ void apply_tier_sampler_overrides(
  * @brief Apply per-tier sampler config to params. (gh#82, v2.4.4)
  *
  * Member wrapper: looks the tier up in config and delegates the
- * precedence decision to the free `apply_tier_sampler_overrides`.
+ * precedence decision to the free `apply_tier_sampler_overrides`, which
+ * applies a tier value only where the caller left the struct default —
+ * an explicit caller knob always wins.
  *
- * @internal
+ * @param params Generation parameters (mutated in place).
+ * @param tier_name Tier whose overrides to consult; an unknown tier is a
+ *        no-op.
+ * @req REQ-INFER-021
  * @version 2.8.2
  */
 void ModelOrchestrator::apply_tier_sampler_defaults(

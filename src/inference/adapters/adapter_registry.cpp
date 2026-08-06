@@ -64,8 +64,10 @@ struct AdapterEntry {
  * in content on every path. Gemma4Adapter is the fallback that closes it;
  * PEG_GEMMA4 remains primary whenever an arena exists.
  *
- * @return Registered factories, in lookup order.
- * @internal
+ * @return Registered factories, in lookup order — the declared set of
+ *         families create_adapter can resolve; anything absent falls back
+ *         to GenericAdapter.
+ * @req REQ-INFER-012
  * @version 2.10.3
  */
 const std::array<AdapterEntry, 4>& adapter_table() {
@@ -106,11 +108,16 @@ std::string to_lower(const std::string& name) {
  * whose tool calls are parsed by common_chat's dedicated grammar — falls
  * back to GenericAdapter (identity assembly + generic fallback parse).
  *
+ * Lookup is case-insensitive, and an unrecognised name falls back to
+ * GenericAdapter rather than failing — a misconfigured adapter name must
+ * not take the tier down.
+ *
  * @param name Adapter name from config.
  * @param tier_name Identity tier name.
  * @param identity_prompt Assembled identity prompt.
- * @return Owned adapter instance.
- * @internal
+ * @return Owned adapter instance: the matching family adapter for a
+ *         registered key, GenericAdapter for anything else.
+ * @req REQ-INFER-012
  * @version 2.7.0 (Phase D)
  */
 std::unique_ptr<ChatAdapter> create_adapter(

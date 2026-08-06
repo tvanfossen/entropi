@@ -44,7 +44,15 @@ enum class GrammarSource {
 
 /**
  * @brief Number of declared grammar sources, sentinel excluded.
- * @utility
+ *
+ * Reads the trailing `count` sentinel, so the value tracks the declaration
+ * automatically: appending a source above the sentinel changes this number
+ * and fails the invariant test, which is the tripwire's whole purpose.
+ *
+ * @return The sentinel's integer value — the count of declared sources
+ *         including `none`, excluding the sentinel itself.
+ * @req REQ-TYPE-004
+ * @req REQ-INFER-008
  * @version 2.10.4
  */
 inline constexpr int grammar_source_count() {
@@ -62,8 +70,11 @@ inline constexpr int grammar_source_count() {
  *
  * @param request_grammar GenerationParams::grammar.
  * @param tool_grammar Render-derived tool-call GBNF.
- * @return The winning source.
- * @utility
+ * @return GrammarSource::request when a request grammar is present,
+ *         GrammarSource::tool_call when only the render-derived grammar is,
+ *         GrammarSource::none when neither is.
+ * @req REQ-INFER-008
+ * @req REQ-TYPE-004
  * @version 2.10.4
  */
 inline GrammarSource resolve_grammar_source(const std::string& request_grammar,
@@ -77,8 +88,9 @@ inline GrammarSource resolve_grammar_source(const std::string& request_grammar,
  * @brief Whether both sources are active — a config error worth reporting.
  * @param request_grammar GenerationParams::grammar.
  * @param tool_grammar Render-derived tool-call GBNF.
- * @return true when both are non-empty.
- * @utility
+ * @return true when both are non-empty — the caller logs the collision at
+ *         ERROR at the application site; false otherwise.
+ * @req REQ-INFER-008
  * @version 2.10.4
  */
 inline bool grammar_sources_collide(const std::string& request_grammar,

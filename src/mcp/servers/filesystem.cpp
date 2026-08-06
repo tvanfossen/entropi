@@ -35,9 +35,14 @@ namespace entropic {
 
 /**
  * @brief Record that a file was read with its content hash.
+ *
+ * The tracker is what makes read-before-write enforceable: the hash
+ * stored here is compared at write time to detect external
+ * modification.
+ *
  * @param path Canonical file path.
  * @param hash Content hash at time of read.
- * @internal
+ * @req REQ-MCP-021
  * @version 1.8.5
  */
 void FileAccessTracker::record_read(const std::string& path,
@@ -50,8 +55,11 @@ void FileAccessTracker::record_read(const std::string& path,
  * @brief Check if file was read and content is unchanged.
  * @param path Canonical file path.
  * @param current_hash Current content hash.
- * @return true if previously read with matching hash.
- * @internal
+ * @return true only when the file was read in this session AND its
+ *         content still hashes the same; false for an unread file or
+ *         one modified externally since the read — both of which refuse
+ *         the write.
+ * @req REQ-MCP-021
  * @version 1.8.5
  */
 bool FileAccessTracker::was_read_unchanged(
@@ -67,8 +75,9 @@ bool FileAccessTracker::was_read_unchanged(
 /**
  * @brief Check if a file was ever read in this session.
  * @param path Canonical file path.
- * @return true if previously recorded.
- * @internal
+ * @return true when a read was recorded for this path, regardless of
+ *         whether the content has since changed.
+ * @req REQ-MCP-021
  * @version 1.8.5
  */
 bool FileAccessTracker::was_read(const std::string& path) const {
@@ -154,10 +163,17 @@ size_t hash_content(const std::string& s) {
 
 /**
  * @brief Build a JSON error response.
+ *
+ * Every filesystem failure is a structured object rather than prose, so
+ * the model can branch on the code: not_found, is_directory, ignored,
+ * size_exceeded, read_before_write, multiple_matches, invalid_regex,
+ * not_directory.
+ *
  * @param code Error code string.
- * @param message Human-readable message.
- * @return JSON string.
- * @internal
+ * @param message Human-readable message, which for not_found names the
+ *                tool to use instead (gh#124).
+ * @return `{"error":"<code>","message":"<message>"}` as a JSON string.
+ * @req REQ-MCP-021
  * @version 1.8.5
  */
 std::string make_error(const std::string& code,
@@ -172,8 +188,10 @@ std::string make_error(const std::string& code,
  * @brief Build read_file result JSON from content string.
  * @param path Canonical path string.
  * @param content File content.
- * @return JSON string with path, total lines, and numbered lines.
- * @internal
+ * @return JSON carrying the path, the total line count, and `lines` as
+ *         an ORDERED ARRAY — not a keyed object (gh#120), so line order
+ *         survives serialisation.
+ * @req REQ-MCP-021
  * @version 2.9.18
  */
 std::string build_read_result(const std::string& path,
@@ -357,10 +375,16 @@ std::vector<std::string> expand_braces(const std::string& pattern) {
 
 /**
  * @brief Enforce read-before-write policy on existing files.
+ *
+ * A file that does not yet exist is creatable without a prior read;
+ * an existing one must have been read this session.
+ *
  * @param tracker File access tracker.
  * @param path Canonical path string.
- * @return Error JSON string if violation, empty string if OK.
- * @internal
+ * @return An empty string when the write may proceed; otherwise a
+ *         structured `read_before_write` error naming the file, logged
+ *         at warning level.
+ * @req REQ-MCP-021
  * @version 1.8.5
  */
 std::string check_read_before_write(
@@ -520,9 +544,13 @@ enum class EntryAction {
  * @param entry Recursive-iterator entry.
  * @param root Workspace root (for path relativization).
  * @param patterns Brace-expanded glob patterns.
- * @param ignore Optional ignore matcher.
- * @return One of EntryAction values.
- * @internal
+ * @param ignore Optional ignore matcher (nullptr disables filtering).
+ * @return kSkipPrune for an ignored or hardcoded-skip directory, so the
+ *         walk never descends into it; kSkip for an ignored file or a
+ *         non-match; kTake for a regular file matching any pattern.
+ *         Matching is done on the path RELATIVE to the root, which is
+ *         what makes path-anchored ignore rules work.
+ * @req REQ-MCP-022
  * @version 2.10.0
  */
 EntryAction classify_glob_entry(
@@ -559,7 +587,16 @@ EntryAction classify_glob_entry(
  * into results. This single function now handles both fixes via the
  * expand_braces + classify_glob_entry helpers.
  *
- * @internal
+ * @param root Starting directory for traversal.
+ * @param pattern Glob pattern (may contain `{a,b,c}`).
+ * @param max_results Maximum number of results.
+ * @param ignore Optional ignore matcher (nullptr disables filtering).
+ * @return Absolute paths of matching regular files, capped at
+ *         `max_results`, with ignored files omitted and ignored
+ *         directories never descended into. `**` matches files at the
+ *         root as well as in subdirectories (gh#126).
+ * @req REQ-MCP-022
+ * @req REQ-MCP-021
  * @version 2.1.4
  */
 std::vector<std::string> collect_glob_matches(
@@ -590,11 +627,15 @@ std::vector<std::string> collect_glob_matches(
 
 /**
  * @brief Search a single file for regex matches.
+ *
+ * Bounded by a shared total-match limit rather than a per-file one, so
+ * a single huge file cannot crowd out the rest of the search.
+ *
  * @param path File path.
  * @param re Compiled regex.
- * @param matches Output vector for match results.
- * @param limit Maximum total matches.
- * @internal
+ * @param matches Output vector for match results, appended to in place.
+ * @param limit Maximum total matches across the whole grep.
+ * @req REQ-MCP-022
  * @version 1.8.5
  */
 void grep_file(const fs::path& path,
@@ -650,10 +691,13 @@ json entry_to_json(const fs::directory_entry& entry) {
 /**
  * @brief Collect directory entries, optionally recursive.
  * @param dir Directory to list.
- * @param recursive Whether to recurse into subdirectories.
- * @param max_depth Maximum recursion depth (0 = immediate only).
- * @return Vector of JSON entry objects.
- * @internal
+ * @param recursive Whether to recurse into subdirectories (defaults to
+ *                  false at the tool boundary, gh#116).
+ * @param max_depth Maximum recursion depth (tool default 3, gh#116);
+ *                  deeper entries are pruned rather than listed.
+ * @return One JSON object per listed entry carrying name, type and
+ *         size.
+ * @req REQ-MCP-021
  * @version 1.8.5
  */
 std::vector<json> collect_entries(const fs::path& dir,
@@ -685,8 +729,11 @@ std::vector<json> collect_entries(const fs::path& dir,
  * @param args Parsed JSON arguments.
  * @param content Current file content.
  * @param out Modified content (output).
- * @return Empty string on success, error JSON on failure.
- * @internal
+ * @return An empty string on success; otherwise a structured
+ *         `not_found` error when old_string is absent, or
+ *         `multiple_matches` (with the use-replace_all hint) when it is
+ *         ambiguous — an ambiguous edit is refused, never guessed.
+ * @req REQ-MCP-021
  * @version 1.8.6
  */
 std::string do_str_replace(const json& args,
@@ -729,11 +776,15 @@ std::string do_insert(const json& args,
 
 /**
  * @brief Apply an edit operation and return result JSON or error.
- * @param args Parsed arguments.
- * @param resolved Resolved file path.
+ * @param args Parsed arguments — `old_string` selects replace mode,
+ *             `insert_line` selects insert mode.
+ * @param resolved Resolved (root-confined) file path.
  * @param path_str Path as string for logging.
- * @return Result JSON or error string.
- * @internal
+ * @return A success JSON object naming the edited path when the edit
+ *         applied and was written back; otherwise the mode's structured
+ *         error, or `invalid_args` when neither mode was selected. The
+ *         file is left untouched on every error path.
+ * @req REQ-MCP-021
  * @version 1.8.5
  */
 std::string apply_edit(const json& args,
@@ -792,8 +843,9 @@ public:
 
     /**
      * @brief Read-only tool — requires READ access.
-     * @return MCPAccessLevel::READ.
-     * @utility
+     * @return MCPAccessLevel::READ, relaxing ToolBase's WRITE default
+     *         because this tool only inspects the workspace.
+     * @req REQ-MCP-011
      * @version 1.9.4
      */
     MCPAccessLevel required_access_level() const override {
@@ -811,9 +863,14 @@ public:
 
     /**
      * @brief Anchor key for context deduplication.
+     *
+     * A non-empty key is what makes MCPServerBase auto-inject the
+     * context_anchor directive for this tool.
+     *
      * @param args_json JSON with "path" key.
      * @return "file:{path}" anchor key.
-     * @internal
+     * @req REQ-MCP-001
+     * @req REQ-MCP-021
      * @version 1.8.5
      */
     std::string anchor_key(
@@ -839,7 +896,18 @@ private:
  * Returns a non-empty error JSON when any gate denies. Path-relative
  * ignore matching uses the server's IgnoreMatcher (#15, v2.1.4).
  *
- * @internal
+ * @param server Owning server (source of the root, ignore rules and
+ *               size limit).
+ * @param resolved Already root-confined path.
+ * @param path_str Resolved path as a string, for messages.
+ * @return An empty string when the read may proceed; otherwise a
+ *         structured error — `not_found` (whose message names
+ *         list_directory, gh#124), `is_directory` for a directory
+ *         argument (gh#116), `ignored` for a path excluded by
+ *         .gitignore/.explorerignore, or `size_exceeded` naming both
+ *         the size and the limit so the model pivots to offset/limit.
+ * @req REQ-MCP-021
+ * @req REQ-MCP-022
  * @version 2.10.0
  */
 std::string check_read_gates(FilesystemServer& server,
@@ -882,7 +950,15 @@ std::string check_read_gates(FilesystemServer& server,
  * Issue #15 (v2.1.4): pre-read gating moved into check_read_gates so
  * the ignore-matcher refusal lives next to existence + size checks.
  *
- * @internal
+ * A successful read records the content hash in the FileAccessTracker —
+ * which is why read_file must always execute and opts out of duplicate
+ * detection.
+ *
+ * @param args_json JSON with a "path" key.
+ * @return A ServerResponse with no directives whose result is either
+ *         the numbered-lines JSON or the first failing gate's
+ *         structured error.
+ * @req REQ-MCP-021
  * @version 2.1.4
  */
 ServerResponse ReadFileTool::execute(const std::string& args_json) {
@@ -940,9 +1016,16 @@ private:
 
 /**
  * @brief Execute write_file: resolve, enforce policy, write.
- * @param args_json JSON arguments.
- * @return ServerResponse with result.
- * @internal
+ *
+ * The path is resolved against the root first (so a traversal attempt
+ * never reaches the write), then the read-before-write gate runs.
+ *
+ * @param args_json JSON with "path" and "content" keys.
+ * @return A ServerResponse with no directives whose result is either a
+ *         success JSON naming the path and bytes written, or the
+ *         structured `read_before_write` error — in which case nothing
+ *         is written.
+ * @req REQ-MCP-021
  * @version 1.8.5
  */
 ServerResponse WriteFileTool::execute(
@@ -1056,8 +1139,9 @@ public:
 
     /**
      * @brief Read-only tool — requires READ access.
-     * @return MCPAccessLevel::READ.
-     * @utility
+     * @return MCPAccessLevel::READ, relaxing ToolBase's WRITE default
+     *         because this tool only inspects the workspace.
+     * @req REQ-MCP-011
      * @version 1.9.4
      */
     MCPAccessLevel required_access_level() const override {
@@ -1130,8 +1214,9 @@ public:
 
     /**
      * @brief Read-only tool — requires READ access.
-     * @return MCPAccessLevel::READ.
-     * @utility
+     * @return MCPAccessLevel::READ, relaxing ToolBase's WRITE default
+     *         because this tool only inspects the workspace.
+     * @req REQ-MCP-011
      * @version 1.9.4
      */
     MCPAccessLevel required_access_level() const override {
@@ -1156,9 +1241,11 @@ private:
  *
  * @param pattern Regex source.
  * @param[out] err Set to a non-empty JSON error string on failure.
- * @return Compiled regex on success; the error path leaves `err`
- *         populated and returns a never-match regex.
- * @internal
+ * @return The compiled regex on success; on failure a never-matching
+ *         regex with `err` set to a structured `invalid_regex` error —
+ *         a bad pattern from the model is a tool error, never a throw
+ *         through the dispatch path.
+ * @req REQ-MCP-021
  * @version 2.1.4
  */
 std::regex compile_grep_or_error(const std::string& pattern,
@@ -1187,8 +1274,11 @@ std::regex compile_grep_or_error(const std::string& pattern,
  * @param file_patterns Brace-expanded glob patterns.
  * @param re Compiled content regex.
  * @param ignore Ignore matcher.
- * @return Up to MAX_GREP_RESULTS match objects.
- * @utility
+ * @return Up to MAX_GREP_RESULTS match objects. Uses exactly the same
+ *         classify_glob_entry filter glob does, so grep and glob honour
+ *         .gitignore/.explorerignore identically and ignored
+ *         directories are pruned rather than walked.
+ * @req REQ-MCP-022
  * @version 2.3.7
  */
 static std::vector<json> grep_search(
@@ -1215,7 +1305,13 @@ static std::vector<json> grep_search(
 
 /**
  * @brief Execute grep: compile regex, walk the tree, collect matches.
- * @internal
+ * @param args_json JSON with a "pattern" key and an optional "glob"
+ *                  (defaulting to "*").
+ * @return A ServerResponse with no directives whose result is the JSON
+ *         array of matches, or the structured `invalid_regex` error
+ *         when the pattern would not compile.
+ * @req REQ-MCP-022
+ * @req REQ-MCP-021
  * @version 2.3.7
  */
 ServerResponse GrepTool::execute(const std::string& args_json) {
@@ -1262,8 +1358,9 @@ public:
 
     /**
      * @brief Read-only tool — requires READ access.
-     * @return MCPAccessLevel::READ.
-     * @utility
+     * @return MCPAccessLevel::READ, relaxing ToolBase's WRITE default
+     *         because this tool only inspects the workspace.
+     * @req REQ-MCP-011
      * @version 1.9.4
      */
     MCPAccessLevel required_access_level() const override {
@@ -1285,9 +1382,16 @@ private:
 
 /**
  * @brief Execute list_directory: list entries in a directory.
- * @param args_json JSON arguments.
- * @return ServerResponse with directory listing.
- * @internal
+ *
+ * The optional parameters carry documented defaults (gh#116): `path`
+ * defaults to the project root, `recursive` to false, `max_depth` to 3.
+ *
+ * @param args_json JSON with optional "path", "recursive" and
+ *                  "max_depth" keys — all three may be omitted.
+ * @return A ServerResponse with no directives whose result is the JSON
+ *         array of entries, or a structured `not_directory` error when
+ *         the resolved path is not a directory.
+ * @req REQ-MCP-021
  * @version 2.9.13
  */
 ServerResponse ListDirectoryTool::execute(
@@ -1319,8 +1423,11 @@ ServerResponse ListDirectoryTool::execute(
  * @brief Compute max read bytes from config and model context.
  * @param config Filesystem configuration.
  * @param model_context_bytes Model context window in bytes.
- * @return Max read bytes (32KB default when no model context provided).
- * @internal
+ * @return The explicit config `max_read_bytes` when set; else a
+ *         percentage of the model context; else a 32KB default — the
+ *         gate that turns an oversized read into a `size_exceeded`
+ *         error instead of a blown context budget.
+ * @req REQ-MCP-021
  * @version 2.0.4
  */
 static int compute_max_read_bytes(const FilesystemConfig& config,
@@ -1344,11 +1451,14 @@ static int compute_max_read_bytes(const FilesystemConfig& config,
  * Issue #15 (v2.1.4): also loads .gitignore + .explorerignore via the
  * IgnoreMatcher member so glob/grep/read filter ignored paths.
  *
- * @param root_dir Project root directory.
+ * @param root_dir Project root directory — canonicalised here, and the
+ *                 boundary every tool's paths are confined to.
  * @param config Filesystem configuration.
  * @param data_dir Path to bundled data directory.
  * @param model_context_bytes Model context window in bytes.
- * @internal
+ * @req REQ-MCP-001
+ * @req REQ-MCP-021
+ * @req REQ-MCP-022
  * @version 2.3.7
  */
 FilesystemServer::FilesystemServer(
@@ -1379,8 +1489,13 @@ FilesystemServer::FilesystemServer(
 
 /**
  * @brief Construct the six filesystem tool instances (ctor step 1).
+ *
+ * read_file, write_file, edit_file, glob, grep and list_directory —
+ * the server's whole surface, each built from its bundled JSON
+ * descriptor.
+ *
  * @param data_dir Directory holding tool JSON definitions.
- * @internal
+ * @req REQ-MCP-021
  * @version 2.3.7
  */
 void FilesystemServer::create_fs_tools(const std::string& data_dir) {
@@ -1394,7 +1509,11 @@ void FilesystemServer::create_fs_tools(const std::string& data_dir) {
 
 /**
  * @brief Register the six filesystem tools (ctor step 2).
- * @internal
+ *
+ * Registration is all it takes — dispatch, envelope shape and the
+ * read_file context anchor come from MCPServerBase.
+ *
+ * @req REQ-MCP-001
  * @version 2.3.7
  */
 void FilesystemServer::register_fs_tools() {
@@ -1415,9 +1534,15 @@ FilesystemServer::~FilesystemServer() = default;
 
 /**
  * @brief read_file always executes (updates FileAccessTracker).
+ *
+ * read_file must run even when repeated, because its side effect —
+ * recording the read in the tracker — is what unlocks a later write.
+ *
  * @param tool_name Tool name to check.
- * @return true for "read_file", false otherwise.
- * @internal
+ * @return true for "read_file", false for every other filesystem tool,
+ *         which stay duplicate-checked.
+ * @req REQ-MCP-015
+ * @req REQ-MCP-021
  * @version 1.8.5
  */
 bool FilesystemServer::skip_duplicate_check(
@@ -1432,8 +1557,11 @@ bool FilesystemServer::skip_duplicate_check(
  * root's .gitignore + .explorerignore take effect immediately.
  *
  * @param path New root directory.
- * @return true on success, false if path is not a directory.
- * @internal
+ * @return true when the path is a directory, in which case the server
+ *         is re-rooted AND the ignore rules are reloaded from the new
+ *         root; false when it is not, leaving the server untouched.
+ * @req REQ-MCP-021
+ * @req REQ-MCP-022
  * @version 2.1.4
  */
 bool FilesystemServer::set_working_dir(const std::string& path) {
@@ -1453,8 +1581,9 @@ bool FilesystemServer::set_working_dir(const std::string& path) {
 
 /**
  * @brief Get the root directory.
- * @return Root directory path reference.
- * @internal
+ * @return The canonical root every requested path is resolved against
+ *         and confined to.
+ * @req REQ-MCP-021
  * @version 1.8.5
  */
 const fs::path& FilesystemServer::root_dir() const {
@@ -1463,8 +1592,9 @@ const fs::path& FilesystemServer::root_dir() const {
 
 /**
  * @brief Get the file access tracker.
- * @return Mutable tracker reference.
- * @internal
+ * @return Mutable reference to the read-before-write tracker shared by
+ *         read_file (which records) and write_file (which enforces).
+ * @req REQ-MCP-021
  * @version 1.8.5
  */
 FileAccessTracker& FilesystemServer::tracker() {
@@ -1473,8 +1603,10 @@ FileAccessTracker& FilesystemServer::tracker() {
 
 /**
  * @brief Get the ignore matcher (#15, v2.1.4).
- * @return Read-only matcher reference.
- * @internal
+ * @return Read-only reference to the loaded .gitignore +
+ *         .explorerignore rule set that glob, grep and read_file all
+ *         consult.
+ * @req REQ-MCP-022
  * @version 2.1.4
  */
 const IgnoreMatcher& FilesystemServer::ignore() const {
@@ -1493,8 +1625,9 @@ const FilesystemConfig& FilesystemServer::config() const {
 
 /**
  * @brief Get max read bytes for size gate.
- * @return Max bytes, or 0 for unlimited.
- * @internal
+ * @return The read size limit in bytes, or 0 for unlimited — a file
+ *         over the limit is refused with `size_exceeded`.
+ * @req REQ-MCP-021
  * @version 1.8.5
  */
 int FilesystemServer::max_read_bytes() const {
@@ -1511,10 +1644,16 @@ int FilesystemServer::max_read_bytes() const {
  * Containment uses lexically_relative so that "/home/user/project"
  * does not falsely contain "/home/user/projectile" via string-prefix.
  *
- * @param requested User-requested path string.
- * @return Resolved canonical path.
- * @throws std::runtime_error if path escapes root.
- * @internal
+ * The single confinement point every filesystem tool goes through, so
+ * no tool can traverse outside the project.
+ *
+ * @param requested User-requested path string (absolute or relative to
+ *                  the root).
+ * @return The canonical path when it lies under the root — or anywhere,
+ *         when allow_outside_root is configured.
+ * @throws std::runtime_error when the canonical result leaves the root,
+ *         logged as "Path escape blocked".
+ * @req REQ-MCP-021
  * @version 2.1.1-rc1
  */
 fs::path FilesystemServer::resolve_path(

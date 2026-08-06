@@ -32,8 +32,14 @@ ExternalMCPClient::ExternalMCPClient(
 
 /**
  * @brief Connect: open transport, initialize, query tools.
- * @return true on success.
- * @internal
+ *
+ * The MCP handshake in order — transport open, initialize, tools/list.
+ *
+ * @return true when the transport opened and initialize succeeded;
+ *         false otherwise. A failed tools/list is NOT fatal: the client
+ *         stays connected with zero tools and a warning, so a server
+ *         that is up but tool-less does not read as down.
+ * @req REQ-MCP-025
  * @version 1.8.7
  */
 bool ExternalMCPClient::connect() {
@@ -73,8 +79,11 @@ void ExternalMCPClient::disconnect() {
 
 /**
  * @brief List tools as JSON array string (cached, prefixed).
- * @return JSON array string.
- * @internal
+ * @return The cached tool descriptors with names already
+ *         `<server>.<tool>`-prefixed, so ServerManager can concatenate
+ *         them without re-prefixing; "[]" when disconnected.
+ * @req REQ-MCP-025
+ * @req REQ-MCP-007
  * @version 1.8.7
  */
 std::string ExternalMCPClient::list_tools() const {
@@ -85,9 +94,14 @@ std::string ExternalMCPClient::list_tools() const {
 /**
  * @brief Execute a tool call via the external server.
  * @param tool_name Local name (without server prefix).
- * @param args_json JSON arguments.
- * @return ServerResponse JSON (directives always empty).
- * @internal
+ * @param args_json JSON arguments; unparseable arguments degrade to an
+ *                  empty object rather than throwing.
+ * @return A ServerResponse JSON envelope whose directives array is
+ *         ALWAYS empty — see build_response. A disconnected transport
+ *         or an empty (timed-out) response yields an is_error envelope
+ *         instead of a hang.
+ * @req REQ-MCP-025
+ * @req REQ-MCP-002
  * @version 1.8.7
  */
 std::string ExternalMCPClient::execute(
@@ -141,8 +155,13 @@ static std::vector<std::string> names_diff(
 
 /**
  * @brief Re-query tools/list and diff against cache.
- * @return Pair of (added, removed) tool name vectors.
- * @internal
+ *
+ * Called after a successful reconnect so the model's tool list tracks
+ * a server that changed while it was down.
+ *
+ * @return A pair of (added, removed) fully-qualified tool names; both
+ *         empty when the server's surface is unchanged.
+ * @req REQ-MCP-025
  * @version 2.3.7
  */
 std::pair<std::vector<std::string>, std::vector<std::string>>
@@ -179,8 +198,10 @@ bool ExternalMCPClient::is_connected() const {
  * @brief Build a JSON-RPC 2.0 request envelope.
  * @param method JSON-RPC method name.
  * @param params JSON-RPC params string.
- * @return JSON-RPC request string.
- * @utility
+ * @return A JSON-RPC 2.0 request carrying a monotonically increasing
+ *         id; unparseable params degrade to an empty object rather than
+ *         throwing.
+ * @req REQ-MCP-025
  * @version 1.8.7
  */
 std::string ExternalMCPClient::build_request(
@@ -224,8 +245,10 @@ bool ExternalMCPClient::validate_init_response(
 
 /**
  * @brief Send MCP initialize handshake.
- * @return true on success.
- * @utility
+ * @return true when the server answered within the init timeout and the
+ *         response carried no JSON-RPC error; false on timeout, empty
+ *         response, or an error object.
+ * @req REQ-MCP-025
  * @version 1.8.8
  */
 bool ExternalMCPClient::send_initialize() {
@@ -247,8 +270,14 @@ bool ExternalMCPClient::send_initialize() {
 
 /**
  * @brief Query tools/list and update cache with prefixed names.
- * @return true on success.
- * @utility
+ *
+ * Prefixing happens once, here, so the cached descriptors are already
+ * in `<server>.<tool>` routing form.
+ *
+ * @return true when the tool list was fetched and cached; false on
+ *         timeout, empty response, or an unparseable/misshaped result.
+ * @req REQ-MCP-025
+ * @req REQ-MCP-007
  * @version 1.8.7
  */
 bool ExternalMCPClient::query_tools() {
@@ -315,10 +344,19 @@ std::string ExternalMCPClient::extract_tool_result(
 
 /**
  * @brief Build ServerResponse JSON with empty directives (security).
+ *
+ * The single construction point for every external response, which is
+ * what makes the guarantee absolute: whatever an external server put in
+ * its own `directives` array is discarded here, so it can never inject
+ * delegate, stop_processing, phase_change or any other engine-level
+ * directive (CWE-94).
+ *
  * @param result_text Result text.
  * @param is_error true if error.
- * @return ServerResponse JSON envelope.
- * @utility
+ * @return A ServerResponse envelope with the text in `result` and an
+ *         ALWAYS-empty `directives` array, plus is_error when set.
+ * @req REQ-MCP-025
+ * @req REQ-MCP-002
  * @version 1.8.7
  */
 std::string ExternalMCPClient::build_response(

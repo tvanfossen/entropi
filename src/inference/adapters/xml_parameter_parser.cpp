@@ -110,7 +110,16 @@ inline void emit_arg(
  * literal `</parameter>`. See the helper definitions above and the
  * header for full contract.
  *
- * @utility
+ * The hand-rolled multi-parameter parser the autoparser families (Qwen,
+ * Nemotron) keep, because common_chat's PEG autoparser drops parameters
+ * past the first. An unterminated parameter is dropped without aborting the
+ * scan, and the body is truncated at a nested `<function=` tag.
+ *
+ * @param func_body Function body between `<function=name>` and `</function>`.
+ * @param logger Adapter-owned logger; may be null (parser stays silent).
+ * @return Map of trimmed parameter key to trimmed value — every well-formed
+ *         parameter in the body, not just the first.
+ * @req REQ-INFER-012
  * @version 2.4.1
  */
 std::unordered_map<std::string, std::string> parse_xml_parameters(

@@ -31,9 +31,10 @@ PluginServer::PluginServer(void* handle, std::filesystem::path path)
  * @brief Destroy the plugin instance, then close the library.
  *
  * Order matters: the instance's destructor lives inside the library, so the
- * library must outlive it.
+ * library must outlive it. destroy() therefore happens-after every other
+ * call on the handle, and dlclose happens-after destroy().
  *
- * @internal
+ * @req REQ-MCP-006
  * @version 2.10.1
  */
 PluginServer::~PluginServer() {
@@ -49,10 +50,21 @@ PluginServer::~PluginServer() {
 
 /**
  * @brief Load a plugin .so and construct its server instance.
+ *
+ * dlopen, then dlsym of all nine entry points, then the API-version
+ * check, then entropic_create_server(). Every failure is typed and
+ * logged with its path — a configured plugin never fails silently.
+ *
  * @param path Plugin shared object path.
- * @param[out] out Receives the loaded plugin on success.
- * @return ENTROPIC_OK or a typed plugin failure.
- * @internal
+ * @param[out] out Receives the loaded plugin on success; left untouched
+ *                 on failure.
+ * @return ENTROPIC_OK on success;
+ *         ENTROPIC_ERROR_PLUGIN_LOAD_FAILED when dlopen fails, an entry
+ *         point is missing, or the factory yields a null/unnamed
+ *         instance; ENTROPIC_ERROR_PLUGIN_VERSION_MISMATCH when the
+ *         plugin reports a different API version.
+ * @req REQ-MCP-005
+ * @req REQ-MCP-004
  * @version 2.10.1
  */
 entropic_error_t PluginServer::load(const std::filesystem::path& path,
@@ -83,8 +95,10 @@ entropic_error_t PluginServer::load(const std::filesystem::path& path,
 
 /**
  * @brief Resolve entry points, check version, create the instance.
- * @return ENTROPIC_OK or the typed failure.
- * @internal
+ * @return ENTROPIC_OK when the plugin satisfies the whole ABI contract;
+ *         otherwise the first typed failure (load-failed or
+ *         version-mismatch) from the step that failed.
+ * @req REQ-MCP-004
  * @version 2.10.1
  */
 entropic_error_t PluginServer::resolve_and_init() {
@@ -97,8 +111,15 @@ entropic_error_t PluginServer::resolve_and_init() {
 
 /**
  * @brief Create the plugin's server instance and read its name.
- * @return ENTROPIC_OK or ENTROPIC_ERROR_PLUGIN_LOAD_FAILED.
- * @internal
+ *
+ * The name string is server-owned for the handle's lifetime (not
+ * caller-freed), and it doubles as the tool-routing prefix — which is
+ * why a blank name is a load failure rather than a warning.
+ *
+ * @return ENTROPIC_OK when the factory yields a non-null instance with a
+ *         non-empty name; ENTROPIC_ERROR_PLUGIN_LOAD_FAILED otherwise.
+ * @req REQ-MCP-004
+ * @req REQ-MCP-005
  * @version 2.10.1
  */
 entropic_error_t PluginServer::create_instance() {
@@ -122,8 +143,17 @@ entropic_error_t PluginServer::create_instance() {
 
 /**
  * @brief Resolve every entry point and verify the reported API version.
- * @return ENTROPIC_OK or the typed failure.
- * @internal
+ *
+ * Signatures and the opaque handle type are LOCKED at API version 1, so
+ * a plugin reporting anything other than
+ * ENTROPIC_MCP_PLUGIN_API_VERSION is refused rather than called.
+ *
+ * @return ENTROPIC_OK when all nine symbols resolve and the version
+ *         matches; ENTROPIC_ERROR_PLUGIN_LOAD_FAILED for a missing entry
+ *         point; ENTROPIC_ERROR_PLUGIN_VERSION_MISMATCH for a version
+ *         mismatch.
+ * @req REQ-MCP-004
+ * @req REQ-MCP-005
  * @version 2.10.1
  */
 entropic_error_t PluginServer::resolve_and_check_version() {
@@ -149,8 +179,14 @@ entropic_error_t PluginServer::resolve_and_check_version() {
  * Reports every absent symbol rather than stopping at the first, so a
  * partially-implemented plugin is diagnosed in one pass.
  *
- * @return true when all resolved.
- * @internal
+ * The nine names are the whole plugin C ABI; each is declared
+ * ENTROPIC_EXPORT in the interface header so a plugin built the usual
+ * way (-fvisibility=hidden) still exports them and every dlsym here
+ * resolves.
+ *
+ * @return true when all nine entry points resolved, false when any is
+ *         absent (each missing name having been logged).
+ * @req REQ-MCP-004
  * @version 2.10.1
  */
 bool PluginServer::resolve_symbols() {
@@ -184,8 +220,8 @@ void* PluginServer::resolve_one(const char* symbol_name, bool& ok) const {
 
 /**
  * @brief Resolve the process-level entry points (version, factory, name, free).
- * @return true when all resolved.
- * @internal
+ * @return true when all four resolved, false when any is absent.
+ * @req REQ-MCP-004
  * @version 2.10.1
  */
 bool PluginServer::resolve_factory_symbols() {
@@ -203,8 +239,8 @@ bool PluginServer::resolve_factory_symbols() {
 
 /**
  * @brief Resolve the per-instance entry points.
- * @return true when all resolved.
- * @internal
+ * @return true when all five resolved, false when any is absent.
+ * @req REQ-MCP-004
  * @version 2.10.1
  */
 bool PluginServer::resolve_instance_symbols() {
@@ -224,9 +260,15 @@ bool PluginServer::resolve_instance_symbols() {
 
 /**
  * @brief Copy a plugin-allocated string and release it via the plugin.
+ *
+ * Strings from list_tools/execute are caller-owned and must be released
+ * through THAT plugin's own entropic_free, never the engine's allocator
+ * — the free is routed back through free_fn_ even on the throwing path.
+ *
  * @param raw Plugin-allocated string; may be null.
- * @return Owned copy, or empty string when raw is null.
- * @internal
+ * @return Owned copy of the plugin's string, or an empty string when raw
+ *         is null. The plugin's buffer is always released before return.
+ * @req REQ-MCP-004
  * @version 2.10.1
  */
 std::string PluginServer::take_string(char* raw) const {
@@ -246,8 +288,16 @@ std::string PluginServer::take_string(char* raw) const {
 
 /**
  * @brief List the plugin's tools.
- * @return JSON array string; "[]" if the plugin returned nothing.
- * @internal
+ *
+ * Descriptors use `inputSchema` (camelCase), which is what
+ * ServerManager::get_tool_schema parses so a plugin tool gets the same
+ * argument validation a built-in does.
+ *
+ * @return JSON array string of tool descriptors; "[]" when the plugin
+ *         returned nothing.
+ * @req REQ-MCP-007
+ * @req REQ-MCP-008
+ * @req REQ-MCP-006
  * @version 2.10.1
  */
 std::string PluginServer::list_tools() const {
@@ -258,10 +308,21 @@ std::string PluginServer::list_tools() const {
 
 /**
  * @brief Execute one of the plugin's tools.
- * @param tool_name Local tool name (no server prefix).
- * @param args_json JSON arguments.
- * @return ServerResponse JSON envelope.
- * @internal
+ *
+ * Serialised on a per-instance mutex so the threading promise the plugin
+ * header makes to authors — "the engine never runs these concurrently on
+ * one handle" — holds by construction rather than by every upstream
+ * caller behaving. No ordering is promised between distinct handles and
+ * the calling thread is not fixed.
+ *
+ * @param tool_name Local tool name (no server prefix); borrowed for the
+ *                  call.
+ * @param args_json JSON arguments; borrowed for the call.
+ * @return The plugin's ServerResponse JSON envelope, copied out of
+ *         plugin-owned memory; empty when the plugin returned null.
+ * @req REQ-MCP-006
+ * @req REQ-MCP-002
+ * @req REQ-MCP-007
  * @version 2.10.1
  */
 std::string PluginServer::execute(const std::string& tool_name,
@@ -273,9 +334,12 @@ std::string PluginServer::execute(const std::string& tool_name,
 
 /**
  * @brief Pass configuration to the plugin instance.
- * @param config_json JSON configuration string.
- * @return Plugin's configure result.
- * @internal
+ *
+ * Serialised on the same per-instance mutex as execute().
+ *
+ * @param config_json JSON configuration string; borrowed for the call.
+ * @return The plugin's own entropic_error_t result, forwarded verbatim.
+ * @req REQ-MCP-006
  * @version 2.10.1
  */
 entropic_error_t PluginServer::configure(const std::string& config_json) {
@@ -285,9 +349,12 @@ entropic_error_t PluginServer::configure(const std::string& config_json) {
 
 /**
  * @brief Set the plugin's working directory.
- * @param dir Directory path.
- * @return Plugin's set_working_dir result.
- * @internal
+ *
+ * Serialised on the same per-instance mutex as execute().
+ *
+ * @param dir Directory path; borrowed for the call.
+ * @return The plugin's own entropic_error_t result, forwarded verbatim.
+ * @req REQ-MCP-006
  * @version 2.10.1
  */
 entropic_error_t PluginServer::set_working_dir(const std::string& dir) {

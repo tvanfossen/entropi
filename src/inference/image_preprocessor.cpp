@@ -171,9 +171,11 @@ static std::vector<uint8_t> read_image_bytes(
 /**
  * @brief Preprocess an image from file path.
  * @param path File path to image.
- * @return Preprocessed image ready for vision encoder.
- * @throws std::runtime_error on invalid format, oversized, or read error.
- * @internal
+ * @return Preprocessed image ready for the vision encoder: RGB pixel
+ *         data, within the configured dimension bounds. A missing file,
+ *         an oversize file, or a non-image is rejected by throwing rather
+ *         than passed downstream.
+ * @req REQ-INFER-025
  * @version 2.3.7
  */
 PreprocessedImage ImagePreprocessor::preprocess_file(
@@ -194,9 +196,9 @@ PreprocessedImage ImagePreprocessor::preprocess_file(
  * @param data Raw image data (JPEG, PNG, BMP, GIF).
  * @param len Data length in bytes.
  * @param source_label Label for logging (e.g., "data_uri").
- * @return Preprocessed image.
- * @throws std::runtime_error on invalid format or decode error.
- * @internal
+ * @return Preprocessed image: RGB pixel data within the configured
+ *         dimension bounds; a non-image buffer is rejected by throwing.
+ * @req REQ-INFER-025
  * @version 1.9.11
  */
 PreprocessedImage ImagePreprocessor::preprocess_buffer(
@@ -255,8 +257,10 @@ PreprocessedImage ImagePreprocessor::decode(
  * enlarges. When preserve_aspect is true, both dimensions are scaled
  * uniformly by the smaller of the two scale factors.
  *
+ * An image already within max dimensions is left untouched.
+ *
  * @param img Image to potentially resize (mutated in place).
- * @internal
+ * @req REQ-INFER-025
  * @version 1.9.11
  */
 void ImagePreprocessor::resize_if_needed(PreprocessedImage& img) {

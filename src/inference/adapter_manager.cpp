@@ -66,8 +66,9 @@ void clear_adapters(llama_context* ctx) {
  * @param adapter_path Path to .gguf adapter file.
  * @param model Base llama_model pointer.
  * @param scale LoRA scaling factor.
- * @return true on success, false on duplicate name or load failure.
- * @internal
+ * @return true on success; false on a duplicate name, a null base model,
+ *         or a load failure — each fails cleanly without corrupting state.
+ * @req REQ-INFER-023
  * @version 1.9.2
  */
 bool AdapterManager::load(
@@ -157,8 +158,10 @@ void AdapterManager::unload(const std::string& name, llama_context* ctx) {
  *
  * @param name Adapter identifier.
  * @param ctx llama_context to activate on.
- * @return true on success.
- * @internal
+ * @return true on success; false for an unknown adapter. At most one
+ *         adapter is HOT per context, so any incumbent is deactivated
+ *         first.
+ * @req REQ-INFER-023
  * @version 1.9.2
  */
 bool AdapterManager::activate(const std::string& name, llama_context* ctx) {
@@ -202,7 +205,7 @@ bool AdapterManager::activate(const std::string& name, llama_context* ctx) {
  * Clears all adapters from the context. No-op if none active.
  *
  * @param ctx llama_context to clear from.
- * @internal
+ * @req REQ-INFER-023
  * @version 1.9.2
  */
 void AdapterManager::deactivate(llama_context* ctx) {
@@ -234,8 +237,10 @@ void AdapterManager::deactivate(llama_context* ctx) {
  *
  * @param name Target adapter (must be WARM).
  * @param ctx llama_context to swap on.
- * @return true on success.
- * @internal
+ * @return true on success; false when the target is COLD/unknown or the
+ *         ON_ADAPTER_SWAP pre-hook vetoes. Swapping to the already-active
+ *         adapter is a successful no-op.
+ * @req REQ-INFER-023
  * @version 1.9.2
  */
 bool AdapterManager::swap(const std::string& name, llama_context* ctx) {
@@ -337,7 +342,7 @@ void AdapterManager::unload_all_for_model(
  * `clear_adapters(ctx)` against a destroyed context would be a
  * use-after-free.
  *
- * @internal
+ * @req REQ-INFER-002
  * @version 2.3.0
  */
 void AdapterManager::unload_all() {
@@ -410,8 +415,9 @@ std::vector<AdapterInfo> AdapterManager::list_adapters() const {
 
 /**
  * @brief Get currently HOT adapter name.
- * @return Adapter name, empty if none.
- * @internal
+ * @return Adapter name, empty if none. Safe under concurrent access with
+ *         an in-flight swap.
+ * @req REQ-INFER-023
  * @version 1.9.2
  */
 std::string AdapterManager::active_adapter() const {
@@ -459,8 +465,9 @@ AdapterInfo AdapterManager::make_info(const AdapterEntry& entry) {
  * @param current Current HOT adapter name.
  * @param target Target adapter name.
  * @param target_path Target .gguf path.
- * @return true if swap should proceed.
- * @internal
+ * @return true if the swap should proceed; false when a registered
+ *         ON_ADAPTER_SWAP hook cancelled it.
+ * @req REQ-INFER-023
  * @version 1.9.2
  */
 bool AdapterManager::fire_swap_hook(

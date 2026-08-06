@@ -36,8 +36,10 @@ namespace entropic {
  * cwd be an existing directory.
  *
  * @param cwd Caller-supplied working directory string.
- * @return true if cwd is safe to inline into the shell command.
- * @internal
+ * @return true only when cwd contains none of `;&|`$<>`, newline,
+ *         quotes, globs or brackets AND names an existing directory;
+ *         false otherwise, which rejects the call before any shell runs.
+ * @req REQ-MCP-023
  * @version 2.1.1-rc1
  */
 static bool is_safe_cwd(const std::string& cwd) {
@@ -51,9 +53,13 @@ static bool is_safe_cwd(const std::string& cwd) {
 
 /**
  * @brief Run a shell command and capture output.
- * @param full_cmd Command string including cd prefix.
- * @return Pair of output string and exit code.
- * @internal
+ * @param full_cmd Command string including cd prefix and the `2>&1`
+ *                 redirect that merges stderr into stdout.
+ * @return The combined stdout+stderr text paired with the process exit
+ *         code; ("Failed to open process", -1) when the pipe could not
+ *         be opened, so a nonexistent command yields an error result
+ *         rather than a throw.
+ * @req REQ-MCP-023
  * @version 1.8.5
  */
 static std::pair<std::string, int> run_popen(
@@ -118,9 +124,13 @@ private:
  * shell `cd` clause and could smuggle commands the operator never
  * saw.
  *
- * @param args_json JSON with "command" and optional "working_dir".
- * @return ServerResponse with output or error.
- * @internal
+ * @param args_json JSON with "command" and optional "working_dir"
+ *                  (defaulting to the server's own working directory).
+ * @return A ServerResponse with no directives whose result is either a
+ *         JSON object carrying the process exit_code and combined
+ *         stdout+stderr output, or the working_dir rejection error when
+ *         the cwd failed validation — in which case no shell ran.
+ * @req REQ-MCP-023
  * @version 2.1.1-rc1
  */
 ServerResponse ExecuteTool::execute(const std::string& args_json) {
@@ -155,10 +165,15 @@ ServerResponse ExecuteTool::execute(const std::string& args_json) {
 
 /**
  * @brief Construct with working directory and data dir.
+ *
+ * A thin MCPServerBase subclass: it builds its one tool, registers it,
+ * and overrides only get_permission_pattern and set_working_dir.
+ *
  * @param working_dir Default working directory for commands.
  * @param data_dir Path to bundled data directory.
  * @param timeout Command timeout in seconds.
- * @internal
+ * @req REQ-MCP-001
+ * @req REQ-MCP-023
  * @version 1.8.5
  */
 BashServer::BashServer(
@@ -190,10 +205,18 @@ BashServer::~BashServer() = default;
 
 /**
  * @brief Permission pattern: "execute:{base_cmd} *".
+ *
+ * Approval granularity matters here: keying on the base command means
+ * an operator's "always allow" applies to a command family rather than
+ * to every shell invocation.
+ *
  * @param tool_name Tool name.
  * @param args_json Arguments JSON.
- * @return Permission pattern with base command extracted.
- * @internal
+ * @return "<tool>:<base command> *" — for `python -m x`, the pattern
+ *         names `python`. Unparseable arguments degrade to a base
+ *         command of "unknown" (logged), never a wildcard.
+ * @req REQ-MCP-023
+ * @req REQ-MCP-009
  * @version 1.8.5
  */
 std::string
@@ -215,9 +238,14 @@ BashServer::get_permission_pattern(const std::string& tool_name, const std::stri
 
 /**
  * @brief Set the working directory.
+ *
+ * Re-targets the server so a sandbox swap does not require
+ * reconstructing it.
+ *
  * @param path New working directory.
- * @return true on success.
- * @internal
+ * @return true — the re-target always succeeds; the path itself is
+ *         validated per call by is_safe_cwd.
+ * @req REQ-MCP-023
  * @version 1.8.5
  */
 bool BashServer::set_working_dir(const std::string& path) {
@@ -228,8 +256,9 @@ bool BashServer::set_working_dir(const std::string& path) {
 
 /**
  * @brief Get the working directory.
- * @return Working directory path.
- * @internal
+ * @return The directory commands default to when a call omits
+ *         `working_dir`.
+ * @req REQ-MCP-023
  * @version 1.8.5
  */
 const std::filesystem::path& BashServer::working_dir() const {
@@ -238,8 +267,8 @@ const std::filesystem::path& BashServer::working_dir() const {
 
 /**
  * @brief Get command timeout.
- * @return Timeout in seconds.
- * @internal
+ * @return The configured command timeout in seconds.
+ * @req REQ-MCP-023
  * @version 1.8.5
  */
 int BashServer::timeout() const {

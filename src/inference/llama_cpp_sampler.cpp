@@ -43,8 +43,11 @@ namespace {
  * error log if `llama_sampler_init_grammar` returns null (output would
  * then be silently unconstrained).
  *
- * @utility
- * @internal
+ * This is where the winning grammar source actually reaches the decode on
+ * the plain path: an empty string leaves the chain unconstrained (the
+ * control case), a non-empty one appends a masking stage at chain head.
+ *
+ * @req REQ-INFER-008
  * @version 2.7.4
  */
 void add_grammar_sampler(llama_sampler* chain,
@@ -172,8 +175,10 @@ LlamaCppSamplerFactory::LlamaCppSamplerFactory(
  * min-p → dist. Each stage is gated by its parameter so the default
  * chain stays bit-identical to pre-v2.3.10.
  * @param params Generation parameters driving each stage's gate.
- * @return Owned Sampler that wraps the constructed llama.cpp chain.
- * @internal
+ * @return Owned Sampler that wraps the constructed llama.cpp chain; a new,
+ *         independent instance on every call.
+ * @req REQ-INFER-006
+ * @req REQ-INFER-008
  * @version 2.3.10
  */
 std::unique_ptr<Sampler> LlamaCppSamplerFactory::create(

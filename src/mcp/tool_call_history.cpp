@@ -18,8 +18,13 @@ namespace entropic {
 
 /**
  * @brief Construct with buffer capacity.
- * @param capacity Maximum entries to retain.
- * @internal
+ *
+ * The buffer is allocated once, up front, and never grows — this is a
+ * bounded diagnostic window (backing entropic.diagnose / entropic.inspect
+ * and the validator's retry enrichment), explicitly NOT the audit log.
+ *
+ * @param capacity Maximum entries to retain (default 100).
+ * @req REQ-MCP-020
  * @version 1.9.12
  */
 ToolCallHistory::ToolCallHistory(size_t capacity)
@@ -30,8 +35,15 @@ ToolCallHistory::ToolCallHistory(size_t capacity)
 
 /**
  * @brief Record a completed tool call.
- * @param entry Tool call record.
- * @internal
+ *
+ * Takes the unique (writer) half of the shared_mutex. When the buffer is
+ * full the oldest record is overwritten in place, so size saturates at
+ * capacity rather than growing.
+ *
+ * @param entry Tool call record — sequence, fully-qualified tool name,
+ *              key-only params summary, status, truncated result
+ *              summary, elapsed ms, error detail and loop iteration.
+ * @req REQ-MCP-020
  * @version 2.0.0
  */
 void ToolCallHistory::record(const ToolCallRecord& entry) {
@@ -47,9 +59,14 @@ void ToolCallHistory::record(const ToolCallRecord& entry) {
 
 /**
  * @brief Get the N most recent entries (newest first).
- * @param count Maximum entries to return.
- * @return Vector of records, newest first.
- * @internal
+ *
+ * Takes the shared (reader) half of the mutex so several readers can run
+ * concurrently alongside a single writer.
+ *
+ * @param count Maximum entries to return; clamped to the stored count.
+ * @return Up to `count` records ordered newest-first, walking the ring
+ *         backwards from the write head; empty when nothing is stored.
+ * @req REQ-MCP-020
  * @version 1.9.12
  */
 std::vector<ToolCallRecord> ToolCallHistory::recent(size_t count) const {
@@ -67,8 +84,14 @@ std::vector<ToolCallRecord> ToolCallHistory::recent(size_t count) const {
 
 /**
  * @brief Get all stored entries in insertion (oldest-first) order.
- * @return Vector of all records.
- * @internal
+ *
+ * Shared-lock read. Handles both the not-yet-wrapped case (start at 0)
+ * and the wrapped case (start at the write head, which is the oldest
+ * surviving slot).
+ *
+ * @return Every retained record oldest-first — at most capacity entries,
+ *         the older ones having been overwritten.
+ * @req REQ-MCP-020
  * @version 1.9.12
  */
 std::vector<ToolCallRecord> ToolCallHistory::all() const {
@@ -88,8 +111,10 @@ std::vector<ToolCallRecord> ToolCallHistory::all() const {
 /**
  * @brief Serialize a single ToolCallRecord to JSON.
  * @param rec Record to serialize.
- * @return JSON object.
- * @internal
+ * @return JSON object with sequence, tool_name, params_summary, status,
+ *         result_summary, elapsed_ms and iteration always present, plus
+ *         error_detail only when the record carries one.
+ * @req REQ-MCP-020
  * @version 1.9.12
  */
 static nlohmann::json record_to_json(const ToolCallRecord& rec) {
@@ -109,9 +134,11 @@ static nlohmann::json record_to_json(const ToolCallRecord& rec) {
 
 /**
  * @brief Serialize recent entries to JSON array string.
- * @param count Maximum entries (0 = all).
- * @return JSON array string.
- * @internal
+ * @param count Maximum entries; 0 means "all", oldest-first.
+ * @return Valid JSON array string honouring the count limit — oldest-first
+ *         for count 0, newest-first otherwise; "[]" when nothing is
+ *         stored.
+ * @req REQ-MCP-020
  * @version 1.9.12
  */
 std::string ToolCallHistory::to_json(size_t count) const {
@@ -125,8 +152,9 @@ std::string ToolCallHistory::to_json(size_t count) const {
 
 /**
  * @brief Current number of stored entries.
- * @return Entry count.
- * @internal
+ * @return Number of retained records under a shared lock — rises to
+ *         capacity and then stays there as older entries are overwritten.
+ * @req REQ-MCP-020
  * @version 1.9.12
  */
 size_t ToolCallHistory::size() const {
@@ -136,9 +164,13 @@ size_t ToolCallHistory::size() const {
 
 /**
  * @brief Extract top-level JSON keys as comma-separated summary.
+ *
+ * Keys ONLY — argument values never enter the history buffer.
+ *
  * @param args_json Full JSON arguments string.
- * @return Comma-separated key names.
- * @internal
+ * @return Comma-separated top-level key names; the input verbatim when
+ *         it is not a JSON object or fails to parse.
+ * @req REQ-MCP-020
  * @version 1.9.12
  */
 std::string summarize_params(const std::string& args_json) {
@@ -163,9 +195,11 @@ std::string summarize_params(const std::string& args_json) {
 /**
  * @brief Truncate text with "..." suffix if too long.
  * @param text Input text.
- * @param max_len Maximum length before truncation.
- * @return Truncated or original string.
- * @internal
+ * @param max_len Maximum length before truncation (200 for the history
+ *                result summary).
+ * @return The input unchanged when it is within `max_len`; otherwise
+ *         its first `max_len` characters with "..." appended.
+ * @req REQ-MCP-020
  * @version 1.9.12
  */
 std::string truncate_result(const std::string& text, size_t max_len) {

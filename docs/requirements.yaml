@@ -5352,9 +5352,19 @@
 
     file are refused with a `read_before_write` error unless a prior read is
 
-    recorded in the FileAccessTracker, and a write is refused when the tracked
+    recorded in the FileAccessTracker. NOT IMPLEMENTED as of v2.10.4: the
 
-    hash no longer matches (external modification). Reads are gated by a size
+    external-modification gate. FileAccessTracker::was_read_unchanged compares
+
+    the tracked hash, but check_read_before_write calls only was_read() — the
+
+    hash is never compared on the write path, and was_read_unchanged has no
+
+    production caller (its only call site is a unit test that asserts on the
+
+    tracker directly, so it passes without a write ever being refused). Reads
+
+    are gated by a size
 
     limit derived from config `max_read_bytes`, else a percentage of the model
 
@@ -5511,9 +5521,9 @@
 
     rather than every shell invocation. Both servers capture combined
 
-    stdout+stderr with the process exit code in the result, honour a configured
+    stdout+stderr with the process exit code in the result, and re-target via
 
-    timeout, and re-target via `set_working_dir` so sandbox swaps work without
+    `set_working_dir` so sandbox swaps work without
 
     reconstructing the server. GitServer exposes status/diff/log/add/commit/
 

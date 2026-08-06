@@ -29,10 +29,16 @@ PermissionManager::PermissionManager(
 
 /**
  * @brief Check if a tool call is explicitly denied.
- * @param tool_name Fully-qualified tool name.
- * @param pattern Tool pattern with args.
- * @return true if denied.
- * @internal
+ *
+ * Consulted before the allow list, so deny takes precedence whenever
+ * both lists match the same call.
+ *
+ * @param tool_name Fully-qualified tool name (`<server>.<tool>`).
+ * @param pattern The `<tool>:<args-summary>` pattern for this call.
+ * @return true when any deny pattern matches (the match is logged);
+ *         false when the deny list is empty or nothing matches. A false
+ *         here is NOT an approval — the engine's callback still prompts.
+ * @req REQ-MCP-009
  * @version 2.0.0
  */
 bool PermissionManager::is_denied(
@@ -50,10 +56,12 @@ bool PermissionManager::is_denied(
 
 /**
  * @brief Check if a tool call is explicitly allowed.
- * @param tool_name Fully-qualified tool name.
- * @param pattern Tool pattern with args.
- * @return true if in allow list.
- * @internal
+ * @param tool_name Fully-qualified tool name (`<server>.<tool>`).
+ * @param pattern The `<tool>:<args-summary>` pattern for this call.
+ * @return true when any allow pattern matches (the match is logged);
+ *         false otherwise. Callers must still honour is_denied(), which
+ *         wins over any allow match.
+ * @req REQ-MCP-009
  * @version 2.0.0
  */
 bool PermissionManager::is_allowed(
@@ -71,9 +79,16 @@ bool PermissionManager::is_allowed(
 
 /**
  * @brief Add a permission pattern at runtime.
- * @param pattern Permission pattern string.
- * @param allow true for allow list, false for deny list.
- * @internal
+ *
+ * Backs the operator's "always allow / always deny" decision; the new
+ * pattern takes effect on the next call. Re-adding an identical pattern
+ * is a no-op so repeated approvals do not grow the list.
+ *
+ * @param pattern Permission pattern string, at whatever granularity the
+ *                owning server's get_permission_pattern chose.
+ * @param allow true to insert into the allow list, false for the deny
+ *              list.
+ * @req REQ-MCP-009
  * @version 1.8.5
  */
 void PermissionManager::add_permission(
@@ -91,11 +106,19 @@ void PermissionManager::add_permission(
 
 /**
  * @brief Check if a tool matches a permission pattern.
- * @param tool_name Fully-qualified tool name.
- * @param full_pattern Tool name with args pattern.
- * @param permission_pattern Permission pattern to test.
- * @return true if matches.
- * @internal
+ *
+ * fnmatch semantics on both halves, which is what lets one mechanism
+ * express tool-level ("git.commit"), server-level ("filesystem.&#42;")
+ * and argument-level ("bash.execute:python&#42;") patterns. A pattern
+ * without a ':' is satisfied by the tool-name match alone.
+ *
+ * @param tool_name Fully-qualified tool name (`<server>.<tool>`).
+ * @param full_pattern This call's `<tool>:<args-summary>` pattern.
+ * @param permission_pattern Configured or runtime-added pattern to test.
+ * @return true when the tool half matches and, for an argument-level
+ *         pattern, the full `<tool>:<args>` string matches too; false
+ *         otherwise.
+ * @req REQ-MCP-009
  * @version 1.8.5
  */
 bool PermissionManager::pattern_matches(

@@ -133,7 +133,12 @@ void InferenceBackend::deactivate() {
 
 /**
  * @brief Full unload (→ COLD). Idempotent.
- * @internal
+ *
+ * The base half of teardown: fires ON_MODEL_UNLOAD, delegates the resource
+ * release to do_unload(), and lands the state machine in COLD. Safe to call
+ * on a backend whose load failed, and safe to call twice.
+ *
+ * @req REQ-INFER-002
  * @version 1.9.1
  */
 void InferenceBackend::unload() {
@@ -200,7 +205,13 @@ GenerationResult InferenceBackend::generate(
 
 /**
  * @brief Generate with cancel support. Requires ACTIVE state. (gh#81, v2.4.2)
- * @internal
+ * @param messages Conversation history.
+ * @param params Generation parameters.
+ * @param cancel Atomic cancel flag forwarded to the subclass decode loop.
+ * @return GenerationResult with generation_time_ms stamped; an
+ *         ENTROPIC_ERROR_INVALID_STATE result when the backend is not
+ *         ACTIVE.
+ * @req REQ-INFER-005
  * @version 2.4.2
  */
 GenerationResult InferenceBackend::generate(
@@ -227,9 +238,9 @@ GenerationResult InferenceBackend::generate(
  * @brief Same-prefix batch generation. Requires ACTIVE state. (gh#98, v2.8.0)
  * @param requests Per-request message lists.
  * @param params Per-request generation params.
- * @param cancel Atomic cancel flag.
+ * @param cancel Atomic cancel flag forwarded to the batch decode loop.
  * @return One result per request (single error result if not ACTIVE).
- * @internal
+ * @req REQ-INFER-005
  * @version 2.8.0
  */
 std::vector<GenerationResult> InferenceBackend::generate_batch(
@@ -257,9 +268,11 @@ std::vector<GenerationResult> InferenceBackend::generate_batch(
  * @param messages Conversation history.
  * @param params Generation parameters.
  * @param on_token Per-token callback.
- * @param cancel Atomic cancel flag.
- * @return GenerationResult.
- * @internal
+ * @param cancel Atomic cancel flag forwarded to the subclass decode loop.
+ * @return GenerationResult with generation_time_ms stamped; an
+ *         ENTROPIC_ERROR_INVALID_STATE result when the backend is not
+ *         ACTIVE.
+ * @req REQ-INFER-005
  * @version 2.0.0
  */
 GenerationResult InferenceBackend::generate_streaming(
@@ -391,7 +404,10 @@ GenerationResult InferenceBackend::complete(
  * @param n_tokens Number of tokens (minimum 2).
  * @return LogprobResult with per-token logprobs and perplexity.
  * @throws std::runtime_error on state/input errors.
- * @internal
+ * @return LogprobResult whose perplexity equals exp(-mean(logprobs)) and
+ *         total_logprob the sum; deterministic across repeated calls.
+ *         Rejected for fewer than 2 tokens or a non-ACTIVE model.
+ * @req REQ-INFER-024
  * @version 2.0.0
  */
 LogprobResult InferenceBackend::evaluate_logprobs(
@@ -505,8 +521,9 @@ int InferenceBackend::count_tokens(const std::string& text) const {
 /**
  * @brief Query backend capability. Delegates to do_supports().
  * @param cap Capability to query.
- * @return true if supported.
- * @internal
+ * @return true if supported; the base default declares nothing, so an
+ *         unimplemented backend under-promises rather than over-promises.
+ * @req REQ-INFER-024
  * @version 1.9.13
  */
 bool InferenceBackend::supports(BackendCapability cap) const {
@@ -515,8 +532,14 @@ bool InferenceBackend::supports(BackendCapability cap) const {
 
 /**
  * @brief Get all supported capabilities.
- * @return Vector of supported capabilities.
- * @internal
+ *
+ * Iteration is bounded by the `_COUNT` sentinel rather than a hardcoded
+ * length, so a capability appended to the enum is enumerated here without
+ * a second edit — the sentinel is what makes the sweep exhaustive.
+ *
+ * @return Vector of every capability index below `_COUNT` for which
+ *         supports() is true; the sentinel is never included.
+ * @req REQ-TYPE-004
  * @version 1.9.13
  */
 std::vector<BackendCapability> InferenceBackend::capabilities() const {
@@ -533,8 +556,9 @@ std::vector<BackendCapability> InferenceBackend::capabilities() const {
 
 /**
  * @brief Get backend metadata. Delegates to do_info().
- * @return BackendInfo with at least name populated.
- * @internal
+ * @return BackendInfo with at least name populated; the remaining fields
+ *         come from model metadata read after load.
+ * @req REQ-INFER-024
  * @version 1.9.13
  */
 BackendInfo InferenceBackend::info() const {
@@ -546,9 +570,10 @@ BackendInfo InferenceBackend::info() const {
 /**
  * @brief Save model state. Requires ACTIVE.
  * @param seq_id Sequence identifier.
- * @param buffer Output buffer.
- * @return true on success.
- * @internal
+ * @param buffer Caller-owned output buffer.
+ * @return true on success; false when the backend is not ACTIVE or does
+ *         not support the operation.
+ * @req REQ-INFER-024
  * @version 2.0.0
  */
 bool InferenceBackend::save_state(
@@ -571,8 +596,9 @@ bool InferenceBackend::save_state(
  * @brief Restore model state. Requires ACTIVE.
  * @param seq_id Sequence identifier.
  * @param buffer Previously saved state.
- * @return true on success.
- * @internal
+ * @return true on success; false when the backend is not ACTIVE or does
+ *         not support the operation.
+ * @req REQ-INFER-024
  * @version 2.0.0
  */
 bool InferenceBackend::restore_state(
@@ -594,9 +620,10 @@ bool InferenceBackend::restore_state(
 
 /**
  * @brief Clear model state. Requires WARM or ACTIVE.
- * @param seq_id Sequence ID, or -1 for all.
- * @return true on success.
- * @internal
+ * @param seq_id Sequence ID, or -1 to clear every sequence.
+ * @return true on success; false when the model is COLD or the backend
+ *         does not support the operation.
+ * @req REQ-INFER-024
  * @version 1.9.13
  */
 bool InferenceBackend::clear_state(int seq_id) {

@@ -25,10 +25,17 @@ auto logger = entropic::log::get("inference.secondary_loader");
 
 /**
  * @brief Lazily load and activate a model for a role.
+ *
+ * Idempotent against the same path (an already-loaded role short-circuits)
+ * and reloads when the configured path changes. A failed load is isolated:
+ * the role is simply not recorded, so a bogus draft path degrades the
+ * feature without blocking engine initialisation.
+ *
  * @param role Role name (e.g. `"router"`, `"draft"`).
  * @param config ModelConfig for the secondary model.
- * @return true on activation success.
- * @internal
+ * @return true on activation success (including the already-loaded
+ *         short-circuit); false if the backend failed to activate.
+ * @req REQ-INFER-020
  * @version 2.1.11
  */
 bool SecondaryModelLoader::ensure_loaded(
@@ -88,8 +95,10 @@ std::shared_ptr<InferenceBackend> SecondaryModelLoader::get_shared(
 /**
  * @brief Unload and drop a role.
  * @param role Role name.
- * @return true if a role was unloaded, false if none was loaded.
- * @internal
+ * @return true if a role was unloaded, false if none was loaded under that
+ *         name (an unknown role is not an error).
+ * @req REQ-INFER-020
+ * @req REQ-INFER-002
  * @version 2.1.11
  */
 bool SecondaryModelLoader::release_role(const std::string& role) {
@@ -122,8 +131,9 @@ bool SecondaryModelLoader::is_loaded(const std::string& role) const {
 
 /**
  * @brief Names of all loaded roles (sorted for deterministic output).
- * @return Sorted role names whose backend reports is_loaded().
- * @utility
+ * @return Sorted role names whose backend reports is_loaded(); a role whose
+ *         load failed is absent, which is how callers observe the failure.
+ * @req REQ-INFER-020
  * @version 2.1.11
  */
 std::vector<std::string> SecondaryModelLoader::loaded_roles() const {
@@ -141,7 +151,12 @@ std::vector<std::string> SecondaryModelLoader::loaded_roles() const {
 
 /**
  * @brief Fanout: clear prompt/KV cache on every loaded backend.
- * @utility
+ *
+ * Secondary roles participate in pool-wide prompt-cache invalidation, so a
+ * cache flush cannot leave a router or draft model holding a stale prefix.
+ * A no-op when no role is loaded.
+ *
+ * @req REQ-INFER-020
  * @version 2.1.11
  */
 void SecondaryModelLoader::clear_all_prompt_caches() {
@@ -153,7 +168,12 @@ void SecondaryModelLoader::clear_all_prompt_caches() {
 
 /**
  * @brief Unload every role. Safe to call repeatedly.
- * @internal
+ *
+ * Idempotent on an empty loader, so an orchestrator that never loaded a
+ * router or draft still tears down cleanly.
+ *
+ * @req REQ-INFER-002
+ * @req REQ-INFER-020
  * @version 2.1.11
  */
 void SecondaryModelLoader::shutdown() {

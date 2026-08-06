@@ -54,8 +54,10 @@ namespace entropic {
  * loggers. Falls back to "server" if the input sanitizes to empty.
  *
  * @param raw Caller-supplied display name (or command for fallback).
- * @return Sanitized name safe to embed in `[<name>]` log prefixes.
- * @utility
+ * @return The name with any leading slash, all brackets and all control
+ *         characters removed — safe to embed in `[<name>]` log/UI
+ *         markup; the literal "server" when sanitizing leaves nothing.
+ * @req REQ-MCP-025
  * @version 2.1.5
  */
 static std::string sanitize_display_name(const std::string& raw) {
@@ -225,9 +227,13 @@ void StdioTransport::close() {
 /**
  * @brief Send JSON-RPC request via stdin, read response from stdout.
  * @param request_json JSON-RPC request string.
- * @param timeout_ms Timeout (0 = default).
- * @return Response string, or empty on error.
- * @internal
+ * @param timeout_ms Timeout in ms (0 = the transport's default).
+ * @return The child's newline-delimited response line; an empty string
+ *         when the transport is disconnected, an interrupt is pending,
+ *         the write failed, or the read timed out — an empty return is
+ *         what the client turns into a typed error envelope rather than
+ *         a hang.
+ * @req REQ-MCP-025
  * @version 2.0.6-rc16
  */
 std::string StdioTransport::send_request(
@@ -279,7 +285,10 @@ bool StdioTransport::is_connected() const {
  * slice). Subsequent send_request calls also early-exit until the
  * flag is cleared implicitly by a successful open(). (P1-10)
  *
- * @internal
+ * This is what bounds Ctrl+C to ~100ms instead of waiting out a
+ * transport timeout.
+ *
+ * @req REQ-MCP-025
  * @version 2.0.6-rc16
  */
 void StdioTransport::interrupt() {
@@ -362,8 +371,14 @@ bool StdioTransport::spawn_child(
 
 /**
  * @brief Build merged environment for child process.
- * @return Vector of "KEY=VALUE" strings.
- * @utility
+ *
+ * Parent environment first, then the spec's overrides — which have
+ * already had blocked variables filtered out at discovery time, so this
+ * layer applies them verbatim.
+ *
+ * @return The merged environment as "KEY=VALUE" strings, ready for
+ *         posix_spawn's envp.
+ * @req REQ-MCP-025
  * @version 1.8.7
  */
 std::vector<std::string> StdioTransport::build_env() const {
