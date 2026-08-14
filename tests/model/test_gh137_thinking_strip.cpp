@@ -60,9 +60,9 @@ std::filesystem::path models_dir() {
  * @version 2.11.0
  */
 std::string configure_gemma4_tier(ModelTestContext& ctx, bool enable_thinking) {
-    auto target = models_dir() / "gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf";
+    auto target = models_dir() / "gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf";
     if (!std::filesystem::is_regular_file(target)) {
-        SKIP("gemma-4-E2B-it-qat GGUF not present");
+        SKIP("gemma-4-E4B-it-qat GGUF not present");
     }
     REQUIRE(load_registry(ctx.registry));
     REQUIRE(load_test_config(ctx.registry, ctx.config));
