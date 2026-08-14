@@ -93,18 +93,21 @@ extern "C" const char* entropic_error_name(entropic_error_t code) {
  * @param callback Callback function, or NULL to remove.
  * @param user_data Opaque pointer forwarded to callback.
  * @return ENTROPIC_OK on success, ENTROPIC_ERROR_INVALID_ARGUMENT if handle is NULL.
- * @version 1.8.0
+ * @version 2.11.0
  * @internal
  */
 extern "C" entropic_error_t entropic_set_error_callback(
     entropic_handle_t handle,
     entropic_error_callback_t callback,
     void* user_data) {
-    // TODO(v1.8.4): Store callback on per-handle state.
+    // Deliberately unimplemented, and now says so. Returning ENTROPIC_OK made
+    // the engine claim a capability it does not have: the caller registered a
+    // callback, got success, and never heard from it again. NOT_IMPLEMENTED
+    // exists for exactly this and costs the caller one branch to handle.
     (void)callback;
     (void)user_data;
     if (handle == nullptr) {
         return ENTROPIC_ERROR_INVALID_ARGUMENT;
     }
-    return ENTROPIC_OK;
+    return ENTROPIC_ERROR_NOT_IMPLEMENTED;
 }
