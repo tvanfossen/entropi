@@ -217,7 +217,7 @@ void SqliteStorageBackend::close() {
  * @param model_id Optional model identifier.
  * @return Conversation ID.
  * @req REQ-STOR-003
- * @version 2.0.0
+ * @version 2.11.0
  */
 std::string SqliteStorageBackend::create_conversation(
         const std::string& title,
@@ -225,7 +225,7 @@ std::string SqliteStorageBackend::create_conversation(
         const std::optional<std::string>& model_id) {
     auto rec = make_conversation(title, project_path, model_id);
 
-    db_.execute(
+    const bool ok = db_.execute(
         "INSERT INTO conversations "
         "(id, title, created_at, updated_at, project_path, model_id, metadata) "
         "VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -239,6 +239,14 @@ std::string SqliteStorageBackend::create_conversation(
             sqlite3_bind_text(s, 7, rec.metadata.c_str(), -1, SQLITE_TRANSIENT);
         });
 
+    // gh: fail loud. Returning the generated id after a failed INSERT told the
+    // caller a conversation existed when it did not — every later reference to
+    // that id then failed for a reason with no connection to the real cause.
+    if (!ok) {
+        logger->error("Failed to create conversation '{}' — INSERT did not "
+                      "land, returning empty id", rec.id);
+        return std::string{};
+    }
     logger->info("Created conversation: {}", rec.id);
     return rec.id;
 }
@@ -311,7 +319,7 @@ void bind_message_insert(sqlite3_stmt* s, const std::string& conversation_id,
  * @param messages_json JSON array of message objects.
  * @return true on success.
  * @req REQ-STOR-003
- * @version 2.3.7
+ * @version 2.11.0
  */
 bool SqliteStorageBackend::save_messages(
         const std::string& conversation_id,
@@ -335,14 +343,23 @@ bool SqliteStorageBackend::save_messages(
         "(id, conversation_id, role, content, tool_calls, tool_results, "
         "token_count, created_at, is_compacted, identity_tier) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    // gh: every row result was previously discarded and the function returned
+    // true unconditionally, so a caller could not tell a persisted turn from a
+    // lost one. Insert all rows, then report whether all of them landed.
+    bool all_ok = true;
     for (const auto& m : msgs) {
         auto row = build_message_row(m);
-        db_.execute(kInsertSql, [&](sqlite3_stmt* s) {
+        all_ok &= db_.execute(kInsertSql, [&](sqlite3_stmt* s) {
             bind_message_insert(s, conversation_id, now, row);
         });
     }
 
-    return true;
+    if (!all_ok) {
+        logger->error("save_messages: one or more rows failed to insert for "
+                      "conversation '{}' ({} message(s) attempted)",
+                      conversation_id, msgs.size());
+    }
+    return all_ok;
 }
 
 namespace {

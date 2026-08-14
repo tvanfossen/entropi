@@ -597,3 +597,71 @@ SCENARIO("gh#114: get_delegations sanitizes invalid UTF-8 in task field "
         }
     }
 }
+
+/**
+ * @brief Storage on a path that was never initialized — no schema.
+ *
+ * Every write against it fails at the SQL layer ("no such table"). That is the
+ * cheapest way to drive the error path without mocking sqlite.
+ *
+ * @internal
+ * @version 2.11.0
+ */
+struct UninitializedStorage {
+    fs::path path;                            ///< Temp db path
+    entropic::SqliteStorageBackend storage;   ///< Deliberately NOT initialized
+
+    /// @brief Construct without calling initialize(). @version 2.11.0
+    UninitializedStorage()
+        : path(fs::temp_directory_path() / "entropic_test" /
+               ("uninit_" + std::to_string(reinterpret_cast<uintptr_t>(this)) + ".db")),
+          storage(path) {}
+
+    /// @brief Destructor — cleanup. @version 2.11.0
+    ~UninitializedStorage() { fs::remove(path); }
+};
+
+SCENARIO("Storage write failures are reported, not swallowed",
+         "[storage][backend][failloud]") {
+    // Found during the v2.11.0 requirements sweep. save_messages ran an INSERT
+    // per row, ignored EVERY db_.execute() result, and unconditionally returned
+    // true; create_conversation returned a freshly generated UUID even when its
+    // INSERT never landed. A caller could not distinguish a persisted
+    // conversation from a lost one, which is the fail-silent posture this
+    // engine is supposed to reject — and it is worse here than elsewhere,
+    // because the caller goes on to reference an id that does not exist.
+    GIVEN("a storage backend whose schema was never created") {
+        UninitializedStorage t;
+
+        WHEN("a conversation is created") {
+            auto id = t.storage.create_conversation("Test");
+
+            THEN("it does NOT hand back an id for a row that was never written") {
+                CHECK(id.empty());
+            }
+        }
+
+        WHEN("messages are saved against a conversation that cannot exist") {
+            json msgs = json::array();
+            msgs.push_back({{"role", "user"}, {"content", "hello"}});
+
+            THEN("the failure is reported to the caller") {
+                CHECK_FALSE(t.storage.save_messages("no-such-conversation",
+                                                    msgs.dump()));
+            }
+        }
+    }
+
+    GIVEN("a healthy initialized backend") {
+        TempStorage t;
+
+        THEN("the success path is unchanged — writes still report true") {
+            auto id = t.storage.create_conversation("Test");
+            REQUIRE_FALSE(id.empty());
+
+            json msgs = json::array();
+            msgs.push_back({{"role", "user"}, {"content", "hello"}});
+            CHECK(t.storage.save_messages(id, msgs.dump()));
+        }
+    }
+}
