@@ -51,26 +51,6 @@ void FileAccessTracker::record_read(const std::string& path,
     logger->info("Tracked read: {}", path);
 }
 
-/**
- * @brief Check if file was read and content is unchanged.
- * @param path Canonical file path.
- * @param current_hash Current content hash.
- * @return true only when the file was read in this session AND its
- *         content still hashes the same; false for an unread file or
- *         one modified externally since the read — both of which refuse
- *         the write.
- * @req REQ-MCP-021
- * @version 1.8.5
- */
-bool FileAccessTracker::was_read_unchanged(
-    const std::string& path,
-    size_t current_hash) const {
-    auto it = reads_.find(path);
-    if (it == reads_.end()) {
-        return false;
-    }
-    return it->second == current_hash;
-}
 
 /**
  * @brief Check if a file was ever read in this session.

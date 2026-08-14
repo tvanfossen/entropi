@@ -1,12 +1,200 @@
 [
   {
-    "req_id": "REQ-TYPE-003",
-    "req_name": "Every consumer-facing enum has a total, wire-stable string projection",
+    "req_id": "REQ-MCP-001",
+    "req_name": "MCPServerBase holds the shared logic; concrete servers override only deltas",
     "functions": [
       {
-        "name": "entropic_error_name",
-        "file": "src/types/error.cpp",
-        "version": "1.8.0"
+        "name": "anchor_key",
+        "file": "src/mcp/servers/filesystem.cpp",
+        "version": "1.8.5"
+      },
+      {
+        "name": "FilesystemServer",
+        "file": "src/mcp/servers/filesystem.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "register_fs_tools",
+        "file": "src/mcp/servers/filesystem.cpp",
+        "version": "2.3.7"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-MCP-015",
+    "req_name": "Duplicates, errors, and denials return corrective guidance, not bare failure",
+    "functions": [
+      {
+        "name": "skip_duplicate_check",
+        "file": "src/mcp/servers/filesystem.cpp",
+        "version": "1.8.5"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-MCP-021",
+    "req_name": "Filesystem tools are root-confined, read-before-write gated, and size-bounded",
+    "functions": [
+      {
+        "name": "record_read",
+        "file": "src/mcp/servers/filesystem.cpp",
+        "version": "1.8.5"
+      },
+      {
+        "name": "was_read",
+        "file": "src/mcp/servers/filesystem.cpp",
+        "version": "1.8.5"
+      },
+      {
+        "name": "build_read_result",
+        "file": "src/mcp/servers/filesystem.cpp",
+        "version": "2.9.18"
+      },
+      {
+        "name": "check_read_before_write",
+        "file": "src/mcp/servers/filesystem.cpp",
+        "version": "1.8.5"
+      },
+      {
+        "name": "collect_glob_matches",
+        "file": "src/mcp/servers/filesystem.cpp",
+        "version": "2.1.4"
+      },
+      {
+        "name": "collect_entries",
+        "file": "src/mcp/servers/filesystem.cpp",
+        "version": "1.8.5"
+      },
+      {
+        "name": "do_str_replace",
+        "file": "src/mcp/servers/filesystem.cpp",
+        "version": "1.8.6"
+      },
+      {
+        "name": "apply_edit",
+        "file": "src/mcp/servers/filesystem.cpp",
+        "version": "1.8.5"
+      },
+      {
+        "name": "anchor_key",
+        "file": "src/mcp/servers/filesystem.cpp",
+        "version": "1.8.5"
+      },
+      {
+        "name": "check_read_gates",
+        "file": "src/mcp/servers/filesystem.cpp",
+        "version": "2.10.0"
+      },
+      {
+        "name": "execute",
+        "file": "src/mcp/servers/filesystem.cpp",
+        "version": "2.1.4"
+      },
+      {
+        "name": "execute",
+        "file": "src/mcp/servers/filesystem.cpp",
+        "version": "1.8.5"
+      },
+      {
+        "name": "compile_grep_or_error",
+        "file": "src/mcp/servers/filesystem.cpp",
+        "version": "2.1.4"
+      },
+      {
+        "name": "execute",
+        "file": "src/mcp/servers/filesystem.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "execute",
+        "file": "src/mcp/servers/filesystem.cpp",
+        "version": "2.9.13"
+      },
+      {
+        "name": "compute_max_read_bytes",
+        "file": "src/mcp/servers/filesystem.cpp",
+        "version": "2.0.4"
+      },
+      {
+        "name": "FilesystemServer",
+        "file": "src/mcp/servers/filesystem.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "skip_duplicate_check",
+        "file": "src/mcp/servers/filesystem.cpp",
+        "version": "1.8.5"
+      },
+      {
+        "name": "set_working_dir",
+        "file": "src/mcp/servers/filesystem.cpp",
+        "version": "2.1.4"
+      },
+      {
+        "name": "root_dir",
+        "file": "src/mcp/servers/filesystem.cpp",
+        "version": "1.8.5"
+      },
+      {
+        "name": "max_read_bytes",
+        "file": "src/mcp/servers/filesystem.cpp",
+        "version": "1.8.5"
+      },
+      {
+        "name": "resolve_path",
+        "file": "src/mcp/servers/filesystem.cpp",
+        "version": "2.1.1-rc1"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-MCP-022",
+    "req_name": "Glob, grep, and read honour .gitignore plus .explorerignore semantics",
+    "functions": [
+      {
+        "name": "classify_glob_entry",
+        "file": "src/mcp/servers/filesystem.cpp",
+        "version": "2.10.0"
+      },
+      {
+        "name": "collect_glob_matches",
+        "file": "src/mcp/servers/filesystem.cpp",
+        "version": "2.1.4"
+      },
+      {
+        "name": "grep_file",
+        "file": "src/mcp/servers/filesystem.cpp",
+        "version": "1.8.5"
+      },
+      {
+        "name": "check_read_gates",
+        "file": "src/mcp/servers/filesystem.cpp",
+        "version": "2.10.0"
+      },
+      {
+        "name": "grep_search",
+        "file": "src/mcp/servers/filesystem.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "execute",
+        "file": "src/mcp/servers/filesystem.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "FilesystemServer",
+        "file": "src/mcp/servers/filesystem.cpp",
+        "version": "2.3.7"
+      },
+      {
+        "name": "set_working_dir",
+        "file": "src/mcp/servers/filesystem.cpp",
+        "version": "2.1.4"
+      },
+      {
+        "name": "ignore",
+        "file": "src/mcp/servers/filesystem.cpp",
+        "version": "2.1.4"
       }
     ]
   }
