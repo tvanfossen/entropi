@@ -1435,7 +1435,7 @@ std::vector<std::string> LlamaCppBackend::effective_stop(
  * @param content [in,out] Content to clean (channel spans removed in place).
  * @param reasoning_out [in,out,nullable] Accumulates the stripped reasoning text.
  * @utility
- * @version 2.9.4
+ * @version 2.11.0
  */
 void strip_thinking_channels(std::string& content, std::string* reasoning_out) {
     static const std::string kOpen = "<|channel>";
@@ -1462,11 +1462,12 @@ void strip_thinking_channels(std::string& content, std::string* reasoning_out) {
         content.erase(0, nb == std::string::npos ? content.size() : nb);
     }
     if (truncated_unclosed && content.empty()) {
-        logger->warn("strip_thinking_channels: generation hit max_tokens "
-                     "while still inside a <|channel> reasoning block — no "
-                     "answer was ever produced, so content is empty (not a "
-                     "parse error). Raise max_tokens or investigate why this "
-                     "config/prompt doesn't converge within budget.");
+        logger->warn("strip_thinking_channels: a <|channel> reasoning block "
+                     "was never closed, so the strip removed the whole "
+                     "generation and content is empty. Not a parse error. The "
+                     "orchestrator reports whether this was a token budget or "
+                     "the model ending its own turn — only it holds "
+                     "finish_reason. gh#137.");
     }
 }
 

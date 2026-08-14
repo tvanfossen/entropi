@@ -421,7 +421,7 @@ void coerce_string_typed_args(std::vector<ToolCall>& calls,
  * @return Content with this family's reasoning blocks removed and trimmed;
  *         unchanged when the family declares no markers.
  * @req REQ-INFER-011
- * @version 2.10.3
+ * @version 2.11.0
  */
 std::string ChatAdapter::strip_think_blocks(const std::string& content) const {
     const auto markers = thinking_markers();
@@ -446,10 +446,11 @@ std::string ChatAdapter::strip_think_blocks(const std::string& content) const {
     if (truncated_unclosed && result.find_first_not_of(" \t\r\n")
             == std::string::npos) {
         logger->warn(
-            "Generation hit its token budget while still inside a reasoning "
-            "block ('{}' never closed with '{}'), so no answer was produced "
-            "and content is empty — this is a budget/convergence issue, not a "
-            "parse error. Raise max_tokens.",
+            "Reasoning block '{}' was never closed with '{}', so the strip "
+            "removed the whole generation and content is empty. Not a parse "
+            "error. The orchestrator reports the actual cause (budget vs the "
+            "model ending the turn) — it is the only layer holding "
+            "finish_reason. gh#137.",
             markers.open, markers.close);
     }
 

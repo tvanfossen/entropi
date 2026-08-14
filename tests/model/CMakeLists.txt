@@ -324,3 +324,14 @@ set_tests_properties(
     model/test-gh87-orchestrator-cutover
     model/test-gh87-verify-qwen36
     PROPERTIES TIMEOUT 600)
+
+# gh#137 (v2.11.0): a tier with enable_thinking:false generated 77-154 chars
+# and delivered 0. Five source-level hypotheses died (strip greediness, the
+# toolless render path, enable_thinking threading, template support, named
+# channels), and our strip provably agrees with the model's own jinja
+# strip_thinking macro. So this MEASURES instead: it drives a real toolless
+# gemma4 turn and pins the one pairing the engine gets wrong — delivering
+# empty content while advising "Raise max_tokens" on a turn that finished
+# with finish=stop, which no budget increase can fix.
+add_model_test(test-gh137-thinking-strip test_gh137_thinking_strip.cpp)
+set_tests_properties(model/test-gh137-thinking-strip PROPERTIES TIMEOUT 360)

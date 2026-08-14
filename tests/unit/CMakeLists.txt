@@ -74,6 +74,7 @@ add_executable(entropic-inference-tests
     # gh#134 (v2.10.4): every grammar source must reach the sampler. The
     # tool-derived source (common_chat_templates_apply) is discarded today.
     inference/grammar_source_invariant_test.cpp
+    inference/empty_content_diagnosis_test.cpp
     # gh#136 (v2.10.4): 316 sanitized at INGRESS, not per-egress-site.
     inference/utf8_ingress_invariant_test.cpp
     # gh#134/gh#58 (v2.10.4): the new per-turn staged backend state must be

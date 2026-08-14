@@ -16,6 +16,7 @@
 #include <entropic/types/logging.h>
 
 #include "llama_cpp_backend.h"
+#include "empty_content_diagnosis.h"
 #include "response_parse.h"
 #include "mtp_envelope.h"
 #include <entropic/core/stream_think_filter.h>
@@ -553,6 +554,32 @@ static void apply_adapter_parse(InferenceBackend* model,
 
 
 /**
+ * @brief Explain a turn that produced tokens but delivered no content (gh#137).
+ *
+ * The reasoning strip legitimately empties a generation that never closed its
+ * reasoning block — surfacing raw reasoning as the answer would be worse. But
+ * the operator has to know WHICH problem they have, and until v2.11.0 the
+ * engine gave one message for both, telling them to raise max_tokens.
+ *
+ * gh#137 reported finish=stop with 154 chars delivering 0 chars. The model
+ * ended that turn itself; no budget increase can help, and the advice sent the
+ * reporter looking in the wrong place. This is the only site that can tell the
+ * difference, because it is the only one holding finish_reason.
+ *
+ * @param result Completed generation result.
+ * @req REQ-INFER-010
+ * @version 2.11.0
+ */
+static void warn_if_content_vanished(const GenerationResult& result) {
+    const auto cause = diagnose_empty_content(
+        result.content.empty(), !result.raw_content.empty(),
+        result.finish_reason);
+    if (cause == EmptyContentCause::not_empty) { return; }
+    logger->warn("Turn produced {} raw chars but delivered no content. {}",
+                 result.raw_content.size(), explain_empty_content(cause));
+}
+
+/**
  * @brief Diagnose a mandatory-tool turn that ran out of budget (gh#134).
  *
  * Under `tool_choice: REQUIRED` the gemma4 grammar is
@@ -591,6 +618,27 @@ static void warn_if_budget_starved_required_turn(
         "enable_thinking on this tier — the thinking channel is what consumes "
         "the preamble. This is a budget misconfiguration, not a model failure.",
         tier_name);
+}
+
+/**
+ * @brief Report every post-turn diagnostic from one call site (gh#137).
+ *
+ * Folded into a single entry point because the caller is `generate`, which sits
+ * against the knots ABC ceiling — two adjacent warn calls pushed it over. Both
+ * checks are no-ops on a healthy turn.
+ *
+ * @param result Completed generation result.
+ * @param tier_name Selected tier.
+ * @param tiers Configured tiers, for the require_tool_call budget check.
+ * @req REQ-INFER-010
+ * @version 2.11.0
+ */
+static void warn_turn_diagnostics(
+    const GenerationResult& result,
+    const std::string& tier_name,
+    const std::unordered_map<std::string, TierConfig>& tiers) {
+    warn_if_content_vanished(result);
+    warn_if_budget_starved_required_turn(result, tier_name, tiers);
 }
 
 /**
@@ -672,7 +720,7 @@ static void log_orchestration(const GenerationResult& result,
  * @param tier_name Explicit tier or empty for routing.
  * @return GenerationResult.
  * @internal
- * @version 2.10.4
+ * @version 2.11.0
  */
 GenerationResult ModelOrchestrator::generate(
     const std::vector<Message>& messages,
@@ -706,7 +754,7 @@ GenerationResult ModelOrchestrator::generate(
 
     apply_adapter_parse(model, get_adapter(selected), result);
     // gh#134 (v2.10.4): name a budget-starved mandatory-tool turn.
-    warn_if_budget_starved_required_turn(result, selected,
+    warn_turn_diagnostics(result, selected,
                                          config_.models.tiers);
 
     result.routing_ms = routing_ms;
@@ -726,7 +774,7 @@ GenerationResult ModelOrchestrator::generate(
  * cancel)` which polls cancel per token.
  *
  * @internal
- * @version 2.10.4
+ * @version 2.11.0
  */
 GenerationResult ModelOrchestrator::generate(
     const std::vector<Message>& messages,
@@ -758,7 +806,7 @@ GenerationResult ModelOrchestrator::generate(
 
     apply_adapter_parse(model, get_adapter(selected), result);
     // gh#134 (v2.10.4): name a budget-starved mandatory-tool turn.
-    warn_if_budget_starved_required_turn(result, selected,
+    warn_turn_diagnostics(result, selected,
                                          config_.models.tiers);
 
     result.routing_ms = routing_ms;
@@ -855,7 +903,7 @@ static void stream_token_trampoline(const char* data, std::size_t len,
  *         the tier.
  * @req REQ-INFER-011
  * @req REQ-INFER-005
- * @version 2.10.4
+ * @version 2.11.0
  */
 GenerationResult ModelOrchestrator::generate_streaming(
     const std::vector<Message>& messages,
@@ -909,7 +957,7 @@ GenerationResult ModelOrchestrator::generate_streaming(
     filter.flush();
     apply_adapter_parse(model, get_adapter(selected), result);
     // gh#134 (v2.10.4): name a budget-starved mandatory-tool turn.
-    warn_if_budget_starved_required_turn(result, selected,
+    warn_turn_diagnostics(result, selected,
                                          config_.models.tiers);
     return result;
 }
