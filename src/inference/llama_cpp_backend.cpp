@@ -559,6 +559,23 @@ void LlamaCppBackend::teardown_mtp_draft() {
 }
 
 /**
+ * @brief Draft-window size setup_mtp_draft will actually use (gh#106).
+ *
+ * setup_mtp_draft normalises a non-positive n_max to 16. The envelope check
+ * must apply the SAME normalisation or it validates a number the engine never
+ * uses.
+ *
+ * @param n_max Requested window, possibly non-positive.
+ * @return The effective window size.
+ * @req REQ-INFER-015
+ * @version 2.11.0
+ * @internal
+ */
+static int effective_n_draft(int n_max) {
+    return (n_max > 0) ? n_max : 16;
+}
+
+/**
  * @brief Lazily build the MTP head context against the live ctx_ (gh#106).
  *
  * Mirrors the server's separate-head branch (server-context.cpp:944-956):
@@ -569,10 +586,10 @@ void LlamaCppBackend::teardown_mtp_draft() {
  * matches head_path; otherwise tears the stale head down and rebuilds.
  *
  * @internal
- * @version 2.9.0
+ * @version 2.11.0
  */
 bool LlamaCppBackend::setup_mtp_draft(const std::string& head_path, int n_max) {
-    mtp_n_max_ = (n_max > 0) ? n_max : 16;
+    mtp_n_max_ = effective_n_draft(n_max);
     if (mtp_draft_ctx_ != nullptr && mtp_head_path_ == head_path) {
         return true;  // live head already bound to this ctx_
     }
@@ -4192,7 +4209,7 @@ GenerationResult mtp_run_from_tokens(
  *         knob), or LOAD_FAILED (head GGUF would not load). Never a signal
  *         to fall back to plain decode.
  * @req REQ-INFER-015
- * @version 2.9.4
+ * @version 2.11.0
  */
 GenerationResult LlamaCppBackend::mtp_guard(
     const GenerationParams& params,
@@ -4207,13 +4224,26 @@ GenerationResult LlamaCppBackend::mtp_guard(
                        "MTP requires an ACTIVE target");
     } else if (!reason.empty()) {
         r = spec_error(ENTROPIC_ERROR_SPECULATIVE_INCOMPATIBLE_CONFIG, reason);
-    } else if (!setup_mtp_draft(head_path, n_max)) {
-        r = spec_error(ENTROPIC_ERROR_LOAD_FAILED, last_error_);
-    } else if (1 + mtp_n_max_ > llama_n_batch(ctx_)) {
+    } else if (1 + effective_n_draft(n_max) > llama_n_batch(ctx_)) {
+        // Bound-check BEFORE setup_mtp_draft allocates. Ordering this the
+        // other way made the guard's ANSWER depend on process history: an
+        // out-of-envelope window (e.g. n_draft=100000) is still handed to
+        // setup_mtp_draft, whose allocation SUCCEEDS in a fresh process —
+        // so the guard fell through and returned the correct
+        // SPECULATIVE_INCOMPATIBLE_CONFIG — but FAILS after a prior MTP
+        // session, returning LOAD_FAILED for the same config. Same input,
+        // two different typed errors, decided by allocator state. Measured
+        // as `5 == 54` when a second MTP case ran in one process.
+        //
+        // Must use the same normalisation setup_mtp_draft applies, or the
+        // check disagrees with the value actually used.
         r = spec_error(ENTROPIC_ERROR_SPECULATIVE_INCOMPATIBLE_CONFIG,
-            "speculative.n_draft+1 (" + std::to_string(1 + mtp_n_max_)
+            "speculative.n_draft+1 ("
+            + std::to_string(1 + effective_n_draft(n_max))
             + ") exceeds n_batch (" + std::to_string(llama_n_batch(ctx_))
             + "); reduce n_draft or raise n_batch");
+    } else if (!setup_mtp_draft(head_path, n_max)) {
+        r = spec_error(ENTROPIC_ERROR_LOAD_FAILED, last_error_);
     }
     return r;
 }

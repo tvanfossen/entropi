@@ -2,9 +2,12 @@
 
 | REQ | Name | Functions Changed |
 |-----|------|-------------------|
-| REQ-MCP-001 | MCPServerBase holds the shared logic; concrete servers override only deltas | anchor_key, FilesystemServer, register_fs_tools |
-| REQ-MCP-015 | Duplicates, errors, and denials return corrective guidance, not bare failure | skip_duplicate_check |
-| REQ-MCP-021 | Filesystem tools are root-confined, read-before-write gated, and size-bounded | record_read, was_read, build_read_result, check_read_before_write, collect_glob_matches, collect_entries, do_str_replace, apply_edit, anchor_key, check_read_gates, execute, execute, compile_grep_or_error, execute, execute, compute_max_read_bytes, FilesystemServer, skip_duplicate_check, set_working_dir, root_dir, max_read_bytes, resolve_path |
-| REQ-MCP-022 | Glob, grep, and read honour .gitignore plus .explorerignore semantics | classify_glob_entry, collect_glob_matches, grep_file, check_read_gates, grep_search, execute, FilesystemServer, set_working_dir, ignore |
+| REQ-INFER-002 | Teardown releases every model, context and adapter handle | teardown_mtp_draft |
+| REQ-INFER-005 | Every decode path honours cooperative cancellation within one token | run_sampling_loop |
+| REQ-INFER-006 | Sampler chain construction has a fixed order and default-preserving gating | to_common_sampling |
+| REQ-INFER-008 | Every declared grammar source reaches the sampler and exactly one wins | apply_grammar_source, to_common_sampling |
+| REQ-INFER-009 | Tool staging drives a native render whose parse context is captured | render_common_chat, render_prompt, set_active_tools, render_with_tools |
+| REQ-INFER-013 | Sequential tool-call mode hard-stops at the first closed call | tool_call_close_marker |
+| REQ-INFER-015 | MTP speculative decode fails loud and never silently falls back | effective_n_draft, mtp_guard |
 
-**Total: 4 requirement(s) affected, 35 function(s) changed**
+**Total: 7 requirement(s) affected, 12 function(s) changed**
