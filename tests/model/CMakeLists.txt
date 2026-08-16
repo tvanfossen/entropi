@@ -53,6 +53,36 @@ function(add_model_test NAME SOURCE)
     )
 endfunction()
 
+# gh#142: register each TEST_CASE of a model binary as its OWN ctest entry, so
+# every case gets a FRESH PROCESS.
+#
+# Model lifecycles do not fully return VRAM to the driver within a process — the
+# caching allocator retains freed blocks — so N cases in one binary accumulate
+# until an allocation returns null and ggml aborts. Measured on gh106: any single
+# case passes, any PAIR passes, three in one process fails 10/10 at 9889 MiB of
+# 11264. Process exit is the only thing that reliably reclaims.
+#
+# This is a harness workaround, not the fix. The engine defect — an unchecked
+# allocation aborting instead of returning ENTROPIC_ERROR_TIER_MODEL_TOO_LARGE —
+# is tracked in gh#142 and bites real consumers on limited-VRAM machines running
+# large models.
+function(add_model_test_per_case NAME SOURCE)
+    add_executable(${NAME} ${SOURCE})
+    target_link_libraries(${NAME} PRIVATE ${MODEL_TEST_LIBS})
+    target_compile_definitions(${NAME} PRIVATE ${MODEL_TEST_DEFS})
+    math(EXPR _last "${ARGC} - 1")
+    foreach(_i RANGE 2 ${_last})
+        list(GET ARGV ${_i} _case)
+        math(EXPR _n "${_i} - 1")
+        add_test(NAME model/${NAME}-c${_n} COMMAND ${NAME} ${_case})
+        set_tests_properties(model/${NAME}-c${_n} PROPERTIES
+            LABELS "model"
+            RUN_SERIAL TRUE
+            TIMEOUT 360
+        )
+    endforeach()
+endfunction()
+
 # ── Subsystem tests (18) — orchestrator-level ───────────────
 
 add_model_test(test-basic-generation      test_basic_generation.cpp)
@@ -177,7 +207,12 @@ add_model_test(test-gh106-qat-thinking     test_gh106_qat_thinking.cpp)
 add_model_test(test-gh106-mtp              test_gh106_mtp.cpp)
 
 # gh#106 (v2.9.0): MTP combined call path through orchestrator->generate().
-add_model_test(test-gh106-mtp-route        test_gh106_mtp_route.cpp)
+add_model_test_per_case(test-gh106-mtp-route test_gh106_mtp_route.cpp
+    "gh#106 MTP routes through orchestrator->generate()"
+    "gh#108 MTP loud error propagates through orchestrator (no fallback)"
+    "gh#108 MTP engages with tools staged through orchestrator (agent loop)"
+    "gh#108 per-tier speculative_mtp=false overrides the global flag"
+    "gh#108 (v2.10.0) a request-level grammar routes to MTP on an MTP-effective tier (grammar enforced via to_common_sampling)")
 
 # gh#108 (v2.9.1): MTP fail-loud guards (temp/grammar/tools/streaming/n_draft)
 # + greedy engagement + emergent multi-turn, on the live backend.
