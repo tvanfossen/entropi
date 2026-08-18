@@ -28,6 +28,11 @@
 
 #include "model_test_context.h"  // helpers only — NO CATCH_REGISTER_LISTENER
 
+// gh#142: the same estimator the engine's admission gate uses, so the benchmark
+// cannot ask for a configuration the gate would refuse.
+#include "device_memory.h"
+#include "vram_footprint.h"
+
 #include <atomic>
 #include <algorithm>
 #include <cctype>
@@ -97,8 +102,61 @@ struct BenchConfig {
     bool flash_q4kv;  // flash_attn + q4_0 KV together; off = flash off + f16 KV
 };
 
-// Builds a tier for one config. True 128k context (bypasses the shared
-// test-harness 16K safety clamp — see init_orchestrator_full_ctx below).
+/// The context this matrix was written to exercise, when the card allows it.
+constexpr int kDesiredContext = 131072;
+
+/// Below this the agentic script cannot hold its own transcript, so a run would
+/// measure truncation rather than throughput. Reported, not measured.
+constexpr int kMinUsefulContext = 8192;
+
+/**
+ * @brief Largest context this config can actually run at on THIS device.
+ *
+ * gh#142: asks the same estimator the engine's admission gate uses, so the
+ * benchmark and the gate cannot disagree about what fits — a benchmark that
+ * requested more than the gate admits would simply be refused, and one that
+ * requested more than the DEVICE has used to abort the process.
+ *
+ * Falls back to the full desired context when free VRAM cannot be determined
+ * (CPU build, no GPU): there is no device budget to fit inside, and the old
+ * unconditional behaviour is the right one there.
+ *
+ * @param tier Tier being configured, already carrying path and cache types.
+ * @param cfg Benchmark config, for the log line.
+ * @return Context length in tokens; 0 when nothing fits.
+ * @version 2.11.0
+ */
+int fit_context_length(const entropic::ModelConfig& tier, const BenchConfig& cfg) {
+    const uint64_t available = entropic::query_device_free_vram_bytes();
+    if (available == 0) {
+        return kDesiredContext;
+    }
+    std::error_code ec;
+    auto weights = std::filesystem::file_size(tier.path, ec);
+    if (ec) {
+        return kDesiredContext;
+    }
+    entropic::FootprintInputs in;
+    in.weights_bytes = weights;
+    in.mmproj_bytes = 0;  // cleared above — this benchmark is text-only
+    in.gpu_layers = tier.gpu_layers;
+    in.context_length = kDesiredContext;
+    in.cache_type_k = tier.cache_type_k;
+    in.cache_type_v = tier.cache_type_v;
+    in.vram_reserve_mb = 512;
+    const int fits = entropic::recommend_context_length(in, available);
+    std::printf("[fit] %-32s weights=%.2f GiB free=%.2f GiB -> context=%d%s\n",
+                cfg.label.c_str(),
+                static_cast<double>(weights) / 1073741824.0,
+                static_cast<double>(available) / 1073741824.0,
+                fits,
+                fits == kDesiredContext ? " (full 128k)" : " (reduced to fit)");
+    return fits;
+}
+
+// Builds a tier for one config. Context is sized to the device (gh#142);
+// bypasses the shared test-harness 16K safety clamp — see
+// init_orchestrator_full_ctx below.
 std::string configure_tier(ModelTestContext& ctx, const BenchConfig& cfg) {
     REQUIRE(load_registry(ctx.registry));
     REQUIRE(load_test_config(ctx.registry, ctx.config));
@@ -111,11 +169,24 @@ std::string configure_tier(ModelTestContext& ctx, const BenchConfig& cfg) {
     tier.path = cfg.variant.path;
     tier.adapter = "gemma4";
     tier.gpu_layers = 99;
-    tier.context_length = 131072;  // true 128k, max VRAM contention
     tier.flash_attn = cfg.flash_q4kv;
     tier.cache_type_k = cfg.flash_q4kv ? "q4_0" : "f16";
     tier.cache_type_v = cfg.flash_q4kv ? "q4_0" : "f16";
     tier.grammar.reset();
+    // gh#142: the default tier inherits `mmproj: primary_mmproj` from the
+    // global config, which resolves to the QWEN3.6-35B projector. Repointing
+    // `path` at a gemma-4 model left that MISMATCHED projector attached, so
+    // every config loaded 857.6 MiB of the wrong model's vision tower into an
+    // agentic TEXT benchmark. That is the allocation whose cudaMalloc failed
+    // and took the process down via GGML_ASSERT(buffer). Nothing here measures
+    // vision; drop it.
+    tier.mmproj_path.clear();
+    // gh#142: context is sized to the card at run time rather than demanding a
+    // fixed 128k. The original "true 128k, max VRAM contention" ask cannot be
+    // satisfied on an 11 GB device by the E4B variants at full offload, and the
+    // engine had no working budget gate to refuse it — so it aborted instead.
+    // Each config now reports the context it actually ran at.
+    tier.context_length = fit_context_length(tier, cfg);
     auto& spec = ctx.config.inference.speculative;
     spec.enabled = cfg.mtp;
     spec.mtp = cfg.mtp;
@@ -398,13 +469,31 @@ TEST_CASE("gh#108 agentic benchmark: full 24-config permutation matrix "
     struct Summary { std::string label; long vram; double avg_tok_s; int quality; };
     std::vector<Summary> summaries;
 
+    int measured = 0;
+    int did_not_fit = 0;
+
     for (const auto& cfg : configs) {
         ModelTestContext ctx;
         auto tier = configure_tier(ctx, cfg);
+        // gh#142: a config that does not fit the card AS IT IS RIGHT NOW is a
+        // measured result, not a skipped test — the whole point of adapting to
+        // hardware is that the answer depends on what else holds VRAM. Report
+        // it and move to the next config rather than attempting a load the
+        // device cannot satisfy, which is what used to abort the process.
+        const int fitted = ctx.config.models.tiers[tier].context_length;
+        if (fitted < kMinUsefulContext) {
+            std::printf("[fit] %-32s DOES NOT FIT — needs >= %d ctx, "
+                        "device offers %d. Free VRAM, or use a smaller "
+                        "quantization.\n",
+                        cfg.label.c_str(), kMinUsefulContext, fitted);
+            ++did_not_fit;
+            continue;
+        }
         if (!init_orchestrator_full_ctx(ctx)) {
             spdlog::error("orchestrator init failed for {} — skipping", cfg.label);
             continue;
         }
+        ++measured;
         long vram = query_vram_used_mb();
         auto stats = run_agentic_script(*ctx.orchestrator, tier);
         print_report(cfg.label.c_str(), vram, stats);
@@ -420,11 +509,23 @@ TEST_CASE("gh#108 agentic benchmark: full 24-config permutation matrix "
     }
 
     std::printf("\n================ FULL MATRIX SUMMARY "
-               "(avg decode tok/s, VRAM @128k, quality /%d) ================\n",
-               kMaxQualityScore);
+               "(avg decode tok/s, VRAM at fitted ctx, quality /%d) "
+               "================\n", kMaxQualityScore);
+    std::printf("%d config(s) measured, %d did not fit this device\n",
+                measured, did_not_fit);
     std::printf("%-32s %12s %10s %10s\n", "config", "avg tok/s", "VRAM MiB", "quality");
     for (const auto& s : summaries) {
         std::printf("%-32s %12.2f %10ld %10d\n",
                    s.label.c_str(), s.avg_tok_s, s.vram, s.quality);
     }
+
+    // gh#142: adapting to the hardware must not become a way to pass without
+    // measuring anything. If every config was reported as unfittable then this
+    // run produced no benchmark at all, and saying so is the honest outcome —
+    // a green tick over an empty summary table is the vacuous pass this repo
+    // has been burned by before.
+    INFO("measured=" << measured << " did_not_fit=" << did_not_fit
+         << " — free VRAM on the device and re-run; a compositor or a game "
+            "holding several GiB is enough to empty this matrix");
+    CHECK(measured > 0);
 }

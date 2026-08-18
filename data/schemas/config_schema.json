@@ -142,7 +142,15 @@
     "inject_model_context": { "type": "boolean", "default": true },
     "vram_reserve_mb": { "type": "integer", "default": 512, "minimum": 0, "maximum": 65536 },
     "constitution": { "type": ["string", "boolean"], "description": "Path to constitution .md, true for bundled, false to disable." },
-    "app_context": { "type": ["string", "boolean"], "description": "Path to app_context .md, true for bundled, false to disable." }
+    "app_context": {
+      "type": ["string", "boolean", "object"],
+      "description": "Path to app_context .md, true for bundled, false to disable, or an object with 'content' carrying the text inline (gh#141).",
+      "properties": {
+        "content": { "type": "string", "description": "App context text supplied inline, for consumers that hold it in memory and cannot write it to disk." }
+      },
+      "required": ["content"],
+      "additionalProperties": false
+    }
   },
   "$defs": {
     "model_config": {

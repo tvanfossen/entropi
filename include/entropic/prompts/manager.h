@@ -187,6 +187,7 @@ ENTROPIC_EXPORT std::string load_constitution(
  */
 ENTROPIC_EXPORT std::string load_app_context(
     const std::optional<std::filesystem::path>& app_context_path,
+    const std::optional<std::string>& app_context_content,
     bool disabled,
     const std::filesystem::path& data_dir,
     std::string& body);

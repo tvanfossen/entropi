@@ -25,6 +25,7 @@ add_executable(entropic-config-tests
     config/bundled_models_test.cpp
     config/validate_test.cpp
     config/loader_test.cpp
+    config/app_context_content_test.cpp
     config/yaml_util_test.cpp
     config/env_overrides_test.cpp
     prompts/prompt_parse_test.cpp
@@ -75,6 +76,7 @@ add_executable(entropic-inference-tests
     # tool-derived source (common_chat_templates_apply) is discarded today.
     inference/grammar_source_invariant_test.cpp
     inference/empty_content_diagnosis_test.cpp
+    inference/vram_footprint_test.cpp
     # gh#136 (v2.10.4): 316 sanitized at INGRESS, not per-egress-site.
     inference/utf8_ingress_invariant_test.cpp
     # gh#134/gh#58 (v2.10.4): the new per-turn staged backend state must be

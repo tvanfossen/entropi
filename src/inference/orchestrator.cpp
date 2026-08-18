@@ -17,6 +17,8 @@
 
 #include "llama_cpp_backend.h"
 #include "empty_content_diagnosis.h"
+#include "device_memory.h"
+#include "vram_footprint.h"
 #include "response_parse.h"
 #include "mtp_envelope.h"
 #include <entropic/core/stream_think_filter.h>
@@ -1126,6 +1128,48 @@ void ModelOrchestrator::record_activation_reuse(
                             tier_name, path, footprint);
 }
 
+// Defined lower down, beside estimate_footprint_bytes which shares it.
+static FootprintInputs footprint_inputs_for(
+    const TierConfig& tier_cfg, uint64_t weights_bytes, int vram_reserve_mb);
+
+/**
+ * @brief Log what WOULD fit when a tier is refused for VRAM (gh#142).
+ *
+ * Turns a refusal into an actionable setting. Reports the largest context
+ * length that fits the measured budget, or states that the context length is
+ * not the lever when nothing fits at any context.
+ *
+ * @param tier_name Tier being refused.
+ * @internal
+ * @req REQ-INFER-019
+ * @version 2.11.0
+ */
+void ModelOrchestrator::log_fit_recommendation(
+    const std::string& tier_name) const {
+    auto tier_it = config_.models.tiers.find(tier_name);
+    if (tier_it == config_.models.tiers.end()) { return; }
+    const auto& tier_cfg = tier_it->second;
+    std::error_code ec;
+    auto weights = std::filesystem::file_size(tier_cfg.path, ec);
+    if (ec) { return; }
+    FootprintInputs in = footprint_inputs_for(
+        tier_cfg, weights, config_.vram_reserve_mb);
+    int fits = recommend_context_length(in, vram_budget_bytes_);
+    if (fits > 0) {
+        logger->error("[residency] tier '{}' fits at context_length={} "
+                      "(requested {}) — lower it, or reduce gpu_layers to "
+                      "keep the requested context",
+                      tier_name, fits, tier_cfg.context_length);
+    } else {
+        logger->error("[residency] tier '{}' does not fit at ANY context "
+                      "length: weights{} alone exceed the {} MiB budget. "
+                      "Reduce gpu_layers, or use a smaller quantization.",
+                      tier_name,
+                      in.mmproj_bytes > 0 ? " + vision projector" : "",
+                      vram_budget_bytes_ / (1024 * 1024));
+    }
+}
+
 /**
  * @brief VRAM-budget admission test (gh#57).
  *
@@ -1134,7 +1178,7 @@ void ModelOrchestrator::record_activation_reuse(
  * estimate exceeds a known engine VRAM budget. Returns true to admit.
  *
  * @internal
- * @version 2.2.4
+ * @version 2.11.0
  */
 bool ModelOrchestrator::residency_admits(const std::string& tier_name) {
     size_t footprint = estimate_footprint_bytes(tier_name);
@@ -1146,6 +1190,11 @@ bool ModelOrchestrator::residency_admits(const std::string& tier_name) {
                       "exceeds VRAM budget {} bytes — "
                       "TIER_MODEL_TOO_LARGE (gh#57)",
                       tier_name, footprint, vram_budget_bytes_);
+        // gh#142: a bare refusal leaves the operator with nothing to act on.
+        // Say what WOULD fit, so the answer is a setting they can apply rather
+        // than a wall. 0 means even an empty context does not fit, in which
+        // case the context length is not the lever and saying so is honest.
+        log_fit_recommendation(tier_name);
         last_residency_error_ = ENTROPIC_ERROR_TIER_MODEL_TOO_LARGE;
         return false;
     }
@@ -1916,28 +1965,70 @@ void ModelOrchestrator::apply_tier_sampler_defaults(
  * unknown, gate disabled" — see `get_model` for the gate semantics.
  *
  * @internal
- * @version 2.2.4
+ * @version 2.11.0
  */
 size_t ModelOrchestrator::resolve_vram_budget_bytes() {
     const char* env = std::getenv("ENTROPIC_VRAM_BUDGET_BYTES");
-    if (env == nullptr || *env == '\0') { return 0; }
-    try {
-        long long v = std::stoll(env);
-        return (v < 0) ? 0 : static_cast<size_t>(v);
-    } catch (...) {
-        return 0;
+    if (env != nullptr && *env != '\0') {
+        try {
+            long long v = std::stoll(env);
+            return (v < 0) ? 0 : static_cast<size_t>(v);
+        } catch (...) {
+            return 0;
+        }
     }
+    // gh#142: this fallback is what the header has always documented and what
+    // was never implemented. Without it the budget is 0 on every deployment
+    // that does not set the env var, the gate is disabled, and a tier that
+    // cannot fit aborts the host process inside llama.cpp instead of being
+    // refused. Free rather than total: the reporter hit this on a GPU busier
+    // than the developer's.
+    return static_cast<size_t>(query_device_free_vram_bytes());
+}
+
+/**
+ * @brief Gather a tier's footprint inputs for the pure estimator.
+ *
+ * Resolves the vision projector's size when the tier declares one — it is the
+ * allocation that actually aborted the process in gh#142 and the v2.2.4
+ * estimate ignored it entirely.
+ *
+ * @param tier_cfg The tier's configuration.
+ * @param weights_bytes Size of the tier's GGUF on disk.
+ * @return Inputs for estimate_vram_footprint.
+ * @internal
+ * @req REQ-INFER-019
+ * @version 2.11.0
+ */
+static FootprintInputs footprint_inputs_for(
+    const TierConfig& tier_cfg, uint64_t weights_bytes, int vram_reserve_mb) {
+    FootprintInputs in;
+    in.weights_bytes = weights_bytes;
+    in.gpu_layers = tier_cfg.gpu_layers;
+    in.context_length = tier_cfg.context_length;
+    in.cache_type_k = tier_cfg.cache_type_k;
+    in.cache_type_v = tier_cfg.cache_type_v;
+    in.vram_reserve_mb = vram_reserve_mb;
+    if (!tier_cfg.mmproj_path.empty()) {
+        std::error_code proj_ec;
+        auto proj = std::filesystem::file_size(tier_cfg.mmproj_path, proj_ec);
+        if (!proj_ec) { in.mmproj_bytes = proj; }
+    }
+    return in;
 }
 
 /**
  * @brief Estimate per-tier VRAM footprint.
  *
- * Weights file size + context_length × 16 KiB per-token KV estimate +
- * vram_reserve_mb × 1MiB headroom. Returns 0 when the tier or its
- * GGUF file is not resolvable. Pure metadata — no model load.
+ * Delegates the arithmetic to the pure, CPU-unit-tested estimator in
+ * vram_footprint.h, which prices weights by their offload placement, KV by its
+ * cache type, and counts the vision projector. Returns 0 when the tier or its
+ * GGUF is not resolvable, AND when the placement cannot be priced at all —
+ * both mean "unknown" to the gate, which then does not enforce.
  *
  * @internal
- * @version 2.2.4
+ * @req REQ-INFER-019
+ * @version 2.11.0
  */
 size_t ModelOrchestrator::estimate_footprint_bytes(
     const std::string& tier_name) const {
@@ -1947,11 +2038,12 @@ size_t ModelOrchestrator::estimate_footprint_bytes(
     std::error_code ec;
     auto weights = std::filesystem::file_size(tier_cfg.path, ec);
     if (ec) { return 0; }
-    const size_t kv_per_token = 16ull * 1024ull;
-    size_t kv = static_cast<size_t>(tier_cfg.context_length) * kv_per_token;
-    size_t headroom = static_cast<size_t>(config_.vram_reserve_mb)
-        * 1024ull * 1024ull;
-    return static_cast<size_t>(weights) + kv + headroom;
+    FootprintInputs in = footprint_inputs_for(
+        tier_cfg, weights, config_.vram_reserve_mb);
+    // gh#142: an unpriceable placement returns 0 = "unknown", which leaves the
+    // gate open. Guessing here would refuse working configurations — a 13 GB
+    // model at gpu_layers=15 runs fine on an 11 GB card.
+    return static_cast<size_t>(estimate_vram_footprint(in).bytes);
 }
 
 /**

@@ -815,7 +815,7 @@ static void init_mcp_servers(entropic_handle_t h,
  * @param data_dir Bundled data directory.
  * @return Concatenated prefix string.
  * @utility
- * @version 2.0.4
+ * @version 2.11.0
  */
 static std::string build_shared_prompt_prefix(
     entropic_handle_t h,
@@ -825,8 +825,8 @@ static std::string build_shared_prompt_prefix(
         h->config.constitution, h->config.constitution_disabled,
         data_dir, constitution);
     entropic::prompts::load_app_context(
-        h->config.app_context, h->config.app_context_disabled,
-        data_dir, app_ctx);
+        h->config.app_context, h->config.app_context_content,
+        h->config.app_context_disabled, data_dir, app_ctx);
     std::string prefix;
     if (!constitution.empty()) { prefix += constitution + "\n\n"; }
     if (!app_ctx.empty()) { prefix += app_ctx + "\n\n"; }
@@ -1201,7 +1201,7 @@ static char* sp_get_config(void* ud) {
  * ResponseGenerator::inject_engine_state_reminder.
  *
  * @utility
- * @version 2.7.0
+ * @version 2.11.0
  */
 static std::string build_assembled_prompt_for_tier(
     entropic_engine* h, const std::string& tier_name) {
@@ -1211,8 +1211,8 @@ static std::string build_assembled_prompt_for_tier(
         h->config.constitution, h->config.constitution_disabled,
         data_dir, constitution);
     entropic::prompts::load_app_context(
-        h->config.app_context, h->config.app_context_disabled,
-        data_dir, app_ctx);
+        h->config.app_context, h->config.app_context_content,
+        h->config.app_context_disabled, data_dir, app_ctx);
     std::string identity_body;
     auto it = h->config.models.tiers.find(tier_name);
     if (it != h->config.models.tiers.end()) {

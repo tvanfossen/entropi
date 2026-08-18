@@ -132,6 +132,9 @@ def _get_gpu_name():
 
 
 DEFAULT_MODEL_TEST_TIMEOUT_S = 600
+#: Seconds to wait between model tests so host pages are reclaimed (gh#142).
+#: 25s was proven sufficient in an A/B; 30 leaves margin on a busier machine.
+MODEL_TEST_SETTLE_S = 30
 
 
 ## @brief Read each model test's CMake-declared TIMEOUT property.
@@ -181,8 +184,8 @@ def _get_model_test_timeouts(build_dir):
 ## @brief Run one model test exe with retries + a per-attempt timeout.
 ## @utility
 ## @return Tuple of (status, retries, duration_ms). status: pass|skipped|fail.
-## @version 2.10.0
-def _run_one_model_test(exe_path, timeout_s=DEFAULT_MODEL_TEST_TIMEOUT_S):
+## @version 2.11.0
+def _run_one_model_test(exe_path, timeout_s=DEFAULT_MODEL_TEST_TIMEOUT_S, case=None):
     """Run one model test exe (retries + a per-attempt timeout).
 
     gh#89-C: a Catch2 SKIP (all scenarios SKIP — e.g. a GGUF/VRAM-gated test or
@@ -203,7 +206,7 @@ def _run_one_model_test(exe_path, timeout_s=DEFAULT_MODEL_TEST_TIMEOUT_S):
     for attempt in range(MAX_MODEL_RETRIES + 1):
         try:
             rc = subprocess.call(
-                [exe_path],
+                [exe_path] + ([case] if case else []),
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 timeout=timeout_s,
@@ -221,7 +224,7 @@ def _run_one_model_test(exe_path, timeout_s=DEFAULT_MODEL_TEST_TIMEOUT_S):
 ## @brief Run model tests 1:1; a Catch2 SKIP (rc=4) is reported, not failed.
 ## @utility
 ## @return Tuple of (results list, failed count). Skips do NOT count as failures.
-## @version 2.9.7
+## @version 2.11.0
 def _run_model_tests(build_dir):
     """Run model tests 1:1. Returns (results, failed_count). gh#89: a Catch2
     SKIP (GGUF/VRAM-gated or a disabled gate) reports SKIP, not PASS/FAIL.
@@ -247,8 +250,30 @@ def _run_model_tests(build_dir):
     results = []
     passed = failed = flaky = skipped = 0
 
-    for exe in executables:
+    for idx, exe in enumerate(executables):
+        # gh#142: settle between model tests so the previous process's pages are
+        # reclaimed before the next one maps its model.
+        #
+        # PROVEN by controlled A/B, same binary and same predecessor, only the
+        # gap varying:
+        #   no delay  -> test-gh87-backend-common-chat FAILS
+        #   25s delay -> PASSES
+        # GPU offload was identical (0/31 layers) in both arms, so this is HOST
+        # memory, not VRAM: that test mmaps a ~12.6 GB CPU-mapped model, and
+        # back-to-back it cannot be satisfied before the kernel reclaims.
+        #
+        # Three of the five v2.11.0 model-suite failures were this, and every
+        # one of them passes in isolation.
+        if idx > 0:
+            time.sleep(MODEL_TEST_SETTLE_S)
         timeout_s = timeouts.get(exe, DEFAULT_MODEL_TEST_TIMEOUT_S)
+        # gh#142: per-CASE isolation is owned by ctest, which has explicit
+        # per-case entries (add_model_test_per_case in tests/model/CMakeLists.txt)
+        # for the binaries that accumulate across cases. Deriving case names here
+        # by parsing --list-tests is fragile: Catch2 wraps long names across
+        # lines, and a mis-parse produces a phantom filter that matches nothing,
+        # exits 2, and is recorded as a FALSE SKIP. Use `ctest -L model` when
+        # per-case isolation matters.
         status, retries, duration_ms = _run_one_model_test(os.path.join(test_dir, exe), timeout_s)
         if status == "pass":
             passed += 1
@@ -349,7 +374,7 @@ def _write_results_json(test_results, duration_ms):
 
 ## @brief Run tests. Builds first unless --no-build.
 ## @utility
-## @version 2
+## @version 2.11.0
 @task(
     help={
         "model": "Include model tests (GPU recommended, writes results.json)",
@@ -386,7 +411,7 @@ def test(  # noqa: CFQ002
 
     if model:
         # CPU tests first (exclude model label)
-        c.run(f"ctest --test-dir {build_dir} {ctest_args} -LE model")
+        c.run(f'ctest --test-dir {build_dir} {ctest_args} -LE "model|bench"')
 
         # Model tests: run 1:1 with retries, write results.json
         print("\n── Model tests (GPU) ──")
@@ -406,7 +431,7 @@ def test(  # noqa: CFQ002
         # try to load real GGUFs on the CPU lane. The intent of "no
         # model flag" is "fast unit tests only," and the label is
         # authoritative.
-        c.run(f"ctest --test-dir {build_dir} {ctest_args} -LE model")
+        c.run(f'ctest --test-dir {build_dir} {ctest_args} -LE "model|bench"')
 
     if coverage:
         c.run(".venv/bin/python scripts/check_coverage.py")

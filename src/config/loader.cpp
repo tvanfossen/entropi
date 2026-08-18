@@ -657,7 +657,7 @@ static void parse_optional_subsections(
  * @param root YAML root node.
  * @param config Config to populate.
  * @internal
- * @version 2.3.7
+ * @version 2.11.0
  */
 static void extract_scalar_fields(ryml::ConstNodeRef root,
                                   ParsedConfig& config)
@@ -673,8 +673,15 @@ static void extract_scalar_fields(ryml::ConstNodeRef root,
 
     extract_tri_state_path(root, "constitution",
                            config.constitution, config.constitution_disabled);
-    extract_tri_state_path(root, "app_context",
-                           config.app_context, config.app_context_disabled);
+    /* gh#141 (v2.11.0): app_context accepts an object carrying the text
+     * inline, for consumers that hold it in memory and cannot write it to
+     * disk. Checked BEFORE the tri-state path parse, because the object form
+     * has no meaning as a path and would otherwise be stringified into one. */
+    if (!extract_inline_content(root, "app_context",
+                                config.app_context_content)) {
+        extract_tri_state_path(root, "app_context",
+                               config.app_context, config.app_context_disabled);
+    }
 }
 
 /**

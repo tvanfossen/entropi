@@ -105,6 +105,24 @@ bool extract_tri_state_path(
     std::optional<std::filesystem::path>& out, bool& disabled);
 
 /**
+ * @brief Extract inline text from an object-form value (gh#141).
+ *
+ * Recognises `key: { content: "..." }` and yields the content. Any other shape
+ * — a scalar, a sequence, or a map without `content` — is left alone and
+ * reported as not-found, so the caller can fall through to its existing parse
+ * and every pre-gh#141 spelling keeps its meaning.
+ *
+ * @param node The ryml node to extract from.
+ * @param key The key to look up.
+ * @param[out] out Receives the content. Untouched unless the object form matched.
+ * @return true only if the object form matched and content was extracted.
+ * @req REQ-TYPE-005
+ * @version 2.11.0
+ */
+bool extract_inline_content(
+    ryml::ConstNodeRef node, c4::csubstr key, std::optional<std::string>& out);
+
+/**
  * @brief Extract a vector of strings from a YAML sequence node.
  * @param node The ryml node to extract from.
  * @param key The key to look up.

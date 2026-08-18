@@ -3394,17 +3394,46 @@
 
     Before a cold activation, a budget gate runs: the tier''s estimated
 
-    footprint (GGUF weights file size + a context-length-derived KV estimate +
+    footprint is compared against the engine VRAM budget. A tier that does not
 
-    the configured vram_reserve_mb) is compared against the engine VRAM budget
+    fit is refused with ENTROPIC_ERROR_TIER_MODEL_TOO_LARGE stashed for the
 
-    (ENTROPIC_VRAM_BUDGET_BYTES; 0 means unknown and the gate is disabled). A
+    facade to translate, rather than being loaded and aborting the process on a
 
-    tier that does not fit is refused with ENTROPIC_ERROR_TIER_MODEL_TOO_LARGE
+    failed device allocation.
 
-    stashed for the facade to translate, rather than being loaded and OOMing
 
-    the device.
+    The budget resolves from ENTROPIC_VRAM_BUDGET_BYTES when set, else from the
+
+    FREE VRAM the active GPU device reports; 0 (no GPU device at all) means
+
+    unknown and the gate is disabled. Free rather than total, because the
+
+    failure case is an operator whose GPU is busier than the developer''s.
+
+
+    The footprint prices weights by their OFFLOAD PLACEMENT, KV by its CACHE
+
+    TYPE, and counts the vision projector when the tier declares one. A
+
+    partially offloaded tier is deliberately UNPRICEABLE — how much of the file
+
+    lands on the device depends on a layer count not knowable without reading
+
+    GGUF metadata — and reports itself unknown, which leaves the gate open. That
+
+    asymmetry is intentional: refusing a configuration that works is a worse
+
+    failure than missing one that does not, because the operator cannot tell a
+
+    false refusal from a real one.
+
+
+    A refusal also logs what WOULD fit — the largest context length that fits
+
+    the measured budget, or a statement that context length is not the lever
+
+    when nothing fits at any size.
 
 
     Every VRAM state change (Loaded, Evicted, ActivationSwap) fires a
@@ -3425,7 +3454,21 @@
 
     tier is requested, Then activation is refused and last_residency_error is
 
-    TIER_MODEL_TOO_LARGE (cleared after translation). Given a residency
+    TIER_MODEL_TOO_LARGE (cleared after translation). Given no
+
+    ENTROPIC_VRAM_BUDGET_BYTES and a GPU device present, Then the budget is the
+
+    device''s free VRAM and the gate enforces. Given a tier with gpu_layers set
+
+    to a specific positive count below the all-layers sentinel, Then the
+
+    footprint is reported unknown and the tier is NOT refused. Given a KV cache
+
+    type of q4_0, Then its per-token cost is priced below f16 rather than at a
+
+    flat rate. Given a tier declaring an mmproj, Then the projector''s bytes are
+
+    included when the weights are offloaded and excluded when they are not. Given a residency
 
     observer, Then it can be registered and cleared and the event enum matches
 
@@ -3446,6 +3489,16 @@
 
     enum matches the public C ABI" — tests/unit/inference/residency_test.cpp;
 
+    SCENARIO "gh#142 KV is priced by its cache type, not a flat rate",
+
+    "gh#142 offload placement decides whether weights count against VRAM",
+
+    "gh#142 the vision projector is counted — it is what actually failed",
+
+    "gh#142 the config that aborted the process is refused instead"
+
+    — tests/unit/inference/vram_footprint_test.cpp;
+
     SCENARIO "Orchestrator VRAM budget env override is read at initialize",
 
     "Orchestrator residency observer set/clear + speculative setters" and
@@ -3461,7 +3514,7 @@
     thread-safe" — tests/unit/inference/profile_registry_test.cpp
 
     '
-  version: 2.10.4
+  version: 2.11.0
 - id: REQ-INFER-020
   name: Tier routing, handoff rules and secondary model roles
   module: Inference Backends
@@ -6738,7 +6791,7 @@
     SCENARIO(\"Comprehensive config exercises every parse_* helper\")\n  (allowed_tools optional)\
     \ — tests/unit/config/loader_test.cpp\nSCENARIO(\"ModelConfig has correct defaults\"),\n\
     SCENARIO(\"GenerationParams has correct defaults\") —\n  tests/unit/types/config_structs_test.cpp\n\
-    (tri-state path fields identity / constitution / app_context: none)"
+    SCENARIO(\"gh#141 app_context carries inline content\"),\nSCENARIO(\"gh#141 every existing app_context spelling keeps its meaning\")\n  \u2014 tests/unit/config/app_context_content_test.cpp\n(app_context now also accepts an object form carrying the text inline;\nthe bare-string=path, true=bundled and false=disabled spellings are\npinned as regressions. identity / constitution tri-state: still none)"
   version: 2.10.4
 - id: REQ-TYPE-006
   name: Multimodal message vocabulary keeps text readable to text-only callers

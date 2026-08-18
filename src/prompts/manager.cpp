@@ -426,47 +426,91 @@ std::string load_constitution(
 }
 
 /**
- * @brief Load app_context prompt with tri-state resolution.
- * @param app_context_path Custom path (nullopt = disabled).
+ * @brief Read app_context from a file, resolving bare names as bundled.
+ *
+ * Split out of load_app_context in v2.11.0: adding the inline-content branch
+ * (gh#141) pushed that function to the top of the complexity report, and the
+ * two sources are independent concerns.
+ *
+ * @param app_context_path Configured path; a bare filename resolves under
+ *        data_dir/prompts/, anything with a directory component is used as-is.
+ * @param data_dir Bundled data directory.
+ * @param[out] body Receives the parsed prompt body.
+ * @return Empty string on success, an error message otherwise.
+ * @internal
+ * @version 2.11.0
+ */
+static std::string load_app_context_file(
+    const std::filesystem::path& app_context_path,
+    const std::filesystem::path& data_dir,
+    std::string& body)
+{
+    auto path = app_context_path;
+
+    // Bare filename resolves as bundled prompt
+    if (!path.has_parent_path() || path.parent_path().empty()) {
+        path = data_dir / "prompts" / path;
+    }
+
+    std::string err;
+    if (!std::filesystem::exists(path)) {
+        err = "app_context file not found: " + path.string();
+    }
+
+    ParsedPrompt result;
+    if (err.empty()) {
+        err = parse_prompt_file(path, PromptType::APP_CONTEXT, result);
+    }
+
+    if (err.empty()) {
+        body = std::move(result.body);
+        s_log->info("App context loaded from {}", path.string());
+    }
+
+    return err;
+}
+
+/**
+ * @brief Load app_context from inline content or a path, with tri-state resolution.
+ *
+ * Resolution order (gh#141): an explicit opt-out wins over everything; then
+ * inline content, which is used without touching the filesystem; then a path.
+ *
+ * @param app_context_path Custom path (nullopt = none configured).
+ * @param app_context_content Inline text (nullopt = none supplied).
  * @param disabled true if app_context explicitly disabled.
  * @param data_dir Bundled data directory.
  * @param[out] body Output app_context text.
  * @return Empty string on success, error on failure.
- * @version 1.8.2
+ * @req REQ-TYPE-005
+ * @version 2.11.0
  * @utility
  */
 std::string load_app_context(
     const std::optional<std::filesystem::path>& app_context_path,
+    const std::optional<std::string>& app_context_content,
     bool disabled,
     const std::filesystem::path& data_dir,
     std::string& body)
 {
     std::string err;
 
+    // gh#141: inline content wins over a path, but NOT over an explicit
+    // opt-out — `app_context: false` still means off, whatever else is set.
+    // Checked before the path branch so the filesystem is never touched when
+    // the caller already holds the text; that is the whole point of the
+    // feature for a consumer that cannot write the file.
+    if (!disabled && app_context_content.has_value()) {
+        body = *app_context_content;
+        s_log->info("App context supplied inline ({} bytes)", body.size());
+        return err;
+    }
+
     if (disabled || !app_context_path.has_value()) {
         s_log->info("App context disabled (not configured)");
         body.clear();
     } else {
-        auto path = *app_context_path;
-
-        // Bare filename resolves as bundled prompt
-        if (!path.has_parent_path() || path.parent_path().empty()) {
-            path = data_dir / "prompts" / path;
-        }
-
-        if (!std::filesystem::exists(path)) {
-            err = "app_context file not found: " + path.string();
-        }
-
-        ParsedPrompt result;
-        if (err.empty()) {
-            err = parse_prompt_file(path, PromptType::APP_CONTEXT, result);
-        }
-
-        if (err.empty()) {
-            body = std::move(result.body);
-            s_log->info("App context loaded from {}", path.string());
-        }
+        err = load_app_context_file(*app_context_path, data_dir, body);
     }
 
     return err;
@@ -542,7 +586,7 @@ std::string resolve_tier_identity(
  * @param data_dir Bundled data directory.
  * @return Assembled system prompt string.
  * @internal
- * @version 2.0.1
+ * @version 2.11.0
  */
 std::string assemble(
     const entropic::ParsedConfig& config,
@@ -551,8 +595,8 @@ std::string assemble(
 
     load_constitution(config.constitution, config.constitution_disabled,
                       data_dir, constitution);
-    load_app_context(config.app_context, config.app_context_disabled,
-                     data_dir, app_ctx);
+    load_app_context(config.app_context, config.app_context_content,
+                     config.app_context_disabled, data_dir, app_ctx);
 
     std::string identity_body;
     auto tier_it = config.models.tiers.find(config.models.default_tier);

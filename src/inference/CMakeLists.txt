@@ -12,6 +12,9 @@ set(INFERENCE_SOURCES
     llama_cpp_tokenizer.cpp
     prompt_cache.cpp
     orchestrator.cpp
+    # gh#142 (v2.11.0): free-VRAM query behind the admission gate that
+    # orchestrator.h documented but never implemented.
+    device_memory.cpp
     secondary_model_loader.cpp
     speculative_compat.cpp
     adapter_manager.cpp

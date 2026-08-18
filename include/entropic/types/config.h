@@ -1001,6 +1001,16 @@ struct ParsedConfig {
     /// App context: nullopt = disabled by default
     std::optional<std::filesystem::path> app_context;
     bool app_context_disabled = false; ///< true if app_context explicitly disabled
+    /**
+     * @brief Inline app_context text, supplied instead of a path (gh#141).
+     *
+     * Set by the `app_context: {content: ...}` object form. Takes precedence
+     * over `app_context` when both are present. Exists because a consumer may
+     * hold this text in memory and be unable to write it to disk — the file is
+     * a provenance boundary for them, and on Android there is no stable
+     * writable path to point at.
+     */
+    std::optional<std::string> app_context_content;
 
     bool inject_model_context = true;  ///< Auto-inject model context into system prompt
     int vram_reserve_mb = 512;         ///< Reserved VRAM headroom (MB, 0–65536)
