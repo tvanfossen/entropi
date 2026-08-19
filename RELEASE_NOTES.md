@@ -7,8 +7,7 @@ body limit once this file accumulates full project history — see v2.9.3._
 Minor release — **the requirements catalog is back and enforced, and four
 places where the engine documented behaviour it did not have are corrected.**
 
-No new features. This release is about the engine telling the truth about
-itself.
+Mostly about the engine telling the truth about itself. One feature, #141.
 
 ## Requirements traceability, restored and made durable
 
@@ -43,7 +42,7 @@ A missing catalog now fails closed.
 ## Documented behaviour that did not exist
 
 The sweeps were told the implementation is the specification. They read headers,
-which describe intent — and four times the intent had never been built:
+which describe intent — and five times the intent had never been built:
 
 | | |
 |---|---|
@@ -51,10 +50,102 @@ which describe intent — and four times the intent had never been built:
 | `FileAccessTracker::was_read_unchanged` | no production caller; the gate only ever checked *was read*, not *unchanged*. Removed, along with a test named `..._detects_external_change` whose own comment conceded the write succeeds. |
 | Bash/git command timeout | stored, logged, exposed by an accessor, never enforced. Catalog corrected; filed as #140. |
 | `REQ-MCP-021` / `REQ-MCP-023` | both asserted the two above. Rewritten to describe what the code does. |
+| VRAM budget resolution | `orchestrator.h:446` documented `env -> cudaMemGetInfo -> 0`; line 594 conceded the `cudaMemGetInfo` half was "intentionally deferred". The gate it feeds has therefore never run on a default deployment. Built — see below. |
 
 **Behaviour change:** `entropic_set_error_callback` now returns
 `ENTROPIC_ERROR_NOT_IMPLEMENTED` where it previously returned `ENTROPIC_OK`.
 Nothing that relied on the callback firing can break, because it never fired.
+
+## The VRAM admission gate now actually runs (#142)
+
+**This is the behaviour change in this release. Read it before upgrading.**
+
+`ModelOrchestrator::residency_admits()` has refused over-large tiers with
+`ENTROPIC_ERROR_TIER_MODEL_TOO_LARGE` since v2.2.4. It never fired. The gate is
+guarded by `vram_budget_bytes_ > 0`, and that value came only from
+`ENTROPIC_VRAM_BUDGET_BYTES` — unset on every real deployment, so the budget read
+as "unknown" and the gate disabled itself. A tier that could not fit went straight
+to llama.cpp and took the **host process** down on
+`ggml-backend.cpp:179 GGML_ASSERT(buffer)`.
+
+The budget now falls back to the free VRAM the device reports. **Free, not
+total**: the reported failure was an operator whose GPU was busier than the
+developer's, and a total-derived budget would admit the load and abort anyway.
+
+Switching the gate on required fixing the estimate first, because the old one was
+wrong in three ways that all bias toward refusing configurations that work:
+
+| | before | now |
+|---|---|---|
+| weights | entire file, regardless of `gpu_layers` | priced by offload placement |
+| KV cache | flat 16 KiB/token, any `cache_type` | scaled by type — q4_0 is ~0.28x f16, not 1.0x |
+| vision projector | not counted | counted — it is the allocation that failed |
+
+**A partially offloaded tier is deliberately not priced at all.** How much of the
+file lands on the device depends on a layer count only GGUF metadata carries, so
+the estimate reports *unknown* and the gate stays open rather than guessing.
+Qwen3.6-35B-A3B IQ3_XXS (~13 GB) runs at `gpu_layers=15` on an 11 GB card, and a
+gate that guessed would refuse it. Refusing a working configuration is worse than
+missing a broken one, because the operator cannot tell a false refusal from a real
+one.
+
+A refusal also logs the largest context length that *would* fit, so what comes
+back is a setting rather than a wall.
+
+### What the estimate does not count
+
+llama.cpp reserves graph/activation scratch ("compute buffers") per context at
+load time, sized by ubatch and model internals rather than by context length.
+Measured here: **1222 MiB** for a gemma-4 E4B MTP head's context at a 512-token
+ubatch — more than twice the default `vram_reserve_mb` of 512, and a speculative
+configuration pays it twice because it holds two contexts.
+
+It is not estimated, because it cannot be derived without reading GGUF metadata.
+`vram_reserve_mb` is the knob that covers it; raise it if you run near the edge.
+
+So, stated plainly: **the estimate can admit a configuration that then fails to
+load.** It exists to prevent the catastrophic case — an abort that takes the host
+process down — and to hand back an actionable recommendation. It is not a
+guarantee. A load that fails after admission surfaces as a typed error, which is
+the outcome #142 asked for.
+
+### What consumers should expect
+
+- **Full-offload tiers that never fit** now fail fast with
+  `ENTROPIC_ERROR_TIER_MODEL_TOO_LARGE` instead of aborting the process. If you
+  were relying on the abort... you were not.
+- **Partial-offload tiers are unaffected** — never refused, by design.
+- **CPU-only builds and machines with no GPU are unaffected** — no device, budget
+  0, gate stays disabled, which is correct: there is no VRAM to exhaust.
+- **A busy GPU can now refuse a load that used to succeed** on an idle card,
+  because the budget is sampled from free VRAM at `initialize()`. That is the
+  intended behaviour — it is the reported scenario — but it does mean the same
+  config can be admitted or refused depending on what else holds the card.
+  `ENTROPIC_VRAM_BUDGET_BYTES` overrides the device query if you need
+  determinism.
+
+## app_context accepts inline content (#141)
+
+`app_context` could only ever name a file. A consumer holding the text in memory
+had no supported way to deliver it, and for the reporter writing the file was not
+an option: it is a provenance boundary on their side (what the app can rewrite at
+runtime it can rewrite wrongly and silently), and on their Android target there is
+no stable writable path across launches.
+
+```yaml
+app_context:
+  content: |
+    This family follows a Scandinavian, play-first approach...
+```
+
+Resolution order is **explicit opt-out > inline content > path**, so
+`app_context: false` still wins over supplied text. Content never touches the
+filesystem. Every prior spelling keeps its meaning — bare string is a path, `true`
+is bundled, `false` disables, absent is opt-out — each pinned by a regression
+test.
+
+Not taken: a `entropic_set_app_context()` C setter, the reporter's other option.
+That is public-ABI surface and a larger decision than a bug report should settle.
 
 ## Storage write failures are reported
 
@@ -63,6 +154,24 @@ Nothing that relied on the callback firing can break, because it never fired.
 when its INSERT never landed — so the caller went on to reference an id that did
 not exist, and the real failure resurfaced later as something unrelated. Both
 now report.
+
+## Speculative decode failures were completely silent
+
+`spec_error()` built the error result and returned it without logging. The
+message reached only `GenerationResult::error_message`; nothing appeared in the
+log. A consumer whose speculative configuration failed saw `finish=error`, empty
+content, and no explanation anywhere — the same shape as the gh#138 gap.
+
+Found the hard way, diagnosing a benchmark config that failed every turn with
+`LOAD_FAILED` and produced not one line saying why. With the log line in place
+the cause was immediate:
+
+```
+Speculative decode failed (ENTROPIC_ERROR_LOAD_FAILED):
+  MTP head setup failed: .../mtp-gemma-4-E4B-it.gguf
+```
+
+`spec_error()` now logs at ERROR with the code name and the message.
 
 ## Diagnostics for gh#137 and gh#138
 
@@ -102,6 +211,24 @@ untested surface named: `speculative.mtp`, real tool staging, delegation.
   is unaffected.
 - #140: unenforced bash/git timeout.
 - gh#131 closed — its three dependencies shipped in v2.10.0.
+- **The benchmark gate was reporting failures for benchmarks that never ran.**
+  `add_bench_test` registered the binary with no arguments, and the benchmark
+  cases are Catch2 `[.]`-hidden — so a bare run collected nothing, exited 2, and
+  ctest recorded all three as ~0.1s failures. They are now invoked with
+  `"[benchmark]"`.
+- **The agentic benchmark was loading the wrong model's vision tower.** It
+  repointed its tier at a gemma-4 model but never cleared `mmproj_path`, which
+  the default tier inherits from the global config as `mmproj: primary_mmproj`
+  — the Qwen3.6-35B projector. 857.6 MiB of an unrelated model's weights, in a
+  text-only throughput benchmark, and the exact allocation that produced the
+  #142 abort. Cleared, and the matrix now sizes its context per config from the
+  same estimator the admission gate uses, reporting configs that do not fit
+  instead of attempting them. A run that fits nothing fails rather than
+  reporting an empty table.
+- Model-suite skip audit: all 78 `SKIP()` sites in `tests/model` are either GGUF
+  guards whose files are present, or sit in single-case binaries where a skip
+  exits 4 and ctest records a failure. The suite's 74/74 is a real green, not an
+  absence of running tests.
 
 ---
 

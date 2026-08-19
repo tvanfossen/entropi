@@ -24,6 +24,26 @@
  *   - it ignored the vision projector, which is the allocation that actually
  *     failed in the gh#142 abort.
  *
+ * @par What this does NOT count — compute buffers
+ * llama.cpp reserves graph/activation scratch per context at load time, sized by
+ * ubatch and model internals rather than by context length. Measured on this
+ * repo's own benchmark: **1222 MiB** for a gemma-4 E4B MTP head's context, at a
+ * 512-token ubatch. That is more than twice the default `vram_reserve_mb` of
+ * 512, and a speculative configuration pays it TWICE because it holds two
+ * contexts.
+ *
+ * It is not counted here because it cannot be derived from anything this header
+ * is willing to read — it needs the model's hidden size and layer count, i.e.
+ * GGUF metadata. `vram_reserve_mb` is the knob that must cover it, and callers
+ * running near the edge should raise it rather than trust the default.
+ *
+ * The consequence is honest and worth stating plainly: **this estimate can admit
+ * a configuration that then fails to load.** It is designed to prevent the
+ * catastrophic case (an abort that kills the host process) and to produce an
+ * actionable recommendation — not to guarantee a load succeeds. A load that
+ * fails after admission surfaces as a typed error, which is the outcome gh#142
+ * asked for.
+ *
  * @par The rule this file follows
  * An estimate that cannot be bounded is reported as UNKNOWN rather than guessed.
  * An unknown estimate leaves the gate open — the engine declines to refuse what

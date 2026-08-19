@@ -3175,10 +3175,23 @@ bool spec_prefill_minus_last(
 
 /**
  * @brief Build an error result for kernel-level failures.
+ *
+ * v2.11.0: this now LOGS. It previously packed the message into the result and
+ * returned, so a speculative failure was invisible in the logs — the caller got
+ * finish=error with empty content and nothing anywhere said why. Found while
+ * diagnosing an MTP config that failed every turn with LOAD_FAILED and produced
+ * not one line of explanation. A typed error the operator cannot see is only
+ * half of failing loudly.
+ *
+ * @param code Error code for the result.
+ * @param msg Human-readable cause; logged and returned.
+ * @return The populated error result.
  * @internal
- * @version 2.1.11
+ * @version 2.11.0
  */
 GenerationResult spec_error(entropic_error_t code, std::string msg) {
+    logger->error("Speculative decode failed ({}): {}",
+                  entropic_error_name(code), msg);
     GenerationResult r;
     r.error_code = code;
     r.error_message = std::move(msg);

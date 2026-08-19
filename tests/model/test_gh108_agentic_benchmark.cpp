@@ -86,6 +86,7 @@ struct TurnResult {
     std::string tool_name;
     std::string content;
     int error_code = 0;
+    std::string error_message;
     std::string finish_reason;
 };
 
@@ -273,6 +274,7 @@ TurnResult run_turn(ModelOrchestrator& orch, std::vector<entropic::Message>& con
     tr.decode_tok_s = r.throughput_tok_s;
     tr.content = r.content;
     tr.error_code = r.error_code;
+    tr.error_message = r.error_message;
     tr.finish_reason = r.finish_reason;
 
     entropic::Message assistant;
@@ -305,8 +307,21 @@ TurnResult run_turn(ModelOrchestrator& orch, std::vector<entropic::Message>& con
     // narrative preamble) is a legitimate, well-behaved response — content
     // is correctly empty in that case (the answer lives in tool_calls, not
     // content). Only flag a turn that produced neither, after retries.
-    CHECK(r.error_code == 0);
-    CHECK_FALSE((r.content.empty() && r.tool_calls.empty()));
+    // gh#142: ENTROPIC_ERROR_LOAD_FAILED here means the device could not
+    // satisfy an allocation this config needs — measured case: the MTP head's
+    // context wanted 1222 MiB of COMPUTE BUFFERS (graph reservation scratch)
+    // that no pre-flight estimate can predict, because the size depends on
+    // model internals the estimate deliberately does not read. The engine
+    // reported it as a typed error instead of aborting, which is the whole
+    // point of the gh#142 work. Recording "this config does not fit this
+    // device" is the honest result; asserting error_code == 0 would be
+    // asserting something false about the HARDWARE, not about the code.
+    // Every OTHER error code is still a real failure and still asserted.
+    const bool resource_refusal = (r.error_code == ENTROPIC_ERROR_LOAD_FAILED);
+    if (!resource_refusal) {
+        CHECK(r.error_code == 0);
+        CHECK_FALSE((r.content.empty() && r.tool_calls.empty()));
+    }
     return tr;
 }
 
@@ -424,12 +439,17 @@ void print_report(const char* config_label, long vram_mb,
         std::printf(
             "-- %s --\n"
             "  tokens=%d wall_ms=%.1f decode_tok/s=%.2f tool_called=%s%s%s finish=%s\n"
+            "%s%s%s"
             "  content:\n%s\n",
             t.label.c_str(), t.tokens, t.wall_ms, t.decode_tok_s,
             t.tool_called ? "YES(" : "no",
             t.tool_called ? t.tool_name.c_str() : "",
             t.tool_called ? ")" : "",
             t.finish_reason.c_str(),
+            // A failed turn without its reason is an unactionable data point.
+            t.error_message.empty() ? "" : "  error: ",
+            t.error_message.c_str(),
+            t.error_message.empty() ? "" : "\n",
             t.content.c_str());
     }
 }
@@ -497,6 +517,22 @@ TEST_CASE("gh#108 agentic benchmark: full 24-config permutation matrix "
         long vram = query_vram_used_mb();
         auto stats = run_agentic_script(*ctx.orchestrator, tier);
         print_report(cfg.label.c_str(), vram, stats);
+
+        // gh#142: every turn refused for resources means the config did not fit
+        // this device at run time, despite passing the pre-flight estimate.
+        // Counted with the configs that failed the pre-check, not measured.
+        const bool refused = !stats.empty()
+            && std::all_of(stats.begin(), stats.end(), [](const TurnResult& t) {
+                   return t.error_code == ENTROPIC_ERROR_LOAD_FAILED;
+               });
+        if (refused) {
+            std::printf("[fit] %-32s DOES NOT FIT AT RUN TIME — the estimate "
+                        "admitted it but the device refused an allocation. "
+                        "See the 'error:' line above.\n", cfg.label.c_str());
+            ++did_not_fit;
+            --measured;
+            continue;
+        }
         double avg = avg_decode_tok_s(stats);
         int quality = score_config(stats);
         summaries.push_back({cfg.label, vram, avg, quality});
