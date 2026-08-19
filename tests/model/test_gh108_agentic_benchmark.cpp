@@ -144,7 +144,14 @@ int fit_context_length(const entropic::ModelConfig& tier, const BenchConfig& cfg
     in.context_length = kDesiredContext;
     in.cache_type_k = tier.cache_type_k;
     in.cache_type_v = tier.cache_type_v;
-    in.vram_reserve_mb = 512;
+    // gh#142: NOT the 512 MiB default. recommend_context_length returns the
+    // LARGEST context that fits, so whatever reserve it is given is the only
+    // headroom left — and llama.cpp's per-context compute buffers, which the
+    // estimate cannot price, measured 1030-2354 MiB in this very benchmark.
+    // Budgeting 512 meant aiming to consume the entire card and then failing
+    // on the graph reservation. Size the reserve from the measured worst case
+    // so the fit scales to a context with real headroom instead.
+    in.vram_reserve_mb = 2560;
     const int fits = entropic::recommend_context_length(in, available);
     std::printf("[fit] %-32s weights=%.2f GiB free=%.2f GiB -> context=%d%s\n",
                 cfg.label.c_str(),
@@ -153,6 +160,24 @@ int fit_context_length(const entropic::ModelConfig& tier, const BenchConfig& cfg
                 fits,
                 fits == kDesiredContext ? " (full 128k)" : " (reduced to fit)");
     return fits;
+}
+
+/**
+ * @brief Halve a config's context in place for a retry after a refusal.
+ *
+ * gh#142: the estimate cannot price compute buffers, so its first answer can be
+ * too generous. Halving is empirical rather than derived — it needs no model
+ * metadata, and one step usually clears the ~1-2 GiB the estimate missed.
+ *
+ * @param ctx Test context whose tier is re-pointed.
+ * @param tier_name Tier to adjust.
+ * @return The new context length.
+ * @version 2.11.0
+ */
+int halve_context(ModelTestContext& ctx, const std::string& tier_name) {
+    auto& tier = ctx.config.models.tiers[tier_name];
+    tier.context_length /= 2;
+    return tier.context_length;
 }
 
 // Builds a tier for one config. Context is sized to the device (gh#142);
@@ -518,17 +543,43 @@ TEST_CASE("gh#108 agentic benchmark: full 24-config permutation matrix "
         auto stats = run_agentic_script(*ctx.orchestrator, tier);
         print_report(cfg.label.c_str(), vram, stats);
 
-        // gh#142: every turn refused for resources means the config did not fit
-        // this device at run time, despite passing the pre-flight estimate.
-        // Counted with the configs that failed the pre-check, not measured.
+        // gh#142: a resource refusal is NOT a verdict on the config. The
+        // estimate cannot price compute buffers (measured 1030-2354 MiB per
+        // context against a 512 MiB default reserve), so it can hand back a
+        // context the device then refuses. The honest response is to back off
+        // and measure what DOES run, not to declare the config unfittable —
+        // it fits at a smaller context, and on a less contended card it may
+        // fit at the original one.
         const bool refused = !stats.empty()
             && std::all_of(stats.begin(), stats.end(), [](const TurnResult& t) {
                    return t.error_code == ENTROPIC_ERROR_LOAD_FAILED;
                });
         if (refused) {
-            std::printf("[fit] %-32s DOES NOT FIT AT RUN TIME — the estimate "
-                        "admitted it but the device refused an allocation. "
-                        "See the 'error:' line above.\n", cfg.label.c_str());
+            const int retry_ctx = halve_context(ctx, tier);
+            if (retry_ctx >= kMinUsefulContext) {
+                std::printf("[fit] %-32s refused at ctx=%d — retrying at %d\n",
+                            cfg.label.c_str(), fitted, retry_ctx);
+                if (!init_orchestrator_full_ctx(ctx)) {
+                    spdlog::error("re-init failed for {}", cfg.label);
+                    ++did_not_fit;
+                    --measured;
+                    continue;
+                }
+                vram = query_vram_used_mb();
+                stats = run_agentic_script(*ctx.orchestrator, tier);
+                print_report(cfg.label.c_str(), vram, stats);
+            }
+        }
+        const bool still_refused = !stats.empty()
+            && std::all_of(stats.begin(), stats.end(), [](const TurnResult& t) {
+                   return t.error_code == ENTROPIC_ERROR_LOAD_FAILED;
+               });
+        if (still_refused) {
+            std::printf("[fit] %-32s could not be measured: the device refused "
+                        "its allocations even after backing off. Free VRAM is "
+                        "sampled once and other processes share this card, so "
+                        "this is a reading of THIS run, not a verdict on the "
+                        "config.\n", cfg.label.c_str());
             ++did_not_fit;
             --measured;
             continue;
