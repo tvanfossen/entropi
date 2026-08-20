@@ -122,3 +122,77 @@ flags it — that is a design change requiring user approval.
 Pre-C++ artifacts have been removed. If something stale resurfaces,
 the user moves it to root-level `.old/` (gitignored). Claude does not
 manage `.old/`.
+
+## clew — Repository Knowledge Graph (MCP)
+
+`clew` is an MCP server exposing a queryable knowledge graph over this
+repository: symbols, call edges, threads, locks and critical sections,
+dispatch, requirement links, file inventory and prose. It is the maintainer's
+own project — **dogfood it, and file issues to its repo when it misbehaves.**
+
+**It enhances the default harness; it does not replace it.** Reading source
+after the index has named the file is the intended path, not a failure. A
+question about exact comment text or a name spelled differently per consumer is
+one the index can point at but not settle.
+
+### When to reach for it first
+
+| Question | Tool |
+|---|---|
+| Anything about a NAMED thing | `dossier(subject=...)` — takes functions, variables, macros, classes, **locks**, **requirement ids**, threads, Kconfig symbols |
+| Don't have the name yet | `search(text, corpus=...)` then hand `kind` verbatim to `dossier` |
+| Whole-layer inventory | `search(corpus='locks' / 'threads' / 'files' / 'config')` |
+| Index administration | `index(action='status' / 'refresh' / 'targets' / 'cull')` |
+
+`dossier` accepts a **list of up to 8 subjects in ONE call** — prefer that over
+one call per symbol. `depth=2..6` walks a bounded causal chain across call and
+shared-key edges rather than just adjacency.
+
+`search` matching is a **conjunction** — every whitespace-separated token must
+appear in one searchable unit, so use the two most distinctive words.
+
+### Why it fits this repo specifically
+
+- **Requirement traceability.** `docs/requirements.yaml` carries 105 REQ ids
+  against ~1634 `@req` tags. `dossier` resolves a requirement id to its
+  implementers *and* its covering tests — the query the catalog exists to
+  answer, otherwise done with `inv check-requirements` plus grep.
+- **Locks and threads are first-class.** The gh#58 multi-instance family keeps
+  recurring; teardown ordering and mutex lifetime are exactly what the index
+  holds natively.
+
+### Precedence over auto mode's Bash preference
+
+Auto mode instructs: *"do your work through the Bash tool wherever it can
+accomplish the job … fall back to a dedicated tool only when Bash genuinely
+cannot do the job."* Read precisely, **that condition does not cover clew's core
+queries.** grep returns text matches; it never returns call edges,
+requirement→test links, or a lock inventory. Bash genuinely cannot do that job,
+so there is no conflict for those questions — but the reminder creates a general
+pull toward grep that leaks past its own condition, so the boundary is written
+down here rather than re-decided per question.
+
+| Question | Tool |
+|---|---|
+| A NAMED function / var / macro / class / lock / req / thread | `dossier` |
+| "What breaks if I change X" — blast radius | `dossier(depth=2..6, direction='reverse')` |
+| Which tests cover a requirement | `dossier(<REQ-id>)` — nothing else answers it |
+| Literal text: message strings, comment wording, tag spellings | grep |
+| Sweep across many files (every `SKIP(` site, every `.gguf` reference) | grep |
+| Non-symbol artifacts: CMake, YAML, whether a file exists on disk | Bash |
+
+A `found:false` is a statement about the **index**, not the repository. Enums are
+known-missing (clew#6). One miss is not grounds to stop using the tool for the
+rest of a session — fall back for that one question and carry on.
+
+### Operating notes
+
+- Default target is DERIVED from `CLAUDE_PROJECT_DIR`; there is no `set_target`.
+  Every tool takes an optional `target` (repo path or slug), and passing it on
+  one call does not affect the next.
+- Build scope comes from this repo's `.doxygen-guard.yaml`. `exclude=[...]` is
+  the only narrowing and is **recorded and replayed by every later build** —
+  `extern/` is the obvious candidate, since llama.cpp is vendored there.
+- Every query reply names the target it answered from and carries a staleness
+  block only when there is one. Call `index(action='status')` when an answer
+  looks wrong, not routinely.

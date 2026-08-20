@@ -542,6 +542,7 @@ void LlamaCppBackend::init_mmproj_if_configured() {
  *       already-locked generate_mtp→setup_mtp_draft rebuild path, so locking
  *       here would self-deadlock. Callers that race generate_mtp
  *       (do_deactivate/do_unload) hold mtp_mutex_ around the call instead.
+ * @req REQ-INFER-002
  * @internal
  * @version 2.9.1
  */
@@ -558,6 +559,23 @@ void LlamaCppBackend::teardown_mtp_draft() {
 }
 
 /**
+ * @brief Draft-window size setup_mtp_draft will actually use (gh#106).
+ *
+ * setup_mtp_draft normalises a non-positive n_max to 16. The envelope check
+ * must apply the SAME normalisation or it validates a number the engine never
+ * uses.
+ *
+ * @param n_max Requested window, possibly non-positive.
+ * @return The effective window size.
+ * @req REQ-INFER-015
+ * @version 2.11.0
+ * @internal
+ */
+static int effective_n_draft(int n_max) {
+    return (n_max > 0) ? n_max : 16;
+}
+
+/**
  * @brief Lazily build the MTP head context against the live ctx_ (gh#106).
  *
  * Mirrors the server's separate-head branch (server-context.cpp:944-956):
@@ -568,10 +586,10 @@ void LlamaCppBackend::teardown_mtp_draft() {
  * matches head_path; otherwise tears the stale head down and rebuilds.
  *
  * @internal
- * @version 2.9.0
+ * @version 2.11.0
  */
 bool LlamaCppBackend::setup_mtp_draft(const std::string& head_path, int n_max) {
-    mtp_n_max_ = (n_max > 0) ? n_max : 16;
+    mtp_n_max_ = effective_n_draft(n_max);
     if (mtp_draft_ctx_ != nullptr && mtp_head_path_ == head_path) {
         return true;  // live head already bound to this ctx_
     }
@@ -708,7 +726,7 @@ void LlamaCppBackend::reload_model_cpu_only() {
  * On a second handle's GPU model load, llama.cpp's CUDA pool then
  * failed because the prior buffers were still allocated.
  *
- * @internal
+ * @req REQ-INFER-002
  * @version 2.2.8
  */
 LlamaCppBackend::~LlamaCppBackend() {
@@ -757,7 +775,14 @@ void LlamaCppBackend::inject_sampler_factory_for_test(
 
 /**
  * @brief Full unload — free all resources, clear prompt cache.
- * @internal
+ *
+ * Frees in borrow order (MTP head → sampler factory → tokenizer → mtmd →
+ * ctx_ → model_) so no borrow ever outlives what it points into, and is a
+ * safe no-op after a failed load. A leaked llama.cpp allocation stays
+ * visible to CUDA's pool as stale-but-occupied, which is what makes a
+ * second engine handle in the same process fail its GPU model load.
+ *
+ * @req REQ-INFER-002
  * @version 2.10.4
  */
 void LlamaCppBackend::do_unload() {
@@ -1119,8 +1144,14 @@ static ToolCall to_entropic_tool_call(const common_chat_tool_call& cc) {
  * @param messages Conversation history.
  * @param params Generation parameters (enable_thinking honored).
  * @param tools Tool defs for `inputs.tools` (empty for the legacy path).
- * @return Rendered params, or nullopt on any failure.
- * @utility
+ * @param require_tool_call Tier's mandatory-tool flag; selects
+ *        COMMON_CHAT_TOOL_CHOICE_REQUIRED (which makes upstream derive the
+ *        tool-call grammar eagerly) over AUTO.
+ * @return Rendered params carrying .prompt plus, on the tools path, the
+ *         .format / .generation_prompt / .parser / .grammar the later parse
+ *         and sampler need; nullopt when the model is unloaded, the template
+ *         cannot init, or apply throws.
+ * @req REQ-INFER-009
  * @version 2.10.4
  */
 static std::optional<common_chat_params> render_common_chat(
@@ -1212,8 +1243,9 @@ std::string LlamaCppBackend::apply_chat_template(
  *
  * @param messages Conversation history.
  * @param params Generation parameters.
- * @return Formatted prompt string.
- * @internal
+ * @return Formatted prompt string — the tooled render when tools are staged,
+ *         the legacy chat-template render otherwise.
+ * @req REQ-INFER-009
  * @version 2.7.0
  */
 std::string LlamaCppBackend::render_prompt(
@@ -1229,8 +1261,13 @@ std::string LlamaCppBackend::render_prompt(
 
 /**
  * @brief Stage tool defs for the next common_chat render (gh#87).
+ *
+ * Staging is what routes the next render through common_chat with
+ * `inputs.tools`, so the model is instructed in — and emits — its native
+ * tool-call wire format instead of a prompt-injected convention.
+ *
  * @param tools_json MCP tool-list JSON array.
- * @utility
+ * @req REQ-INFER-009
  * @version 2.7.0
  */
 void LlamaCppBackend::set_active_tools(const std::string& tools_json) {
@@ -1245,11 +1282,20 @@ void LlamaCppBackend::set_active_tools(const std::string& tools_json) {
  * Captures the rendered params (format/generation_prompt/parser) so
  * parse_response can decode the emission. See header for contract.
  *
+ * Writes BOTH captures. The LIVE one (last_*) is overwritten by every
+ * render including a toolless interleave, and answers "what did THIS render
+ * produce" for close-marker selection. The STICKY one (parse_*) is written
+ * only here, by a successful tooled render, and is never cleared by a
+ * toolless one — gh#105: a constitutional validator's critique render
+ * otherwise clobbered the parser arena and the main call extracted zero
+ * tool calls.
+ *
  * @param messages Conversation history.
  * @param params Generation parameters.
- * @return Formatted prompt string.
- * @internal
- * @version 2.10.4
+ * @return Formatted prompt string; the low-level template render when
+ *         common_chat could not be applied (no capture is written then).
+ * @req REQ-INFER-009
+ * @version 2.10.6
  */
 std::string LlamaCppBackend::render_with_tools(
     const std::vector<Message>& messages,
@@ -1279,9 +1325,40 @@ std::string LlamaCppBackend::render_with_tools(
         tool_grammar_lazy_ = rendered->grammar_lazy;
         prompt = rendered->prompt;
         logger->info("render_with_tools: format={}, {} tool(s), captured "
-                     "parser ({} bytes)", last_chat_format_, tools.size(),
-                     last_parser_.size());
+                     "parser ({} bytes), grammar ({} bytes, lazy={})",
+                     last_chat_format_, tools.size(), last_parser_.size(),
+                     tool_grammar_.size(), tool_grammar_lazy_);
+        // gh#138: the silent failure a consumer cannot see. A tier asking for
+        // tool_choice=REQUIRED whose render yields no grammar is unconstrained
+        // — the flag is set, tools are staged, and nothing enforces the call.
+        // Loud, because the alternative is what gh#138 actually experienced:
+        // prose-only turns with no diagnostic anywhere.
+        if (require_tool_call_ && tool_grammar_.empty()) {
+            logger->error(
+                "require_tool_call is set for this tier but the chat template "
+                "derived NO tool-call grammar from {} staged tool(s) "
+                "(format={}). The turn will decode unconstrained and may end "
+                "in prose with no tool call. This template may not support "
+                "tool_choice=REQUIRED.",
+                tools.size(), last_chat_format_);
+        }
     } else {
+        // gh#137: this fallback CANNOT honor enable_thinking — the low-level
+        // llama_chat_apply_template API has no slot for it. Saying so is the
+        // difference between a diagnosable config problem and a mystery: a
+        // tier that set enable_thinking:false still reasons here, and on
+        // gemma4 the whole generation can be one unterminated <|channel>
+        // block, which the reasoning strip then correctly reduces to zero
+        // characters. The consumer sees "0 chars, 0 tool calls" and no cause.
+        if (!params.enable_thinking) {
+            logger->warn(
+                "Falling back to the low-level chat template, which cannot "
+                "honor enable_thinking:false — this tier WILL still emit "
+                "reasoning, and a generation that is entirely reasoning is "
+                "stripped to empty content. The jinja render was unavailable "
+                "for this turn (no tools staged, or the template could not be "
+                "applied).");
+        }
         prompt = apply_chat_template_lowlevel(messages);
     }
     return prompt;
@@ -1310,8 +1387,8 @@ bool LlamaCppBackend::common_chat_parse_reliable() const {
  * @brief Tool-call close marker for the captured chat format (gh#103). See
  *        the header + tool_call_markers.h. "" when no tool render captured
  *        params (no format) or the format has no confirmed per-call marker.
- * @return Close marker, or "".
- * @utility
+ * @return Close marker derived from the format THIS render resolved, or "".
+ * @req REQ-INFER-013
  * @version 2.8.2
  */
 std::string LlamaCppBackend::tool_call_close_marker() const {
@@ -1328,9 +1405,16 @@ std::string LlamaCppBackend::tool_call_close_marker() const {
  * Called post-render by each decode body so the marker reflects THIS
  * generation's captured format (the live capture). append_sequential_stop is
  * a no-op unless params.tool_call_mode == "sequential".
+ *
+ * gh#103 originally injected the marker PRE-render off the previous or empty
+ * format, so it never fired on the call it was configured for.
+ *
  * @param params Generation params.
- * @return Effective stop list.
- * @utility
+ * @return params.stop plus this render's close marker in sequential mode
+ *         (deduped against a caller-supplied stop); params.stop unchanged
+ *         otherwise. The marker is a stop only — it stays in the generated
+ *         content so common_chat still sees a complete call block.
+ * @req REQ-INFER-013
  * @version 2.8.3
  */
 std::vector<std::string> LlamaCppBackend::effective_stop(
@@ -1368,7 +1452,7 @@ std::vector<std::string> LlamaCppBackend::effective_stop(
  * @param content [in,out] Content to clean (channel spans removed in place).
  * @param reasoning_out [in,out,nullable] Accumulates the stripped reasoning text.
  * @utility
- * @version 2.9.4
+ * @version 2.11.0
  */
 void strip_thinking_channels(std::string& content, std::string* reasoning_out) {
     static const std::string kOpen = "<|channel>";
@@ -1395,11 +1479,12 @@ void strip_thinking_channels(std::string& content, std::string* reasoning_out) {
         content.erase(0, nb == std::string::npos ? content.size() : nb);
     }
     if (truncated_unclosed && content.empty()) {
-        logger->warn("strip_thinking_channels: generation hit max_tokens "
-                     "while still inside a <|channel> reasoning block — no "
-                     "answer was ever produced, so content is empty (not a "
-                     "parse error). Raise max_tokens or investigate why this "
-                     "config/prompt doesn't converge within budget.");
+        logger->warn("strip_thinking_channels: a <|channel> reasoning block "
+                     "was never closed, so the strip removed the whole "
+                     "generation and content is empty. Not a parse error. The "
+                     "orchestrator reports whether this was a token budget or "
+                     "the model ending its own turn — only it holds "
+                     "finish_reason. gh#137.");
     }
 }
 
@@ -1416,8 +1501,9 @@ void strip_thinking_channels(std::string& content, std::string* reasoning_out) {
  * gh#106 (v2.9.0): strips Gemma 4 QAT `<|channel>` reasoning into reasoning_content.
  *
  * @param raw Raw model output (assistant turn only).
- * @return Parsed tool calls + cleaned content + reasoning.
- * @internal
+ * @return Parsed tool calls + cleaned content + reasoning; when no render
+ *         ever captured params, the raw text as content with no calls.
+ * @req REQ-INFER-009
  * @version 2.9.0
  */
 LlamaCppBackend::CommonChatResult LlamaCppBackend::parse_response(
@@ -1646,9 +1732,13 @@ GenerationResult LlamaCppBackend::decode_loop(
  * @param sampler Per-request sampler (carries its grammar).
  * @param params Generation parameters (max_tokens, stop).
  * @param on_token Streaming callback (empty for batch).
- * @param cancel Cancel flag (nullptr for batch).
- * @return GenerationResult with content/finish_reason/token_count.
- * @internal
+ * @param cancel Cancel flag (nullptr for batch, and NULL means "never
+ *        cancel"); polled once per decode iteration, so cancellation
+ *        latency is one token.
+ * @return GenerationResult with content/finish_reason/token_count;
+ *         finish_reason "cancelled" and ENTROPIC_ERROR_CANCELLED when the
+ *         flag was observed set, "stop"/"length"/"error" otherwise.
+ * @req REQ-INFER-005
  * @version 2.10.4
  */
 GenerationResult LlamaCppBackend::generate_after_prefill(
@@ -2501,7 +2591,13 @@ entropic_error_t LlamaCppBackend::mtmd_prefill(
  * body of both text-only generation variants but factored out so
  * generate_multimodal can reuse it after mtmd_prefill.
  *
- * @internal
+ * @param params Generation parameters (max_tokens, stop).
+ * @param on_token Streaming callback (empty for buffered).
+ * @param cancel Cancel flag, polled per iteration; nullptr means never.
+ * @param t0 Start timestamp used to stamp timings on the result.
+ * @return GenerationResult; finish_reason "cancelled" with
+ *         ENTROPIC_ERROR_CANCELLED when the flag was observed set.
+ * @req REQ-INFER-005
  * @version 2.8.3
  */
 GenerationResult LlamaCppBackend::run_sampling_loop(
@@ -2545,7 +2641,17 @@ GenerationResult LlamaCppBackend::run_sampling_loop(
 
 /**
  * @brief Multimodal generation core (v2.1.8, gh#37 / v1.9.11 Phase 6).
- * @internal
+ *
+ * The mtmd prefill mutates seq 0 out of band, so the warm-keep resident
+ * record is invalidated before it runs.
+ *
+ * @param messages Conversation history carrying image content parts.
+ * @param params Generation parameters.
+ * @param on_token Per-token callback (may be empty).
+ * @param cancel Cancel flag, polled per token; nullptr means never.
+ * @return GenerationResult; ENTROPIC_ERROR_IMAGE_LOAD_FAILED when a bitmap
+ *         could not be built, or the prefill's own error code.
+ * @req REQ-INFER-025
  * @version 2.7.5
  */
 GenerationResult LlamaCppBackend::generate_multimodal(
@@ -2697,7 +2803,16 @@ GenerationResult LlamaCppBackend::do_generate(
  * poll inside the decode loop. See its docs for the prefill / sampler
  * contract.
  *
- * @internal
+ * gh#81 (v2.4.2) added this overload because the non-streaming path
+ * previously ran to max_tokens with no way to honour an interrupt —
+ * measured at roughly 60s of lag on a 13B model at default max_tokens.
+ *
+ * @param messages Conversation history.
+ * @param params Generation parameters.
+ * @param cancel Cancel flag, polled once per decoded token.
+ * @return GenerationResult; finish_reason "cancelled" with
+ *         ENTROPIC_ERROR_CANCELLED when the flag was observed set.
+ * @req REQ-INFER-005
  * @version 2.8.3
  */
 GenerationResult LlamaCppBackend::do_generate_text_only(
@@ -2781,7 +2896,13 @@ GenerationResult LlamaCppBackend::do_generate_streaming(
 
 /**
  * @brief Text-only streaming body (v2.1.8, extracted for knots SLOC).
- * @internal
+ * @param messages Conversation history.
+ * @param params Generation parameters.
+ * @param on_token Per-token callback.
+ * @param cancel Cancel flag, polled once per decoded token.
+ * @return GenerationResult; finish_reason "cancelled" with
+ *         ENTROPIC_ERROR_CANCELLED when the flag was observed set.
+ * @req REQ-INFER-005
  * @version 2.8.3
  */
 GenerationResult LlamaCppBackend::do_generate_streaming_text_only(
@@ -2861,24 +2982,26 @@ GenerationResult LlamaCppBackend::do_generate_speculative(
 namespace {
 
 /**
- * @brief Map entropic GenerationParams → common_params_sampling.
+ * @brief Resolve which grammar constrains this decode and apply it.
  *
- * The speculative path uses common_sampler (not llama_sampler) so it
- * can call common_sampler_sample_and_accept_n. Sampler config flows
- * through entropic's GenerationParams.
+ * Extracted from to_common_sampling to keep that function inside the knots
+ * SLOC/ABC gate once gh#138 added the tool-grammar observables.
  *
- * @param params Entropic generation params.
- * @return Populated common_params_sampling.
+ * @param cps Sampling params (mutated).
+ * @param params Incoming generation params (carries a request grammar).
+ * @param tool_grammar GBNF the render derived from the staged tool schemas.
+ * @param tool_grammar_lazy Whether that grammar arms on a trigger.
+ * @param generation_prompt Render prefill, required by the TOOL_CALLS type.
+ * @req REQ-INFER-008
+ * @version 2.10.5
  * @internal
- * @version 2.10.4
  */
-common_params_sampling to_common_sampling(
+static void apply_grammar_source(
+    common_params_sampling& cps,
     const GenerationParams& params,
     const std::string& tool_grammar,
     bool tool_grammar_lazy,
     const std::string& generation_prompt) {
-    common_params_sampling cps;
-    cps.temp = params.temperature;
     // gh#108 (v2.10.0): propagate GBNF grammar to the MTP sampler chain so
     // grammar-constrained tiers are correctly enforced under speculative.mtp.
     //
@@ -2916,7 +3039,64 @@ common_params_sampling to_common_sampling(
         // content rather than as a grammar error. Measured exactly that on
         // gemma4 before this line existed.
         cps.generation_prompt = generation_prompt;
+        // gh#138: the ONLY observable that the tool-call grammar is in force.
+        // The orchestration line reports params.grammar, which is the REQUEST
+        // grammar — it prints "unconstrained" even when this grammar is
+        // active, so a consumer reading logs cannot tell the difference
+        // between "tool grammar applied" and "nothing constrained the
+        // decode". INFO, not DEBUG: this is the diagnostic that would have
+        // answered gh#138 from the reporter's own logs.
+        logger->info(
+            "Tool-call grammar applied: {} bytes, lazy={}, prefill={} bytes",
+            tool_grammar.size(), tool_grammar_lazy,
+            generation_prompt.size());
+    } else if (!tool_grammar.empty()) {
+        // Tools were staged and a grammar derived, but the request grammar
+        // won the precedence rule — say so rather than letting the tool
+        // grammar vanish silently.
+        logger->warn(
+            "Tool-call grammar ({} bytes) NOT applied — an explicit request "
+            "grammar takes precedence. Tool calls are not structurally "
+            "enforced this turn.",
+            tool_grammar.size());
     }
+}
+
+/**
+ * @brief Map entropic GenerationParams → common_params_sampling.
+ *
+ * The speculative path uses common_sampler (not llama_sampler) so it
+ * can call common_sampler_sample_and_accept_n. Sampler config flows
+ * through entropic's GenerationParams.
+ *
+ * The chain this produces must mirror the plain path's stage order and
+ * gating exactly (LlamaCppSamplerFactory::create), or speculative output
+ * stops being distribution-identical to plain decode. It is also the
+ * speculative half of grammar-source resolution: request beats tool-call,
+ * a collision is logged at ERROR here rather than silently resolved, and
+ * the tool-call grammar is applied as COMMON_GRAMMAR_TYPE_TOOL_CALLS with
+ * generation_prompt prefilled — never as _USER.
+ *
+ * @param params Entropic generation params.
+ * @param tool_grammar Render-derived tool-call GBNF ("" when none).
+ * @param tool_grammar_lazy Whether the tool grammar arms on trigger.
+ * @param generation_prompt Render prefill, required by the TOOL_CALLS type.
+ * @return Populated common_params_sampling carrying the winning grammar (if
+ *         any) plus every sampler knob, gated so defaults leave the chain
+ *         shape unchanged.
+ * @req REQ-INFER-006
+ * @req REQ-INFER-008
+ * @version 2.10.4
+ */
+common_params_sampling to_common_sampling(
+    const GenerationParams& params,
+    const std::string& tool_grammar,
+    bool tool_grammar_lazy,
+    const std::string& generation_prompt) {
+    common_params_sampling cps;
+    cps.temp = params.temperature;
+    apply_grammar_source(cps, params, tool_grammar, tool_grammar_lazy,
+                         generation_prompt);
     cps.top_k = params.top_k;
     cps.top_p = params.top_p;
     cps.penalty_repeat = params.repeat_penalty;
@@ -2995,10 +3175,23 @@ bool spec_prefill_minus_last(
 
 /**
  * @brief Build an error result for kernel-level failures.
+ *
+ * v2.11.0: this now LOGS. It previously packed the message into the result and
+ * returned, so a speculative failure was invisible in the logs — the caller got
+ * finish=error with empty content and nothing anywhere said why. Found while
+ * diagnosing an MTP config that failed every turn with LOAD_FAILED and produced
+ * not one line of explanation. A typed error the operator cannot see is only
+ * half of failing loudly.
+ *
+ * @param code Error code for the result.
+ * @param msg Human-readable cause; logged and returned.
+ * @return The populated error result.
  * @internal
- * @version 2.1.11
+ * @version 2.11.0
  */
 GenerationResult spec_error(entropic_error_t code, std::string msg) {
+    logger->error("Speculative decode failed ({}): {}",
+                  entropic_error_name(code), msg);
     GenerationResult r;
     r.error_code = code;
     r.error_message = std::move(msg);
@@ -4017,8 +4210,19 @@ GenerationResult mtp_run_from_tokens(
  * existed for. gh#108 (v2.9.4): temperature is NO LONGER guarded — the MTP
  * draft proposal is a deterministic point mass (see mtp_envelope.h), so the
  * existing exact-match accept step is already lossless at any temperature.
- * @internal
- * @version 2.9.4
+ *
+ * @param params Generation params for the request.
+ * @param on_token Streaming callback (bound-ness is the streaming signal).
+ * @param head_path MTP head GGUF path.
+ * @param n_max Draft window size.
+ * @return An ENTROPIC_OK result meaning "proceed"; otherwise a typed loud
+ *         error — INVALID_STATE (target not ACTIVE),
+ *         SPECULATIVE_INCOMPATIBLE_CONFIG (outside the envelope, or
+ *         n_draft+1 over n_batch naming both numbers and the corrective
+ *         knob), or LOAD_FAILED (head GGUF would not load). Never a signal
+ *         to fall back to plain decode.
+ * @req REQ-INFER-015
+ * @version 2.11.0
  */
 GenerationResult LlamaCppBackend::mtp_guard(
     const GenerationParams& params,
@@ -4033,13 +4237,26 @@ GenerationResult LlamaCppBackend::mtp_guard(
                        "MTP requires an ACTIVE target");
     } else if (!reason.empty()) {
         r = spec_error(ENTROPIC_ERROR_SPECULATIVE_INCOMPATIBLE_CONFIG, reason);
-    } else if (!setup_mtp_draft(head_path, n_max)) {
-        r = spec_error(ENTROPIC_ERROR_LOAD_FAILED, last_error_);
-    } else if (1 + mtp_n_max_ > llama_n_batch(ctx_)) {
+    } else if (1 + effective_n_draft(n_max) > llama_n_batch(ctx_)) {
+        // Bound-check BEFORE setup_mtp_draft allocates. Ordering this the
+        // other way made the guard's ANSWER depend on process history: an
+        // out-of-envelope window (e.g. n_draft=100000) is still handed to
+        // setup_mtp_draft, whose allocation SUCCEEDS in a fresh process —
+        // so the guard fell through and returned the correct
+        // SPECULATIVE_INCOMPATIBLE_CONFIG — but FAILS after a prior MTP
+        // session, returning LOAD_FAILED for the same config. Same input,
+        // two different typed errors, decided by allocator state. Measured
+        // as `5 == 54` when a second MTP case ran in one process.
+        //
+        // Must use the same normalisation setup_mtp_draft applies, or the
+        // check disagrees with the value actually used.
         r = spec_error(ENTROPIC_ERROR_SPECULATIVE_INCOMPATIBLE_CONFIG,
-            "speculative.n_draft+1 (" + std::to_string(1 + mtp_n_max_)
+            "speculative.n_draft+1 ("
+            + std::to_string(1 + effective_n_draft(n_max))
             + ") exceeds n_batch (" + std::to_string(llama_n_batch(ctx_))
             + "); reduce n_draft or raise n_batch");
+    } else if (!setup_mtp_draft(head_path, n_max)) {
+        r = spec_error(ENTROPIC_ERROR_LOAD_FAILED, last_error_);
     }
     return r;
 }
@@ -4051,7 +4268,17 @@ GenerationResult LlamaCppBackend::mtp_guard(
  * deactivate/unload teardown cannot free mtp_draft_ctx_ mid-flight (gh#58 UAF).
  * Fails loudly (no plain-decode fallback) when the request is outside the MTP
  * envelope — see mtp_guard / mtp_unsupported_reason.
- * @internal
+ *
+ * @param messages Conversation history.
+ * @param params Generation parameters.
+ * @param on_token Per-accepted-token callback (may be empty).
+ * @param cancel Cancel flag, polled per accept round.
+ * @param head_path MTP head GGUF path.
+ * @param n_max Draft window size.
+ * @return The MTP kernel's result, or the guard's typed error verbatim —
+ *         this route owns the outcome and never degrades to plain decode.
+ * @req REQ-INFER-015
+ * @req REQ-INFER-005
  * @version 2.10.4
  */
 GenerationResult LlamaCppBackend::generate_mtp(
@@ -4123,9 +4350,17 @@ bool LlamaCppBackend::is_recurrent() const {
 
 /**
  * @brief Declare llama.cpp backend capabilities.
+ *
+ * `_COUNT` is load-bearing twice here: it rejects out-of-range values
+ * (including the sentinel itself) before the static table is indexed, and
+ * the table's length is pinned to it, so appending a capability without
+ * extending the table is a build-time failure rather than a read past the
+ * end.
+ *
  * @param cap Capability to check.
- * @return true if this backend supports the capability.
- * @internal
+ * @return true if this backend supports the capability; false for any index
+ *         outside [0, _COUNT).
+ * @req REQ-TYPE-004
  * @version 1.9.13
  */
 bool LlamaCppBackend::do_supports(BackendCapability cap) const {

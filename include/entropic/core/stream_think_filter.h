@@ -39,6 +39,7 @@ public:
      * @brief Construct with consumer callback.
      * @param cb Consumer token callback (receives filtered output).
      * @param ud Consumer user_data.
+     * @req REQ-LOOP-008
      * @version 2.0.1
      */
     StreamThinkFilter(TokenCallback cb, void* ud);
@@ -61,6 +62,7 @@ public:
      * @param ud Consumer user_data.
      * @param open_marker Reasoning-block opening delimiter.
      * @param close_marker Reasoning-block closing delimiter.
+     * @req REQ-LOOP-008
      * @version 2.10.3
      */
     StreamThinkFilter(TokenCallback cb, void* ud,
@@ -70,6 +72,7 @@ public:
      * @brief Set optional raw callback (receives ALL tokens unfiltered).
      * @param cb Raw callback.
      * @param ud Raw user_data.
+     * @req REQ-LOOP-008
      * @version 2.0.1
      */
     void set_raw_callback(TokenCallback cb, void* ud);
@@ -78,6 +81,7 @@ public:
      * @brief Process a chunk of tokens.
      * @param chunk Token data.
      * @param len Token byte length.
+     * @req REQ-LOOP-008
      * @version 2.0.1
      */
     void on_token(const char* chunk, size_t len);
@@ -88,6 +92,7 @@ public:
      * Call at end of generation to ensure no content is lost
      * in the tag accumulator.
      *
+     * @req REQ-LOOP-008
      * @version 2.0.1
      */
     void flush();
@@ -121,6 +126,7 @@ private:
      * @brief Emit bytes to consumer, buffering incomplete UTF-8 codepoints.
      * @param data Byte data to emit.
      * @param len Byte length.
+     * @req REQ-LOOP-008
      * @version 2.0.2
      */
     void emit_utf8_safe(const char* data, size_t len);

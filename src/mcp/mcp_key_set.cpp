@@ -49,10 +49,18 @@ bool MCPKeySet::revoke(const std::string& pattern) {
 
 /**
  * @brief Check if a specific tool is authorized at the required level.
+ *
+ * Levels are ordinal, so a key granting WRITE also satisfies a READ
+ * requirement but not the reverse — which is what makes ToolBase's
+ * WRITE default a genuine restriction on a READ-only key set.
+ *
  * @param tool_name Fully-qualified tool name.
- * @param required Minimum access level needed.
- * @return true if authorized.
- * @internal
+ * @param required Minimum access level needed, as declared by the tool.
+ * @return true when the best-matching granted key's level is at least
+ *         `required`; false otherwise, including when no key matches
+ *         (which resolves to NONE).
+ * @req REQ-MCP-010
+ * @req REQ-MCP-011
  * @version 1.9.4
  */
 bool MCPKeySet::has_access(const std::string& tool_name,
@@ -176,9 +184,15 @@ std::string MCPKeySet::server_wildcard(
 
 /**
  * @brief Find the best matching access level for a tool name.
+ *
+ * Most-specific-wins: exact tool name, then the server wildcard
+ * (`filesystem.*`), then the full wildcard (`*`).
+ *
  * @param tool_name Fully-qualified tool name.
- * @return Granted MCPAccessLevel, or NONE if no match.
- * @internal
+ * @return The granted MCPAccessLevel from the most specific matching
+ *         key; MCPAccessLevel::NONE when nothing matches — default-deny
+ *         once an identity is enforced.
+ * @req REQ-MCP-010
  * @version 1.9.4
  */
 MCPAccessLevel MCPKeySet::find_best_match(

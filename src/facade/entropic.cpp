@@ -68,7 +68,7 @@ static auto s_log = entropic::log::get("facade");
  * @param fn Body returning the natural success / error code.
  * @return `fn()`'s return value on no exception; mapped error code
  *         otherwise.
- * @utility
+ * @req REQ-ABI-002
  * @version 2.3.13
  */
 template <typename Fn>
@@ -100,7 +100,7 @@ static entropic_error_t c_api_try(entropic_handle_t handle, Fn&& fn) {
  *
  * @param src Source string (null-terminated).
  * @return Heap-allocated copy, or NULL on OOM.
- * @utility
+ * @req REQ-API-008
  * @version 2.0.1
  */
 static char* alloc_cstr(const char* src) {
@@ -115,7 +115,7 @@ static char* alloc_cstr(const char* src) {
  * @brief Allocate a C string copy from std::string.
  * @param src Source string.
  * @return Heap-allocated copy, or NULL on OOM.
- * @utility
+ * @req REQ-API-008
  * @version 2.0.1
  */
 static char* alloc_cstr(const std::string& src) {
@@ -144,7 +144,12 @@ static thread_local char s_pre_create_error[512] = "";
  * valid until the same thread reads again — matches the v1.8.0
  * contract documented in include/entropic/types/error.h.
  *
- * @utility
+ * @return Thread-local copy of this handle's last error message; the
+ *        empty string when there is none. Never NULL, never freed by
+ *        the caller.
+ * @req REQ-API-007
+ * @req REQ-API-003
+ * @req REQ-ABI-001
  * @version 2.2.6
  */
 extern "C" const char* entropic_last_error(entropic_handle_t handle) {
@@ -158,7 +163,7 @@ extern "C" const char* entropic_last_error(entropic_handle_t handle) {
  * @brief Check handle prerequisites for orchestrator APIs.
  * @param h Engine handle.
  * @return ENTROPIC_OK if valid, error code otherwise.
- * @internal
+ * @req REQ-API-005
  * @version 2.0.0
  */
 static entropic_error_t check_orchestrator(entropic_handle_t h) {
@@ -173,7 +178,7 @@ static entropic_error_t check_orchestrator(entropic_handle_t h) {
  * @brief Check handle prerequisites for MCP auth APIs.
  * @param h Engine handle.
  * @return ENTROPIC_OK if valid, error code otherwise.
- * @internal
+ * @req REQ-API-005
  * @version 2.0.0
  */
 static entropic_error_t check_mcp_auth(entropic_handle_t h) {
@@ -188,7 +193,7 @@ static entropic_error_t check_mcp_auth(entropic_handle_t h) {
  * @brief Check handle prerequisites for identity manager APIs.
  * @param h Engine handle.
  * @return ENTROPIC_OK if valid, error code otherwise.
- * @internal
+ * @req REQ-API-005
  * @version 2.0.0
  */
 static entropic_error_t check_identity(entropic_handle_t h) {
@@ -235,7 +240,9 @@ extern "C" {
  * Subsystem pointers remain null until entropic_configure().
  *
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-API-002
+ * @req REQ-API-003
+ * @req REQ-ABI-001
  * @version 2.0.2
  */
 entropic_error_t entropic_create(entropic_handle_t* handle) {
@@ -418,7 +425,7 @@ static void wire_external_interrupt(entropic_handle_t h) {
  * observers never miss tokens on a late-bound engine. (P0-1)
  *
  * @param h Engine handle with engine just constructed.
- * @utility
+ * @req REQ-API-010
  * @version 2.0.6-rc16
  */
 static void rewire_stream_observer(entropic_handle_t h) {
@@ -437,7 +444,7 @@ static void rewire_stream_observer(entropic_handle_t h) {
  * miss queue-consumption events on a late-bound engine.
  *
  * @param h Engine handle with engine just constructed.
- * @utility
+ * @req REQ-API-010
  * @version 2.1.10
  */
 static void rewire_queue_observer(entropic_handle_t h) {
@@ -456,7 +463,7 @@ static void rewire_queue_observer(entropic_handle_t h) {
  * survive engine construction AND streaming runs.
  *
  * @param h Engine handle with engine just constructed.
- * @utility
+ * @req REQ-API-010
  * @version 2.1.10
  */
 static void rewire_state_observer(entropic_handle_t h) {
@@ -476,7 +483,7 @@ static void rewire_state_observer(entropic_handle_t h) {
  * registered callbacks after every (re)construction.
  *
  * @param h Engine handle with validator just constructed (or NULL).
- * @utility
+ * @req REQ-API-010
  * @version 2.1.12
  */
 static void rewire_critique_callbacks(entropic_handle_t h) {
@@ -496,7 +503,7 @@ static void rewire_critique_callbacks(entropic_handle_t h) {
  * under the SLOC ceiling. (gh#40 fallout, v2.1.10)
  *
  * @param h Engine handle with engine just constructed.
- * @utility
+ * @req REQ-API-010
  * @version 2.1.12
  */
 static void rewire_observers(entropic_handle_t h) {
@@ -808,7 +815,7 @@ static void init_mcp_servers(entropic_handle_t h,
  * @param data_dir Bundled data directory.
  * @return Concatenated prefix string.
  * @utility
- * @version 2.0.4
+ * @version 2.11.0
  */
 static std::string build_shared_prompt_prefix(
     entropic_handle_t h,
@@ -818,8 +825,8 @@ static std::string build_shared_prompt_prefix(
         h->config.constitution, h->config.constitution_disabled,
         data_dir, constitution);
     entropic::prompts::load_app_context(
-        h->config.app_context, h->config.app_context_disabled,
-        data_dir, app_ctx);
+        h->config.app_context, h->config.app_context_content,
+        h->config.app_context_disabled, data_dir, app_ctx);
     std::string prefix;
     if (!constitution.empty()) { prefix += constitution + "\n\n"; }
     if (!app_ctx.empty()) { prefix += app_ctx + "\n\n"; }
@@ -843,7 +850,7 @@ static std::string build_shared_prompt_prefix(
  *
  * @param tc Tier config (mutated).
  * @param fm Parsed identity frontmatter.
- * @utility
+ * @req REQ-API-013
  * @version 2.7.4
  */
 static void thread_frontmatter_sampler(
@@ -881,7 +888,7 @@ static void thread_frontmatter_sampler(
  * @param h Engine handle.
  * @param name Tier name.
  * @param fm Parsed frontmatter.
- * @internal
+ * @req REQ-API-013
  * @version 2.7.3
  */
 static void apply_identity_frontmatter(
@@ -908,7 +915,7 @@ static void apply_identity_frontmatter(
  * @brief Cache per-tier frontmatter fields from identity files.
  * @param h Engine handle with config + engine constructed.
  * @param data_dir Bundled data directory.
- * @internal
+ * @req REQ-API-013
  * @version 2.5.2
  */
 static void cache_tier_allowed_tools(
@@ -953,7 +960,7 @@ static void cache_tier_allowed_tools(
  *
  * @param h Engine handle (config tiers mutated in place).
  * @param data_dir Bundled data directory (identity file resolution).
- * @internal
+ * @req REQ-API-013
  * @version 2.7.3
  */
 static void thread_frontmatter_samplers(
@@ -1014,7 +1021,8 @@ static char* tool_history_json_thunk(size_t count, void* ud) {
  * thunk), and registers it with the AgentEngine.
  *
  * @param h Engine handle with engine + server_manager constructed.
- * @internal
+ * @req REQ-API-013
+ * @req REQ-MCP-014
  * @version 2.0.6-rc16
  */
 static void wire_tool_executor(entropic_handle_t h) {
@@ -1193,7 +1201,7 @@ static char* sp_get_config(void* ud) {
  * ResponseGenerator::inject_engine_state_reminder.
  *
  * @utility
- * @version 2.7.0
+ * @version 2.11.0
  */
 static std::string build_assembled_prompt_for_tier(
     entropic_engine* h, const std::string& tier_name) {
@@ -1203,8 +1211,8 @@ static std::string build_assembled_prompt_for_tier(
         h->config.constitution, h->config.constitution_disabled,
         data_dir, constitution);
     entropic::prompts::load_app_context(
-        h->config.app_context, h->config.app_context_disabled,
-        data_dir, app_ctx);
+        h->config.app_context, h->config.app_context_content,
+        h->config.app_context_disabled, data_dir, app_ctx);
     std::string identity_body;
     auto it = h->config.models.tiers.find(tier_name);
     if (it != h->config.models.tiers.end()) {
@@ -1545,7 +1553,7 @@ static entropic::LoopConfig build_loop_config(entropic_handle_t h) {
  * engine without spawning a separate process.
  *
  * @param h Engine handle (must be fully configured).
- * @internal
+ * @req REQ-BRIDGE-001
  * @version 2.0.8
  */
 static void start_external_bridge(entropic_handle_t h) {
@@ -1581,7 +1589,9 @@ static void start_external_bridge(entropic_handle_t h) {
  * pass into subsystems that already wired against the original
  * orchestrator/engine/mcp_auth.
  *
- * @internal
+ * @return ENTROPIC_OK when the handle is not yet configured,
+ *        ENTROPIC_ERROR_INVALID_STATE when it already is.
+ * @req REQ-API-004
  * @version 2.2.5
  */
 static entropic_error_t reject_if_configured(entropic_handle_t h) {
@@ -1603,7 +1613,10 @@ static entropic_error_t reject_if_configured(entropic_handle_t h) {
  * knots gate after v2.2.6's per-handle InterfaceContext wiring grew
  * the body past 50 lines.
  *
- * @internal
+ * @return ENTROPIC_OK on success, an error code when orchestrator
+ *        construction fails.
+ * @req REQ-API-013
+ * @req REQ-API-004
  * @version 2.2.9
  */
 static entropic_error_t init_orchestrator(
@@ -1704,7 +1717,9 @@ static void wire_prompts_and_persistence(
 
 /**
  * @brief Shared body of all entropic_configure* entry points.
- * @internal
+ * @return ENTROPIC_OK on success, else the first failing step's
+ *        error code.
+ * @req REQ-API-004
  * @version 2.7.3
  */
 static entropic_error_t configure_common(entropic_handle_t h) {
@@ -1735,7 +1750,9 @@ static entropic_error_t configure_common(entropic_handle_t h) {
 
 /**
  * @brief entropic_configure body — wrapped by `c_api_try` in the public entry.
- * @internal
+ * @return ENTROPIC_OK on success, else the configure error code.
+ * @req REQ-API-004
+ * @req REQ-ABI-002
  * @version 2.9.5
  */
 static entropic_error_t do_configure_json(
@@ -1766,7 +1783,10 @@ static entropic_error_t do_configure_json(
  * @brief Configure the engine from a JSON/YAML config string.
  *
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-API-004
+ * @req REQ-API-005
+ * @req REQ-ABI-001
+ * @req REQ-ABI-002
  * @version 2.0.2
  */
 entropic_error_t entropic_configure(
@@ -1783,7 +1803,9 @@ entropic_error_t entropic_configure(
 
 /**
  * @brief entropic_configure_from_file body — wrapped by `c_api_try`.
- * @internal
+ * @return ENTROPIC_OK on success, else the configure error code.
+ * @req REQ-API-004
+ * @req REQ-ABI-002
  * @version 2.3.13
  */
 static entropic_error_t do_configure_from_file(
@@ -1815,7 +1837,10 @@ static entropic_error_t do_configure_from_file(
  * @brief Configure the engine from a YAML config file.
  *
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-API-004
+ * @req REQ-API-005
+ * @req REQ-ABI-001
+ * @req REQ-ABI-002
  * @version 2.0.5
  */
 entropic_error_t entropic_configure_from_file(
@@ -1832,7 +1857,10 @@ entropic_error_t entropic_configure_from_file(
 
 /**
  * @brief entropic_configure_dir body — wrapped by `c_api_try`.
- * @internal
+ * @return ENTROPIC_OK on success, else the configure error code.
+ * @req REQ-API-004
+ * @req REQ-CFG-001
+ * @req REQ-ABI-002
  * @version 2.3.13
  */
 static entropic_error_t do_configure_dir(
@@ -1875,7 +1903,11 @@ static entropic_error_t do_configure_dir(
  * so sandbox snapshots use the configured tree rather than CWD.
  *
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-API-004
+ * @req REQ-CFG-001
+ * @req REQ-API-005
+ * @req REQ-ABI-001
+ * @req REQ-ABI-002
  * @version 2.1.6
  */
 entropic_error_t entropic_configure_dir(
@@ -1894,7 +1926,9 @@ entropic_error_t entropic_configure_dir(
  * subsystem pointer is null-safe. After this call, the
  * handle is invalid.
  *
- * @internal
+ * @req REQ-API-002
+ * @req REQ-API-003
+ * @req REQ-ABI-001
  * @version 2.0.8
  */
 void entropic_destroy(entropic_handle_t handle) {
@@ -1930,7 +1964,8 @@ void entropic_destroy(entropic_handle_t handle) {
 /**
  * @brief Get the library version string.
  * @return Static version string.
- * @utility
+ * @req REQ-API-008
+ * @req REQ-ABI-001
  * @version 1.8.0
  */
 const char* entropic_version(void) {
@@ -1940,7 +1975,8 @@ const char* entropic_version(void) {
 /**
  * @brief Get the plugin API version number.
  * @return API version integer.
- * @utility
+ * @req REQ-TYPE-002
+ * @req REQ-ABI-001
  * @version 2.0.0
  */
 int entropic_api_version(void) {
@@ -1949,7 +1985,10 @@ int entropic_api_version(void) {
 
 /**
  * @brief gh#35: idle-time accessor for host-side idle-exit policies.
- * @utility
+ * @return Seconds since the most recent run on this handle; 0 when
+ *        the handle is NULL or no run has happened yet.
+ * @req REQ-API-005
+ * @req REQ-ABI-001
  * @version 2.3.0
  */
 int64_t entropic_seconds_since_last_activity(entropic_handle_t handle) {
@@ -1961,7 +2000,8 @@ int64_t entropic_seconds_since_last_activity(entropic_handle_t handle) {
  * @brief Allocate memory using the engine's allocator.
  *
  * @return Pointer to allocated memory, or NULL on failure.
- * @utility
+ * @req REQ-API-008
+ * @req REQ-ABI-001
  * @version 1.8.0
  */
 void* entropic_alloc(size_t size) {
@@ -1971,7 +2011,8 @@ void* entropic_alloc(size_t size) {
 /**
  * @brief Free memory allocated by the engine.
  *
- * @utility
+ * @req REQ-API-008
+ * @req REQ-ABI-001
  * @version 1.8.0
  */
 void entropic_free(void* ptr) {
@@ -1992,6 +2033,11 @@ void entropic_free(void* ptr) {
  *                    entropic_free).
  * @return ENTROPIC_OK on success, error code otherwise.
  * @req REQ-API-002
+ * @req REQ-API-009
+ * @req REQ-API-010
+ * @req REQ-API-008
+ * @req REQ-API-005
+ * @req REQ-ABI-002
  * @version 2.9.5
  */
 entropic_error_t entropic_run(
@@ -2084,7 +2130,10 @@ static entropic_error_t run_as_inner(
  *                    entropic_free).
  * @return ENTROPIC_OK on success; ENTROPIC_ERROR_IDENTITY_NOT_FOUND for an
  *         unknown tier; other error codes per entropic_run().
- * @internal
+ * @req REQ-API-009
+ * @req REQ-API-010
+ * @req REQ-API-008
+ * @req REQ-API-005
  * @version 2.9.5
  */
 entropic_error_t entropic_run_as(
@@ -2187,7 +2236,11 @@ static std::vector<std::vector<entropic::Message>> build_batch_messages(
  * @param[out] result_json JSON array of N {content, finish_reason, tool_calls}.
  *             Caller frees with entropic_free().
  * @return ENTROPIC_OK on success; error codes per entropic_run().
- * @internal
+ * @req REQ-API-009
+ * @req REQ-INFER-018
+ * @req REQ-API-008
+ * @req REQ-API-005
+ * @req REQ-ABI-002
  * @version 2.9.5
  */
 entropic_error_t entropic_run_batch(
@@ -2239,7 +2292,10 @@ entropic_error_t entropic_run_batch(
  * @param user_data Opaque pointer passed back to the callback.
  * @param cancel_flag Optional pointer; set *cancel_flag to non-zero from another thread to stop generation.
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-API-009
+ * @req REQ-API-010
+ * @req REQ-API-005
+ * @req REQ-ABI-002
  * @version 2.9.5
  */
 entropic_error_t entropic_run_streaming(
@@ -2354,7 +2410,11 @@ static entropic_error_t run_messages_inner(
  * @param messages_json JSON array of message objects.
  * @param result_json Out-param: malloc'd JSON result. Caller frees.
  * @return ENTROPIC_OK or one of the documented error codes.
- * @internal
+ * @req REQ-API-009
+ * @req REQ-INFER-025
+ * @req REQ-API-008
+ * @req REQ-API-005
+ * @req REQ-ABI-002
  * @version 2.9.5
  */
 entropic_error_t entropic_run_messages(
@@ -2420,7 +2480,10 @@ static entropic_error_t run_messages_stream_inner(
  * @param user_data Forwarded to on_token.
  * @param cancel_flag Optional int*; non-zero cancels.
  * @return ENTROPIC_OK or one of the documented error codes.
- * @internal
+ * @req REQ-API-009
+ * @req REQ-INFER-025
+ * @req REQ-API-005
+ * @req REQ-ABI-002
  * @version 2.9.5
  */
 entropic_error_t entropic_run_messages_streaming(
@@ -2453,7 +2516,8 @@ entropic_error_t entropic_run_messages_streaming(
  * @param observer Token callback (NULL to clear).
  * @param user_data Forwarded to observer.
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-API-010
+ * @req REQ-API-005
  * @version 2.0.6-rc16
  */
 entropic_error_t entropic_set_stream_observer(
@@ -2475,7 +2539,10 @@ entropic_error_t entropic_set_stream_observer(
 
 /**
  * @brief Toggle automatic constitutional revision.
- * @internal
+ * @return ENTROPIC_OK on success, ENTROPIC_ERROR_INVALID_HANDLE when
+ *        handle is NULL.
+ * @req REQ-VALID-003
+ * @req REQ-API-005
  * @version 2.1.5
  */
 entropic_error_t entropic_validation_set_auto_retry(
@@ -2489,7 +2556,11 @@ entropic_error_t entropic_validation_set_auto_retry(
 
 /**
  * @brief Resume a paused constitutional revision pass.
- * @internal
+ * @return ENTROPIC_OK on success, ENTROPIC_ERROR_INVALID_HANDLE when
+ *        handle is NULL, ENTROPIC_ERROR_INVALID_STATE when no
+ *        validator exists.
+ * @req REQ-VALID-003
+ * @req REQ-API-005
  * @version 2.1.5
  */
 entropic_error_t entropic_validation_resume_retry(
@@ -2502,7 +2573,11 @@ entropic_error_t entropic_validation_resume_retry(
 
 /**
  * @brief Accept the last paused attempt as the final answer.
- * @internal
+ * @return ENTROPIC_OK on success, ENTROPIC_ERROR_INVALID_HANDLE when
+ *        handle is NULL, ENTROPIC_ERROR_INVALID_STATE when no
+ *        validator exists.
+ * @req REQ-VALID-003
+ * @req REQ-API-005
  * @version 2.1.5
  */
 entropic_error_t entropic_validation_accept_last(
@@ -2515,7 +2590,11 @@ entropic_error_t entropic_validation_accept_last(
 
 /**
  * @brief Register attempt-boundary callback on the validator.
- * @internal
+ * @return ENTROPIC_OK on success, ENTROPIC_ERROR_INVALID_HANDLE when
+ *        handle is NULL.
+ * @req REQ-API-010
+ * @req REQ-VALID-003
+ * @req REQ-API-005
  * @version 2.1.5
  */
 entropic_error_t entropic_set_attempt_boundary_cb(
@@ -2536,7 +2615,9 @@ entropic_error_t entropic_set_attempt_boundary_cb(
  * @param on_complete Post-delegation result (nullable clears).
  * @param user_data Forwarded to both callbacks.
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-API-010
+ * @req REQ-DELEG-002
+ * @req REQ-API-005
  * @version 2.1.5
  */
 entropic_error_t entropic_set_delegation_callbacks(
@@ -2565,7 +2646,9 @@ entropic_error_t entropic_set_delegation_callbacks(
  * @param observer State observer (NULL to clear).
  * @param user_data Forwarded to observer.
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-API-010
+ * @req REQ-LOOP-001
+ * @req REQ-API-005
  * @version 2.1.10
  */
 entropic_error_t entropic_set_state_observer(
@@ -2602,7 +2685,9 @@ entropic_error_t entropic_set_state_observer(
  * @param end_cb Post-critique callback (NULL to disable).
  * @param user_data Forwarded to both callbacks.
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-API-010
+ * @req REQ-VALID-002
+ * @req REQ-API-005
  * @version 2.1.12
  */
 entropic_error_t entropic_set_critique_callbacks(
@@ -2626,7 +2711,9 @@ entropic_error_t entropic_set_critique_callbacks(
  *
  * @param handle Engine handle returned by entropic_create.
  * @return ENTROPIC_OK if interrupted.
- * @internal
+ * @req REQ-API-009
+ * @req REQ-LOOP-006
+ * @req REQ-API-005
  * @version 2.0.0
  */
 entropic_error_t entropic_interrupt(entropic_handle_t handle) {
@@ -2647,7 +2734,12 @@ entropic_error_t entropic_interrupt(entropic_handle_t handle) {
  * the run path to avoid deadlock. The engine's per-queue mutex
  * guarantees thread safety on the queue itself.
  *
- * @internal
+ * @return ENTROPIC_OK on success; INVALID_HANDLE for a NULL handle,
+ *        INVALID_ARGUMENT for a NULL message, INVALID_STATE when no
+ *        run is in flight, QUEUE_FULL when the bounded queue is at
+ *        capacity.
+ * @req REQ-API-005
+ * @req REQ-ABI-001
  * @version 2.1.10
  */
 entropic_error_t entropic_queue_user_message(
@@ -2667,7 +2759,11 @@ entropic_error_t entropic_queue_user_message(
 
 /**
  * @brief Snapshot the mid-gen queue depth.
- * @internal
+ * @return ENTROPIC_OK on success (depth 0 when the engine is not
+ *        built), INVALID_HANDLE for a NULL handle, INVALID_ARGUMENT
+ *        for a NULL count.
+ * @req REQ-API-005
+ * @req REQ-ABI-001
  * @version 2.1.10
  */
 entropic_error_t entropic_user_message_queue_depth(
@@ -2681,7 +2777,10 @@ entropic_error_t entropic_user_message_queue_depth(
 
 /**
  * @brief Drop all queued mid-gen user messages.
- * @internal
+ * @return ENTROPIC_OK on success (a benign no-op before configure),
+ *        ENTROPIC_ERROR_INVALID_HANDLE when handle is NULL.
+ * @req REQ-API-005
+ * @req REQ-ABI-001
  * @version 2.1.10
  */
 entropic_error_t entropic_clear_user_message_queue(
@@ -2701,7 +2800,10 @@ entropic_error_t entropic_clear_user_message_queue(
  * source of truth at fire time — set_callbacks() shuffles in the
  * streaming path do not touch this slot.
  *
- * @internal
+ * @return ENTROPIC_OK on success, ENTROPIC_ERROR_INVALID_HANDLE when
+ *        handle is NULL.
+ * @req REQ-API-010
+ * @req REQ-API-005
  * @version 2.1.10
  */
 entropic_error_t entropic_set_queue_observer(
@@ -2723,7 +2825,8 @@ entropic_error_t entropic_set_queue_observer(
  * @brief Clear conversation history.
  * @param handle Engine handle returned by entropic_create.
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-API-005
+ * @req REQ-ABI-001
  * @version 2.0.1
  */
 entropic_error_t entropic_context_clear(entropic_handle_t handle) {
@@ -2738,7 +2841,9 @@ entropic_error_t entropic_context_clear(entropic_handle_t handle) {
  * @param handle Engine handle returned by entropic_create.
  * @param messages_json Out-param: newly allocated JSON string (caller owns; free with entropic_free).
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-SAFE-001
+ * @req REQ-API-008
+ * @req REQ-API-005
  * @version 2.0.1
  */
 entropic_error_t entropic_context_get(
@@ -2756,7 +2861,8 @@ entropic_error_t entropic_context_get(
  * @param handle Engine handle returned by entropic_create.
  * @param count Out-param: receives the token count.
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-API-005
+ * @req REQ-ABI-001
  * @version 2.0.1
  */
 entropic_error_t entropic_context_count(
@@ -2778,7 +2884,8 @@ entropic_error_t entropic_context_count(
  * @param tokens_used Out-param: tokens in the current conversation.
  * @param capacity Out-param: active tier's configured context_length.
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-API-005
+ * @req REQ-ABI-001
  * @version 2.1.8
  */
 entropic_error_t entropic_context_usage(
@@ -2816,7 +2923,9 @@ static entropic_error_t do_state_save(
 /**
  * @brief Save a tier's KV cache to a file (gh#23 v2.3.25, MVP item 13).
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-API-005
+ * @req REQ-ABI-001
+ * @req REQ-ABI-002
  * @version 2.3.25
  */
 entropic_error_t entropic_state_save(
@@ -2872,7 +2981,9 @@ static entropic_error_t do_state_load(
 /**
  * @brief Restore a tier's KV cache from a file (gh#23 v2.3.25).
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-API-005
+ * @req REQ-ABI-001
+ * @req REQ-ABI-002
  * @version 2.3.25
  */
 entropic_error_t entropic_state_load(
@@ -2898,7 +3009,8 @@ entropic_error_t entropic_state_load(
  * @param handle Engine handle.
  * @param[out] out Output JSON; caller frees via entropic_free.
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-API-008
+ * @req REQ-API-005
  * @version 2.0.6-rc16.2
  */
 entropic_error_t entropic_metrics_json(
@@ -2920,7 +3032,9 @@ entropic_error_t entropic_metrics_json(
  * base_model_path is resolved to a tier via model path matching.
  *
  * @return ENTROPIC_OK on success, error code on failure.
- * @internal
+ * @req REQ-INFER-023
+ * @req REQ-API-005
+ * @req REQ-ABI-002
  * @version 2.0.2
  */
 entropic_error_t entropic_adapter_load(
@@ -2963,7 +3077,9 @@ entropic_error_t entropic_adapter_load(
  * configuration for lifecycle management.
  *
  * @return ENTROPIC_OK on success, error code on failure.
- * @internal
+ * @req REQ-INFER-023
+ * @req REQ-API-005
+ * @req REQ-ABI-002
  * @version 2.0.0
  */
 entropic_error_t entropic_adapter_unload(
@@ -3001,7 +3117,9 @@ entropic_error_t entropic_adapter_unload(
  * configuration for lifecycle management.
  *
  * @return ENTROPIC_OK on success, error code on failure.
- * @internal
+ * @req REQ-INFER-023
+ * @req REQ-API-005
+ * @req REQ-ABI-002
  * @version 2.0.0
  */
 entropic_error_t entropic_adapter_swap(
@@ -3036,7 +3154,9 @@ entropic_error_t entropic_adapter_swap(
  * Returns -1 if the handle is invalid or adapter name not found.
  *
  * @return AdapterState as int, or -1 on error.
- * @internal
+ * @req REQ-INFER-023
+ * @req REQ-API-005
+ * @req REQ-ABI-002
  * @version 2.0.0
  */
 int entropic_adapter_state(
@@ -3064,7 +3184,10 @@ int entropic_adapter_state(
  * tier_name, and base_model_path. Caller frees with entropic_free().
  *
  * @return JSON string (caller frees), or NULL on error.
- * @internal
+ * @req REQ-INFER-023
+ * @req REQ-API-008
+ * @req REQ-API-005
+ * @req REQ-ABI-002
  * @version 2.0.2
  */
 char* entropic_adapter_info(
@@ -3093,7 +3216,10 @@ char* entropic_adapter_info(
  * and tier_name. Caller frees with entropic_free().
  *
  * @return JSON array string (caller frees), or NULL on error.
- * @internal
+ * @req REQ-INFER-023
+ * @req REQ-API-008
+ * @req REQ-API-005
+ * @req REQ-ABI-002
  * @version 2.0.2
  */
 char* entropic_adapter_list(entropic_handle_t handle)
@@ -3123,7 +3249,9 @@ char* entropic_adapter_list(entropic_handle_t handle)
  *
  * @return ENTROPIC_OK on success, ENTROPIC_ERROR_ALREADY_EXISTS if
  *         key already registered.
- * @internal
+ * @req REQ-INFER-007
+ * @req REQ-API-005
+ * @req REQ-ABI-002
  * @version 2.0.0
  */
 entropic_error_t entropic_grammar_register(
@@ -3156,7 +3284,9 @@ entropic_error_t entropic_grammar_register(
  *
  * @return ENTROPIC_OK on success, ENTROPIC_ERROR_IO if file unreadable,
  *         ENTROPIC_ERROR_ALREADY_EXISTS if key exists.
- * @internal
+ * @req REQ-INFER-007
+ * @req REQ-API-005
+ * @req REQ-ABI-002
  * @version 2.0.0
  */
 entropic_error_t entropic_grammar_register_file(
@@ -3189,7 +3319,9 @@ entropic_error_t entropic_grammar_register_file(
  *
  * @return ENTROPIC_OK on success, ENTROPIC_ERROR_GRAMMAR_NOT_FOUND
  *         if key not registered.
- * @internal
+ * @req REQ-INFER-007
+ * @req REQ-API-005
+ * @req REQ-ABI-002
  * @version 2.0.0
  */
 entropic_error_t entropic_grammar_deregister(
@@ -3219,7 +3351,10 @@ entropic_error_t entropic_grammar_deregister(
  * Caller frees with entropic_free().
  *
  * @return GBNF string (caller frees), or NULL if not found.
- * @internal
+ * @req REQ-INFER-007
+ * @req REQ-API-008
+ * @req REQ-API-005
+ * @req REQ-ABI-002
  * @version 2.0.2
  */
 char* entropic_grammar_get(
@@ -3248,7 +3383,10 @@ char* entropic_grammar_get(
  *
  * @return NULL if valid; error description string (caller frees) if
  *         invalid.
- * @utility
+ * @req REQ-INFER-007
+ * @req REQ-API-008
+ * @req REQ-ABI-001
+ * @req REQ-ABI-002
  * @version 2.0.2
  */
 char* entropic_grammar_validate(const char* gbnf_content) {
@@ -3269,7 +3407,10 @@ char* entropic_grammar_validate(const char* gbnf_content) {
  * with entropic_free().
  *
  * @return JSON array string (caller frees), or NULL on error.
- * @internal
+ * @req REQ-INFER-007
+ * @req REQ-API-008
+ * @req REQ-API-005
+ * @req REQ-ABI-002
  * @version 2.0.2
  */
 char* entropic_grammar_list(entropic_handle_t handle)
@@ -3305,7 +3446,9 @@ char* entropic_grammar_list(entropic_handle_t handle)
  *
  * @return ENTROPIC_OK on success, ENTROPIC_ERROR_ALREADY_EXISTS if
  *         name exists, ENTROPIC_ERROR_INVALID_ARGUMENT on parse error.
- * @internal
+ * @req REQ-INFER-019
+ * @req REQ-API-005
+ * @req REQ-ABI-002
  * @version 2.0.0
  */
 entropic_error_t entropic_profile_register(
@@ -3345,7 +3488,9 @@ entropic_error_t entropic_profile_register(
  *
  * @return ENTROPIC_OK on success, ENTROPIC_ERROR_PROFILE_NOT_FOUND
  *         if name not registered.
- * @internal
+ * @req REQ-INFER-019
+ * @req REQ-API-005
+ * @req REQ-ABI-002
  * @version 2.0.0
  */
 entropic_error_t entropic_profile_deregister(
@@ -3377,7 +3522,10 @@ entropic_error_t entropic_profile_deregister(
  * entropic_free().
  *
  * @return JSON string (caller frees), or NULL on error.
- * @internal
+ * @req REQ-INFER-019
+ * @req REQ-API-008
+ * @req REQ-API-005
+ * @req REQ-ABI-002
  * @version 2.0.2
  */
 char* entropic_profile_get(
@@ -3411,7 +3559,10 @@ char* entropic_profile_get(
  * with entropic_free().
  *
  * @return JSON array string (caller frees), or NULL on error.
- * @internal
+ * @req REQ-INFER-019
+ * @req REQ-API-008
+ * @req REQ-API-005
+ * @req REQ-ABI-002
  * @version 2.0.2
  */
 char* entropic_profile_list(entropic_handle_t handle)
@@ -3441,7 +3592,9 @@ char* entropic_profile_list(entropic_handle_t handle)
  * throughput (one tracker, not per-model).
  *
  * @return Tokens per second estimate, or 0.0 on error/no data.
- * @internal
+ * @req REQ-INFER-021
+ * @req REQ-API-005
+ * @req REQ-ABI-002
  * @version 2.0.0
  */
 double entropic_throughput_tok_per_sec(
@@ -3469,7 +3622,9 @@ double entropic_throughput_tok_per_sec(
  *
  * @param handle Engine handle returned by entropic_create.
  * @param model_path Path or registry key identifying the model whose throughput should be reset.
- * @internal
+ * @req REQ-INFER-021
+ * @req REQ-API-005
+ * @req REQ-ABI-002
  * @version 2.0.0
  */
 void entropic_throughput_reset(
@@ -3495,7 +3650,8 @@ void entropic_throughput_reset(
  * @brief Grant an MCP tool key to an identity.
  *
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-MCP-010
+ * @req REQ-API-005
  * @version 2.0.0
  */
 entropic_error_t entropic_grant_mcp_key(
@@ -3516,7 +3672,8 @@ entropic_error_t entropic_grant_mcp_key(
  * @brief Revoke an MCP tool key from an identity.
  *
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-MCP-010
+ * @req REQ-API-005
  * @version 2.0.0
  */
 entropic_error_t entropic_revoke_mcp_key(
@@ -3535,7 +3692,8 @@ entropic_error_t entropic_revoke_mcp_key(
  * @brief Check MCP key authorization for an identity.
  *
  * @return 1 if authorized, 0 if denied, -1 on error.
- * @internal
+ * @req REQ-MCP-010
+ * @req REQ-API-005
  * @version 2.0.0
  */
 int entropic_check_mcp_key(
@@ -3556,7 +3714,10 @@ int entropic_check_mcp_key(
  * @brief List MCP keys for an identity as JSON array.
  *
  * @return JSON array string (caller frees), or NULL on error.
- * @internal
+ * @req REQ-MCP-010
+ * @req REQ-API-008
+ * @req REQ-API-005
+ * @req REQ-ABI-002
  * @version 2.0.2
  */
 char* entropic_list_mcp_keys(
@@ -3585,7 +3746,8 @@ char* entropic_list_mcp_keys(
  * @brief Grant a key from one identity to another.
  *
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-MCP-010
+ * @req REQ-API-005
  * @version 2.0.0
  */
 entropic_error_t entropic_grant_mcp_key_from(
@@ -3607,7 +3769,10 @@ entropic_error_t entropic_grant_mcp_key_from(
  * @brief Serialize all identity key sets to JSON.
  *
  * @return JSON string (caller frees), or NULL on error.
- * @internal
+ * @req REQ-MCP-010
+ * @req REQ-API-008
+ * @req REQ-API-005
+ * @req REQ-ABI-002
  * @version 2.0.2
  */
 char* entropic_serialize_mcp_keys(entropic_handle_t handle)
@@ -3628,7 +3793,8 @@ char* entropic_serialize_mcp_keys(entropic_handle_t handle)
  * @brief Deserialize all identity key sets from JSON.
  *
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-MCP-010
+ * @req REQ-API-005
  * @version 2.0.0
  */
 entropic_error_t entropic_deserialize_mcp_keys(
@@ -3649,7 +3815,9 @@ entropic_error_t entropic_deserialize_mcp_keys(
  * @brief Create a dynamic identity from JSON config.
  *
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-IDEN-002
+ * @req REQ-API-005
+ * @req REQ-ABI-002
  * @version 2.0.0
  */
 entropic_error_t entropic_create_identity(
@@ -3680,7 +3848,9 @@ entropic_error_t entropic_create_identity(
  * @brief Update an existing dynamic identity.
  *
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-IDEN-002
+ * @req REQ-API-005
+ * @req REQ-ABI-002
  * @version 2.0.0
  */
 entropic_error_t entropic_update_identity(
@@ -3712,7 +3882,8 @@ entropic_error_t entropic_update_identity(
  * @brief Destroy a dynamic identity.
  *
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-IDEN-002
+ * @req REQ-API-005
  * @version 2.0.0
  */
 entropic_error_t entropic_destroy_identity(
@@ -3730,7 +3901,10 @@ entropic_error_t entropic_destroy_identity(
  * @brief Get identity config as JSON by name.
  *
  * @return JSON string (caller frees), or NULL if not found.
- * @internal
+ * @req REQ-IDEN-002
+ * @req REQ-API-008
+ * @req REQ-API-005
+ * @req REQ-ABI-002
  * @version 2.0.2
  */
 char* entropic_get_identity_config(
@@ -3756,7 +3930,10 @@ char* entropic_get_identity_config(
  * @brief List all identity names as JSON array.
  *
  * @return JSON array string (caller frees), or NULL.
- * @internal
+ * @req REQ-IDEN-002
+ * @req REQ-API-008
+ * @req REQ-API-005
+ * @req REQ-ABI-002
  * @version 2.0.2
  */
 char* entropic_list_identities(entropic_handle_t handle)
@@ -3775,7 +3952,8 @@ char* entropic_list_identities(entropic_handle_t handle)
  * @brief Get identity count (total and dynamic).
  *
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-IDEN-002
+ * @req REQ-API-005
  * @version 2.0.0
  */
 entropic_error_t entropic_identity_count(
@@ -3802,7 +3980,10 @@ entropic_error_t entropic_identity_count(
  * arrays are engine-allocated — free with entropic_free_logprob_result().
  *
  * @return ENTROPIC_OK on success, error code on failure.
- * @internal
+ * @req REQ-INFER-024
+ * @req REQ-API-008
+ * @req REQ-API-005
+ * @req REQ-ABI-002
  * @version 2.0.0
  */
 entropic_error_t entropic_get_logprobs(
@@ -3847,7 +4028,9 @@ entropic_error_t entropic_get_logprobs(
  * InferenceBackend::compute_perplexity().
  *
  * @return ENTROPIC_OK on success, error code on failure.
- * @internal
+ * @req REQ-INFER-024
+ * @req REQ-API-005
+ * @req REQ-ABI-002
  * @version 2.0.0
  */
 entropic_error_t entropic_compute_perplexity(
@@ -3879,7 +4062,8 @@ entropic_error_t entropic_compute_perplexity(
  * Frees logprobs and tokens arrays, then NULLs the pointers to
  * prevent double-free. The struct itself is caller-owned.
  *
- * @utility
+ * @req REQ-API-008
+ * @req REQ-ABI-001
  * @version 1.9.10
  */
 void entropic_free_logprob_result(entropic_logprob_result_t* result)
@@ -3903,7 +4087,9 @@ void entropic_free_logprob_result(entropic_logprob_result_t* result)
  * an mmproj loaded, 0 if text-only.
  *
  * @return 1 if vision-capable, 0 if text-only or error.
- * @internal
+ * @req REQ-INFER-025
+ * @req REQ-API-005
+ * @req REQ-ABI-002
  * @version 2.0.0
  */
 int entropic_model_has_vision(
@@ -3931,7 +4117,8 @@ int entropic_model_has_vision(
  * @brief Enable or disable constitutional validation globally.
  *
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-VALID-001
+ * @req REQ-API-005
  * @version 2.0.2
  */
 entropic_error_t entropic_validation_set_enabled(
@@ -3948,7 +4135,8 @@ entropic_error_t entropic_validation_set_enabled(
  * @brief Set per-identity validation override.
  *
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-VALID-001
+ * @req REQ-API-005
  * @version 2.0.0
  */
 entropic_error_t entropic_validation_set_identity(
@@ -3969,7 +4157,10 @@ entropic_error_t entropic_validation_set_identity(
  * @brief Get last validation result as JSON.
  *
  * @return JSON string (caller frees), or NULL if no result.
- * @internal
+ * @req REQ-VALID-001
+ * @req REQ-API-008
+ * @req REQ-API-005
+ * @req REQ-ABI-002
  * @version 2.10.0
  */
 char* entropic_validation_last_result(entropic_handle_t handle)
@@ -3993,7 +4184,8 @@ char* entropic_validation_last_result(entropic_handle_t handle)
  * @param handle Engine handle returned by entropic_create.
  * @param prompt_out Out-param: newly allocated JSON string (caller owns; free with entropic_free).
  * @return ENTROPIC_OK on success, error code on failure.
- * @internal
+ * @req REQ-API-008
+ * @req REQ-API-005
  * @version 2.0.2
  */
 entropic_error_t entropic_get_diagnostic_prompt(
@@ -4045,7 +4237,9 @@ entropic_error_t entropic_get_diagnostic_prompt(
  *        frees with entropic_free_string.
  * @return ENTROPIC_OK / ENTROPIC_ERROR_INVALID_HANDLE /
  *         ENTROPIC_ERROR_INVALID_STATE.
- * @internal
+ * @req REQ-INFER-016
+ * @req REQ-API-008
+ * @req REQ-API-005
  * @version 2.1.11
  */
 entropic_error_t entropic_speculative_compat(
@@ -4079,7 +4273,11 @@ entropic_error_t entropic_speculative_compat(
  * activation_swap transition; the lambda forwards to the C callback
  * with the residency-event enum, tier name, model path, and footprint.
  *
- * @internal
+ * @return ENTROPIC_OK on success, ENTROPIC_ERROR_INVALID_HANDLE when
+ *        handle is NULL.
+ * @req REQ-API-010
+ * @req REQ-INFER-019
+ * @req REQ-API-005
  * @version 2.2.4
  */
 entropic_error_t entropic_set_residency_observer(
@@ -4121,7 +4319,11 @@ entropic_error_t entropic_set_residency_observer(
  * heap-allocated and must be freed by the caller with
  * `entropic_free_string`.
  *
- * @internal
+ * @return ENTROPIC_OK on success; INVALID_HANDLE for a NULL handle
+ *        or out_json, INVALID_STATE when no orchestrator exists.
+ * @req REQ-INFER-019
+ * @req REQ-API-008
+ * @req REQ-API-005
  * @version 2.2.4
  */
 entropic_error_t entropic_residency_snapshot(

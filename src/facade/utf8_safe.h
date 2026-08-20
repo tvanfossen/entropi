@@ -20,13 +20,13 @@ namespace entropic::facade {
 
 /**
  * @brief Truncate a UTF-8 string at-or-before a byte cap on a codepoint boundary.
- * @utility
  *
  * @param s         Input string (treated as UTF-8 bytes).
  * @param max_bytes Maximum byte length of the returned prefix.
  * @return Prefix of `s` with length <= `max_bytes` ending on a codepoint
  *         boundary. If `s` is already <= `max_bytes`, it is returned as-is.
  *         If `s` is valid UTF-8 the returned prefix is also valid UTF-8.
+ * @req REQ-SAFE-001
  * @version 2.2.3
  */
 inline std::string utf8_safe_substr(const std::string& s, std::size_t max_bytes) {

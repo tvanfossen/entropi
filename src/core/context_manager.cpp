@@ -54,7 +54,7 @@ void ContextManager::refresh_context_limit(
  * @param ctx Loop context.
  * @param keep_recent Number of recent results to keep.
  * @return (pruned_count, freed_chars).
- * @internal
+ * @req REQ-COMPACT-002
  * @version 2.0.0
  */
 std::pair<int, int> ContextManager::prune_tool_results(
@@ -117,7 +117,7 @@ std::pair<int, int> ContextManager::prune_tool_results(
  * eliminates the bug class entirely whenever context has headroom.
  *
  * @param ctx Loop context.
- * @internal
+ * @req REQ-COMPACT-002
  * @version 2.1.3-rc2
  */
 void ContextManager::prune_old_tool_results(LoopContext& ctx) {
@@ -181,7 +181,7 @@ void ContextManager::prune_old_tool_results(LoopContext& ctx) {
 /**
  * @brief Inject context usage warning if over threshold.
  * @param ctx Loop context.
- * @internal
+ * @req REQ-COMPACT-002
  * @version 1.8.4
  */
 void ContextManager::inject_context_warning(LoopContext& ctx) {
@@ -217,7 +217,8 @@ void ContextManager::inject_context_warning(LoopContext& ctx) {
  * @brief Check and perform compaction if needed.
  * @param ctx Loop context.
  * @param force Bypass threshold check.
- * @internal
+ * @req REQ-COMPACT-001
+ * @req REQ-HOOK-002
  * @version 2.3.7
  */
 void ContextManager::check_compaction(
@@ -246,7 +247,8 @@ void ContextManager::check_compaction(
  * @param ctx Loop context.
  * @param force Whether this is a forced compaction.
  * @return true if a hook cancelled compaction.
- * @internal
+ * @req REQ-COMPACT-001
+ * @req REQ-HOOK-002
  * @version 2.3.7
  */
 bool ContextManager::fire_pre_compact_hook(LoopContext& ctx, bool force) {
@@ -271,7 +273,8 @@ bool ContextManager::fire_pre_compact_hook(LoopContext& ctx, bool force) {
  * @param ctx Loop context.
  * @param old_count Token count before compaction.
  * @param new_count Token count after compaction.
- * @internal
+ * @req REQ-COMPACT-001
+ * @req REQ-HOOK-002
  * @version 2.3.7
  */
 void ContextManager::fire_post_compact_hooks(LoopContext& ctx, int old_count,

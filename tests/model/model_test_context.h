@@ -48,6 +48,8 @@
 #include <cstring>
 #include <algorithm>
 #include <filesystem>
+#include <chrono>
+#include <thread>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -224,7 +226,55 @@ inline void use_small_default_model(ModelTestContext& ctx) {
     }
 }
 
+/**
+ * @brief Wait until the host has reclaimed enough memory to map a model.
+ *
+ * gh#142: consecutive model-test PROCESSES fail when the previous one's pages
+ * have not yet been reclaimed. Proven by a controlled A/B — same binary, same
+ * predecessor, only the gap varying:
+ *
+ *   no delay  -> test-gh87-backend-common-chat FAILS
+ *   25s delay -> PASSES
+ *
+ * GPU offload was identical (0/31 layers) in both arms, so this is HOST memory,
+ * not VRAM: that test mmaps a ~12.6 GB CPU-mapped model.
+ *
+ * Lives in the harness rather than in a runner because BOTH runners need it and
+ * neither can express it — ctest has no inter-test delay, and the invoke runner
+ * only covers its own path. Polling MemAvailable beats a fixed sleep: it costs
+ * nothing when memory is already free and waits exactly as long as needed when
+ * it is not.
+ *
+ * @param need_mb Minimum MemAvailable before proceeding.
+ * @param max_wait_s Give up after this long and proceed anyway — a hard failure
+ *        here would be less diagnosable than letting the load fail loudly.
+ * @return true when the threshold was met, false when it timed out.
+ * @version 2.11.0
+ */
+inline bool wait_for_host_memory(long need_mb = 12000, int max_wait_s = 90) {
+    auto avail_mb = []() -> long {
+        std::ifstream f("/proc/meminfo");
+        std::string key;
+        long kb = 0;
+        while (f >> key) {
+            if (key == "MemAvailable:") { f >> kb; return kb / 1024; }
+            std::getline(f, key);
+        }
+        return -1;
+    };
+    for (int waited = 0; waited <= max_wait_s; waited += 2) {
+        long mb = avail_mb();
+        if (mb < 0 || mb >= need_mb) { return true; }
+        std::this_thread::sleep_for(std::chrono::seconds(2));
+    }
+    spdlog::warn("Test harness: only {} MB available after {}s (wanted {} MB) "
+                 "— proceeding; a large model map may fail. gh#142",
+                 avail_mb(), max_wait_s, need_mb);
+    return false;
+}
+
 inline bool init_orchestrator(ModelTestContext& ctx) {
+    wait_for_host_memory();
     // gh#87 (v2.7.0): harness footprint clamps for the dev box.
     //
     // (1) gpu_layers: the default primary tier is now Qwen3.6-35B-A3B (~13GB).
@@ -348,7 +398,7 @@ inline std::string load_app_context_prompt() {
     auto data_dir = fs::path(MODEL_PATH) / "data";
     auto path = data_dir / "prompts" / "app_context.md";
     auto err = entropic::prompts::load_app_context(
-        path, false, data_dir, body);
+        path, std::nullopt, false, data_dir, body);
     if (!err.empty()) {
         spdlog::error("Failed to load app_context: {}", err);
         return "";

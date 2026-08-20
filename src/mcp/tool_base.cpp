@@ -49,9 +49,13 @@ const ToolDefinition& ToolBase::definition() const {
 
 /**
  * @brief Default anchor_key — no anchoring.
- * @param args_json Tool call arguments (unused).
- * @return Empty string.
- * @internal
+ *
+ * MCPServerBase injects a context_anchor directive only for a non-empty
+ * key, so the default leaves the envelope's directives array empty.
+ *
+ * @param args_json Tool call arguments (unused in the default).
+ * @return Empty string — no ContextAnchor is injected for this tool.
+ * @req REQ-MCP-001
  * @version 1.8.5
  */
 std::string ToolBase::anchor_key(
@@ -61,8 +65,12 @@ std::string ToolBase::anchor_key(
 
 /**
  * @brief Default required access level — WRITE (safe default).
- * @return MCPAccessLevel::WRITE.
- * @internal
+ *
+ * A newly added tool is treated as privileged until someone deliberately
+ * relaxes it; read-only tools override this to READ.
+ *
+ * @return MCPAccessLevel::WRITE for every tool that does not override.
+ * @req REQ-MCP-011
  * @version 1.9.4
  */
 MCPAccessLevel ToolBase::required_access_level() const {
@@ -71,11 +79,21 @@ MCPAccessLevel ToolBase::required_access_level() const {
 
 /**
  * @brief Load a tool definition from a JSON file.
+ *
+ * Reads the bundled `data/tools/<server>/<tool>.json` descriptor, whose
+ * `inputSchema` (camelCase) is the schema ToolExecutor later validates
+ * arguments against.
+ *
  * @param tool_name Tool name (e.g., "read_file").
- * @param server_prefix Server directory name (e.g., "filesystem").
+ * @param server_prefix Server directory name (e.g., "filesystem"); an
+ *                      empty prefix reads directly from data_dir.
  * @param data_dir Base directory for tool JSON files.
- * @return Parsed ToolDefinition.
- * @utility
+ * @return Parsed ToolDefinition carrying name, description and the
+ *         serialised inputSchema.
+ * @throws std::runtime_error when the descriptor file cannot be opened;
+ *         nlohmann parse errors propagate for malformed JSON or a
+ *         missing `name`/`inputSchema` key.
+ * @req REQ-MCP-013
  * @version 1.8.5
  */
 ToolDefinition load_tool_definition(

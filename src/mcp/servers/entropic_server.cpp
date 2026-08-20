@@ -176,7 +176,10 @@ void TodoTool::apply_todo_action(const std::string& action,
 
 /**
  * @brief Execute the todo tool (add/update/remove) and emit directives.
- * @internal
+ * @param args_json JSON with "action" plus the action's own fields.
+ * @return A ServerResponse whose result is the re-rendered todo list
+ *         and whose directives are context_anchor + notify_presenter.
+ * @req REQ-MCP-024
  * @version 2.3.7
  */
 ServerResponse TodoTool::execute(const std::string& args_json) {
@@ -227,9 +230,15 @@ public:
 
 /**
  * @brief Construct and patch enum in input schema.
+ *
+ * The target enum is patched at construction from the tier names the
+ * server was given — and those exclude source tiers, so a tier cannot
+ * delegate to itself.
+ *
  * @param def Tool definition.
  * @param tier_names Tier names for target enum.
- * @internal
+ * @req REQ-MCP-024
+ * @req REQ-MCP-013
  * @version 1.8.5
  */
 DelegateTool::DelegateTool(
@@ -247,9 +256,12 @@ DelegateTool::DelegateTool(
 
 /**
  * @brief Parse delegation args and emit directives.
- * @param args_json JSON with "target", "task", optional "max_turns".
- * @return ServerResponse with result text and directives.
- * @internal
+ * @param args_json JSON with "target", "task", optional "max_turns"
+ *                  (defaulting to -1 for "engine decides").
+ * @return A ServerResponse whose result echoes the delegation and whose
+ *         directives are delegate + stop_processing — the pair that
+ *         hands the turn to the child loop.
+ * @req REQ-MCP-024
  * @version 1.8.5
  */
 ServerResponse DelegateTool::execute(const std::string& args_json) {
@@ -310,9 +322,15 @@ private:
 
 /**
  * @brief Construct and patch stage enum in input schema.
+ *
+ * The tier list is kept as a member as well as patched into the schema,
+ * so stages are re-validated at execute time rather than trusting the
+ * model to have honoured the enum.
+ *
  * @param def Tool definition.
  * @param tier_names Tier names for stages enum.
- * @internal
+ * @req REQ-MCP-024
+ * @req REQ-MCP-013
  * @version 2.10.0
  */
 PipelineTool::PipelineTool(
@@ -336,8 +354,12 @@ PipelineTool::PipelineTool(
  * error string naming the offending stage and the valid options.
  *
  * @param args_json JSON with "stages" and "task".
- * @return ServerResponse with result text and directives.
- * @internal
+ * @return On success, a ServerResponse echoing the stages with
+ *         pipeline + stop_processing directives. On fewer than two
+ *         stages, or a stage naming a tier not in tier_names, an error
+ *         string quoting the offending stage and the valid options —
+ *         with NO directives, so nothing is dispatched.
+ * @req REQ-MCP-024
  * @version 2.10.0
  */
 ServerResponse PipelineTool::execute(const std::string& args_json) {
@@ -416,9 +438,13 @@ public:
  * instead.
  *
  * @param args_json JSON with "summary" and optional "coverage_gap" /
- *                  "suggested_files".
- * @return ServerResponse with summary and directives.
- * @internal
+ *                  "gap_description" / "suggested_files".
+ * @return On success, a ServerResponse carrying the sanitized summary
+ *         with complete + stop_processing directives. When
+ *         coverage_gap is true and gap_description is empty, a
+ *         `missing_gap_description` error with NO directives — the
+ *         validation runs before any directive is emitted.
+ * @req REQ-MCP-024
  * @version 2.10.0
  */
 ServerResponse CompleteTool::execute(const std::string& args_json) {
@@ -508,8 +534,9 @@ PhaseChangeTool::PhaseChangeTool()
 /**
  * @brief Parse phase and emit directive.
  * @param args_json JSON with "phase".
- * @return ServerResponse with phase_change directive.
- * @internal
+ * @return A ServerResponse echoing the requested phase with a single
+ *         phase_change directive for the DirectiveProcessor.
+ * @req REQ-MCP-024
  * @version 1.8.5
  */
 ServerResponse PhaseChangeTool::execute(
@@ -557,9 +584,11 @@ public:
 
 /**
  * @brief Parse keep_recent and emit prune directive.
- * @param args_json JSON with optional "keep_recent".
- * @return ServerResponse with prune_messages directive.
- * @internal
+ * @param args_json JSON with optional "keep_recent" (defaulting to 2
+ *                  when omitted).
+ * @return A ServerResponse echoing the retained-message count with a
+ *         single prune_messages directive.
+ * @req REQ-MCP-024
  * @version 1.8.5
  */
 ServerResponse PruneContextTool::execute(
@@ -610,8 +639,9 @@ public:
 
     /**
      * @brief Read-only tool requires only READ access.
-     * @return MCPAccessLevel::READ.
-     * @internal
+     * @return MCPAccessLevel::READ, relaxing ToolBase's WRITE default
+     *         because this tool only reads engine state.
+     * @req REQ-MCP-011
      * @version 1.9.12
      */
     MCPAccessLevel required_access_level() const override {
@@ -633,10 +663,16 @@ private:
 
 /**
  * @brief Call a state provider callback and wrap result.
+ *
+ * Every introspection tool reads engine state through the
+ * entropic_state_provider_t callback struct, and each individual
+ * callback is null-checked here rather than dereferenced.
+ *
  * @param fn Callback returning malloc'd string (or nullptr).
  * @param ud User data for callback.
- * @return JSON string (empty object if callback is null).
- * @internal
+ * @return The callback's string, copied and its buffer freed; "{}" when
+ *         the callback is absent or returned null.
+ * @req REQ-MCP-024
  * @version 1.9.12
  */
 static std::string call_provider(
@@ -746,9 +782,17 @@ static nlohmann::json build_snapshot(
 
 /**
  * @brief Execute diagnostic snapshot.
- * @param args_json JSON with optional include_docs, history_limit.
- * @return ServerResponse with snapshot JSON.
- * @internal
+ *
+ * Introspection, not control: the response carries data and NO
+ * directives.
+ *
+ * @param args_json JSON with optional include_docs (default false) and
+ *                  history_limit (default 20).
+ * @return A ServerResponse with an empty directives array whose result
+ *         is the snapshot JSON; when no state provider is configured,
+ *         the "engine state provider not configured" error instead of a
+ *         null callback dereference.
+ * @req REQ-MCP-024
  * @version 1.9.12
  */
 ServerResponse DiagnoseTool::execute(const std::string& args_json) {
@@ -798,8 +842,9 @@ public:
 
     /**
      * @brief Read-only tool requires only READ access.
-     * @return MCPAccessLevel::READ.
-     * @internal
+     * @return MCPAccessLevel::READ, relaxing ToolBase's WRITE default
+     *         because this tool only reads engine state.
+     * @req REQ-MCP-011
      * @version 1.9.12
      */
     MCPAccessLevel required_access_level() const override {
@@ -852,8 +897,9 @@ public:
 
     /**
      * @brief Read-only tool requires only READ access.
-     * @return MCPAccessLevel::READ.
-     * @internal
+     * @return MCPAccessLevel::READ, relaxing ToolBase's WRITE default
+     *         because this tool only reads engine state.
+     * @req REQ-MCP-011
      * @version 2.0.6-rc16
      */
     MCPAccessLevel required_access_level() const override {
@@ -1084,8 +1130,12 @@ static std::string dispatch_inspect(
  * `nlohmann::json::type_error.306`.
  *
  * @param args_json JSON with optional "target" and "key".
- * @return ServerResponse with query result.
- * @internal
+ * @return A ServerResponse with an empty directives array whose result
+ *         is the full state dump for an absent/empty target, the
+ *         target's data otherwise, an unknown-target error listing the
+ *         supported targets, or the provider-not-configured error when
+ *         no state provider is wired.
+ * @req REQ-MCP-024
  * @version 2.1.6
  */
 ServerResponse InspectTool::execute(const std::string& args_json) {
@@ -1124,9 +1174,12 @@ ServerResponse InspectTool::execute(const std::string& args_json) {
  * Delegates to the state provider's get_history callback with the
  * caller-supplied max_messages limit (0 = all messages).
  *
- * @param args_json JSON with optional "max_messages".
- * @return ServerResponse with JSON array of message entries.
- * @internal
+ * @param args_json JSON with optional "max_messages" (0 = all).
+ * @return A ServerResponse with an empty directives array whose result
+ *         is the JSON array of message entries; the
+ *         provider-not-configured error when no state provider is
+ *         wired.
+ * @req REQ-MCP-024
  * @version 2.0.6-rc16
  */
 ServerResponse ContextInspectTool::execute(
@@ -1179,8 +1232,9 @@ public:
 
     /**
      * @brief Read-only — requires only READ access.
-     * @return MCPAccessLevel::READ.
-     * @internal
+     * @return MCPAccessLevel::READ, relaxing ToolBase's WRITE default
+     *         because this tool only reads prior delegation records.
+     * @req REQ-MCP-011
      * @version 2.1.6
      */
     MCPAccessLevel required_access_level() const override {
@@ -1202,9 +1256,14 @@ private:
 
 /**
  * @brief Execute a followup query against prior delegations.
- * @param args_json JSON with "query" and optional "max_results".
- * @return ServerResponse with results or typed error; no directives.
- * @internal
+ * @param args_json JSON with "query" and optional "max_results"
+ *                  (default 3).
+ * @return A ServerResponse with NO directives whose result is the
+ *         search results JSON, or one of the typed errors: invalid args
+ *         for non-object/malformed JSON, a required-query error for an
+ *         empty query, or storage-not-available when no search provider
+ *         is wired.
+ * @req REQ-MCP-024
  * @version 2.1.6
  */
 ServerResponse FollowupTool::execute(const std::string& args_json) {
@@ -1276,8 +1335,11 @@ public:
 /**
  * @brief Parse resume args and emit a resume-flavored DelegateDirective.
  * @param args_json JSON {delegation_id, task, max_turns?}.
- * @return ServerResponse with directives.
- * @internal
+ * @return On valid arguments, a ServerResponse with delegate +
+ *         stop_processing directives. On non-object args, or a missing
+ *         delegation_id or task, a typed error with NO directives —
+ *         validation precedes any directive emission.
+ * @req REQ-MCP-024
  * @version 2.1.6
  */
 ServerResponse ResumeDelegationTool::execute(const std::string& args_json) {
@@ -1312,9 +1374,15 @@ ServerResponse ResumeDelegationTool::execute(const std::string& args_json) {
 
 /**
  * @brief Register core tools (todo, complete, phase_change, prune).
+ *
+ * The control half of the engine's own surface — every one of these
+ * returns typed directives the DirectiveProcessor acts on.
+ *
  * @param tools_dir Path to tools directory.
- * @return Number of tools registered.
- * @internal
+ * @return 4 — todo, complete, phase_change and prune_context are
+ *         always registered regardless of tier configuration.
+ * @req REQ-MCP-024
+ * @req REQ-MCP-001
  * @version 1.9.12
  */
 int EntropicServer::register_core_tools(
@@ -1346,8 +1414,11 @@ int EntropicServer::register_core_tools(
  * @brief Register delegation tools if multi-tier.
  * @param tools_dir Path to tools directory.
  * @param tier_names Tier names for schema patching.
- * @return Number of tools registered.
- * @internal
+ * @return 3 (delegate, pipeline, resume_delegation) when more than one
+ *         tier is configured; 0 for a single-tier config, which skips
+ *         registering them entirely so they never appear in the model's
+ *         tool list.
+ * @req REQ-MCP-024
  * @version 2.1.6
  */
 int EntropicServer::register_delegation_tools(
@@ -1381,9 +1452,15 @@ int EntropicServer::register_delegation_tools(
 
 /**
  * @brief Register introspection tools (diagnose, inspect, context_inspect).
+ *
+ * The read-only half of the surface: these return data with NO
+ * directives, and all four read engine state through the same
+ * state_provider plumbing.
+ *
  * @param tools_dir Path to tools directory.
- * @return Number of tools registered.
- * @internal
+ * @return 4 — diagnose, inspect, context_inspect and followup.
+ * @req REQ-MCP-024
+ * @req REQ-MCP-011
  * @version 2.3.7
  */
 int EntropicServer::register_introspection_tools(
@@ -1437,9 +1514,14 @@ EntropicServer::~EntropicServer() = default;
 
 /**
  * @brief Skip duplicate check for delegate and pipeline.
+ *
+ * Both are legitimately repeatable side effects — the same delegation
+ * issued twice is two delegations, not a stuck model.
+ *
  * @param tool_name Local tool name.
- * @return true for delegate and pipeline.
- * @internal
+ * @return true for "delegate" and "pipeline"; false for every other
+ *         entropic tool, which stay duplicate-checked.
+ * @req REQ-MCP-015
  * @version 1.8.5
  */
 bool EntropicServer::skip_duplicate_check(
@@ -1449,8 +1531,15 @@ bool EntropicServer::skip_duplicate_check(
 
 /**
  * @brief Set the engine state provider for introspection tools.
- * @param provider Callback struct with engine state accessors.
- * @internal
+ *
+ * Until this is called every introspection tool answers with the
+ * "engine state provider not configured" error rather than
+ * dereferencing a null callback.
+ *
+ * @param provider Callback struct with engine state accessors; copied
+ *                 into the server, and the copy's address handed to
+ *                 diagnose, inspect, context_inspect and followup.
+ * @req REQ-MCP-024
  * @version 2.1.6
  */
 void EntropicServer::set_state_provider(

@@ -101,8 +101,10 @@ static bool one_call_satisfies_schema(const ToolCall& call,
  * @brief Check that every call's declared required parameters are present.
  * @param calls Parsed tool calls.
  * @param tools_json Staged MCP tool defs.
- * @return true when nothing is provably missing.
- * @internal
+ * @return true when nothing is provably missing — including the vacuous
+ *         cases of no calls or no staged schema, and calls naming a tool
+ *         outside the staged set, which are left alone.
+ * @req REQ-INFER-010
  * @version 2.10.3
  */
 bool calls_satisfy_schema(const std::vector<ToolCall>& calls,
@@ -117,11 +119,18 @@ bool calls_satisfy_schema(const std::vector<ToolCall>& calls,
 
 /**
  * @brief Tool calls from the template parser, when trustworthy.
+ *
+ * Trustworthiness is an a-posteriori check, not a try/catch: common_chat's
+ * PEG autoparser silently extracts only the FIRST `<parameter=>` of a
+ * multi-parameter call and returns a well-formed ToolCall with arguments
+ * missing, so the result is validated against the staged schema.
+ *
  * @param llama Backend.
  * @param raw Raw output.
  * @param[out] out Result to populate on success.
- * @return true when the template produced a usable parse.
- * @utility
+ * @return true when the format is reliable AND the parsed calls satisfy the
+ *         staged schema; false routes the caller to the adapter parser.
+ * @req REQ-INFER-010
  * @version 2.10.3
  */
 static bool try_template_parse(LlamaCppBackend* llama, const std::string& raw,
@@ -142,11 +151,22 @@ static bool try_template_parse(LlamaCppBackend* llama, const std::string& raw,
 
 /**
  * @brief Parse a raw emission: template first, adapter second.
+ *
+ * The single shared rule, used by both the orchestrator's buffered result
+ * and the agent-loop tool parse — duplicating the branch is how gh#108
+ * reached one path and not the other. Tool-call extraction is either/or
+ * (two call lists cannot be merged); content cleanup composes, so the
+ * adapter's reasoning strip ALWAYS runs over whichever branch produced the
+ * content, and is idempotent so no path can be missed.
+ *
  * @param llama Backend, or nullptr when not llama.cpp-backed.
  * @param adapter Resolved chat adapter, or nullptr.
  * @param raw Raw model output.
- * @return Cleaned content plus tool calls.
- * @internal
+ * @return Cleaned content plus tool calls, with used_template set when the
+ *         template branch won; with no backend, no captured arena, or a
+ *         schema-incomplete template parse, the adapter's calls instead —
+ *         and the raw text as content when there is no adapter either.
+ * @req REQ-INFER-010
  * @version 2.10.3
  */
 ParsedModelResponse parse_model_response(LlamaCppBackend* llama,

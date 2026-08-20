@@ -98,6 +98,7 @@ public:
      * @param hook_iface HookInterface for registration (via fire_post).
      * @param inference InferenceInterface for critique generation.
      * @return ENTROPIC_OK on success.
+     * @req REQ-HOOK-002
      * @version 1.9.8
      */
     entropic_error_t attach(
@@ -107,6 +108,7 @@ public:
     /**
      * @brief Deregister the POST_GENERATE hook.
      * @param hook_iface HookInterface for deregistration.
+     * @req REQ-HOOK-002
      * @version 1.9.8
      */
     void detach(HookInterface* hook_iface);
@@ -119,6 +121,7 @@ public:
      *
      * @param identity_name Identity name to check.
      * @return true if validation should run for this identity.
+     * @req REQ-VALID-001
      * @version 2.0.7
      */
     bool should_validate(const std::string& identity_name) const;
@@ -127,6 +130,7 @@ public:
      * @brief Set per-identity validation override.
      * @param identity_name Identity name.
      * @param enabled Whether validation is enabled for this identity.
+     * @req REQ-VALID-001
      * @version 1.9.8
      */
     void set_identity_validation(
@@ -150,7 +154,7 @@ public:
      * no per-identity override exists.
      *
      * @param enabled true to enable validation globally, false to disable.
-     * @req REQ-VALID-004
+     * @req REQ-VALID-001
      * @version 2.0.2
      */
     void set_global_enabled(bool enabled);
@@ -169,6 +173,7 @@ public:
      * Unset, the `<think>` default applies.
      *
      * @param resolver Maps tier name → {open, close}.
+     * @req REQ-VALID-001
      * @version 2.10.3
      */
     void set_marker_resolver(
@@ -189,6 +194,8 @@ public:
      * 4. If violations and revision enabled, revise
      * 5. Return final (possibly revised) content
      *
+     * @req REQ-VALID-001
+     * @req REQ-VALID-002
      * @version 1.9.8
      */
     ValidationResult validate(
@@ -199,6 +206,7 @@ public:
     /**
      * @brief Get the last validation result.
      * @return Most recent ValidationResult, or default if none.
+     * @req REQ-VALID-002
      * @version 1.9.8
      */
     ValidationResult last_result() const;
@@ -215,6 +223,7 @@ public:
      * behavior).
      *
      * @param enabled Whether auto-revision is enabled.
+     * @req REQ-VALID-003
      * @version 2.1.5
      */
     void set_auto_retry(bool enabled);
@@ -222,7 +231,7 @@ public:
     /**
      * @brief Whether auto-revision is currently enabled.
      * @return true if enabled.
-     * @utility
+     * @req REQ-VALID-003
      * @version 2.1.5
      */
     bool auto_retry_enabled() const;
@@ -236,6 +245,7 @@ public:
      * `ENTROPIC_ERROR_INVALID_STATE` if no validation is paused.
      *
      * @return ENTROPIC_OK on success.
+     * @req REQ-VALID-003
      * @version 2.1.5
      */
     entropic_error_t resume_retry();
@@ -249,6 +259,7 @@ public:
      *
      * @return ENTROPIC_OK on success.
      *         ENTROPIC_ERROR_INVALID_STATE if no validation is paused.
+     * @req REQ-VALID-003
      * @version 2.1.5
      */
     entropic_error_t accept_last();
@@ -261,6 +272,7 @@ public:
      *
      * @param cb Callback (nullable clears).
      * @param user_data Forwarded to `cb`.
+     * @req REQ-VALID-003
      * @version 2.1.5
      */
     void set_attempt_boundary_cb(
@@ -288,6 +300,7 @@ public:
      * @param end_cb   Fires after the critique generate returns.
      * @param user_data Forwarded to both callbacks.
      * @threadsafety Thread-safe (guarded by critique_cbs_mutex_).
+     * @req REQ-VALID-003
      * @version 2.1.12
      */
     void set_critique_callbacks(
@@ -315,7 +328,7 @@ public:
      * @param modified_json Output: revised JSON or NULL.
      * @param user_data ValidationContext pointer.
      * @return 0 (post-hooks cannot cancel).
-     * @callback
+     * @req REQ-HOOK-002
      * @version 1.9.8
      */
     static int hook_callback(
@@ -328,6 +341,7 @@ public:
      * @brief Build the critique prompt (exposed for testing).
      * @param content Text to critique.
      * @return Formatted critique prompt string.
+     * @req REQ-VALID-002
      * @version 1.9.8
      */
     std::string build_critique_prompt(const std::string& content) const;
@@ -336,6 +350,7 @@ public:
      * @brief Parse critique JSON into structured result (exposed for testing).
      * @param json_str Raw JSON string from grammar-constrained generation.
      * @return Parsed CritiqueResult.
+     * @req REQ-VALID-002
      * @version 1.9.8
      */
     static CritiqueResult parse_critique(const std::string& json_str);
@@ -345,7 +360,8 @@ private:
      * @brief Generate a critique of the given content.
      * @param content Text to critique.
      * @return Parsed CritiqueResult.
-     * @internal
+     * @req REQ-VALID-002
+     * @req REQ-VALID-003
      * @version 1.9.8
      */
     CritiqueResult run_critique(const std::string& content);
@@ -373,7 +389,7 @@ private:
      * @param critique The critique result with violations.
      * @param messages_json Original conversation context.
      * @return Revised content string.
-     * @internal
+     * @req REQ-VALID-002
      * @version 1.9.8
      */
     std::string revise(
@@ -392,7 +408,7 @@ private:
     /**
      * @brief Emit a disambiguating log line per verdict.
      * @param result Validation result with verdict set.
-     * @internal
+     * @req REQ-VALID-002
      * @version 2.0.6-rc17
      */
     void log_verdict(const ValidationResult& result) const;
@@ -403,7 +419,8 @@ private:
      * @param tier Identity/tier name.
      * @param messages_json Conversation context.
      * @return ValidationResult after critique/revision.
-     * @internal
+     * @req REQ-VALID-002
+     * @req REQ-VALID-003
      * @version 1.9.8
      */
     ValidationResult run_validation_loop(
@@ -417,7 +434,8 @@ private:
      * @param initial_critique First critique result.
      * @param messages_json Conversation context.
      * @return Updated ValidationResult.
-     * @internal
+     * @req REQ-VALID-002
+     * @req REQ-VALID-003
      * @version 1.9.8
      */
     ValidationResult apply_revisions(
@@ -431,7 +449,7 @@ private:
      * @param critique Critique with violations.
      * @param messages_json Conversation context for Path B.
      * @return Revised content string.
-     * @internal
+     * @req REQ-VALID-002
      * @version 1.9.8
      */
     std::string attempt_revision(
@@ -492,7 +510,8 @@ private:
      * @param context_json JSON context from engine.
      * @param modified_json Output: revised JSON or NULL.
      * @return 0 (post-hooks cannot cancel).
-     * @internal
+     * @req REQ-HOOK-002
+     * @req REQ-VALID-001
      * @version 1.9.8
      */
     int handle_hook(const char* context_json, char** modified_json);

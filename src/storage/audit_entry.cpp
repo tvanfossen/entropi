@@ -47,7 +47,7 @@ static void parse_result_fields(
  * @brief Serialize AuditEntry fields to a JSON object.
  * @param entry The audit entry to serialize.
  * @return JSON object with all entry fields.
- * @internal
+ * @req REQ-STOR-008
  * @version 1.9.5
  */
 nlohmann::json audit_entry_to_json(const AuditEntry& entry) {
@@ -74,7 +74,7 @@ nlohmann::json audit_entry_to_json(const AuditEntry& entry) {
  * @param j JSON object (one JSONL line).
  * @param[out] entry Populated entry.
  * @return true if all required fields present and valid.
- * @internal
+ * @req REQ-STOR-008
  * @version 1.9.5
  */
 bool audit_entry_from_json(const nlohmann::json& j, AuditEntry& entry) {

@@ -105,7 +105,7 @@ constexpr Subcommand kSubcommands[] = {
  * @param argv Argument vector. argv[1] is the subcommand name.
  * @return 0 on success, 1 on usage error or subcommand failure.
  *
- * @internal
+ * @req REQ-PROD-001
  * @version 2.0.5
  */
 int main(int argc, char* argv[])

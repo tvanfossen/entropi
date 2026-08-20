@@ -1,1 +1,223 @@
-[]
+[
+  {
+    "req_id": "REQ-INFER-002",
+    "req_name": "Teardown releases every model, context and adapter handle",
+    "functions": [
+      {
+        "name": "shutdown",
+        "file": "src/inference/orchestrator.cpp",
+        "version": "2.1.11"
+      },
+      {
+        "name": "~ModelOrchestrator",
+        "file": "src/inference/orchestrator.cpp",
+        "version": "2.3.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-INFER-005",
+    "req_name": "Every decode path honours cooperative cancellation within one token",
+    "functions": [
+      {
+        "name": "generate_streaming",
+        "file": "src/inference/orchestrator.cpp",
+        "version": "2.11.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-INFER-007",
+    "req_name": "Named grammars are registered, validated, and resolved by a fixed precedence",
+    "functions": [
+      {
+        "name": "resolve_grammar_key",
+        "file": "src/inference/orchestrator.cpp",
+        "version": "2.0.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-INFER-009",
+    "req_name": "Tool staging drives a native render whose parse context is captured",
+    "functions": [
+      {
+        "name": "stage_active_tools",
+        "file": "src/inference/orchestrator.cpp",
+        "version": "2.10.4"
+      },
+      {
+        "name": "resolve_and_stage",
+        "file": "src/inference/orchestrator.cpp",
+        "version": "2.10.4"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-INFER-010",
+    "req_name": "One template-first / adapter-second rule parses every raw emission",
+    "functions": [
+      {
+        "name": "apply_adapter_parse",
+        "file": "src/inference/orchestrator.cpp",
+        "version": "2.10.3"
+      },
+      {
+        "name": "warn_if_content_vanished",
+        "file": "src/inference/orchestrator.cpp",
+        "version": "2.11.0"
+      },
+      {
+        "name": "warn_turn_diagnostics",
+        "file": "src/inference/orchestrator.cpp",
+        "version": "2.11.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-INFER-011",
+    "req_name": "Reasoning-block markers are declared once per model family",
+    "functions": [
+      {
+        "name": "generate_streaming",
+        "file": "src/inference/orchestrator.cpp",
+        "version": "2.11.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-INFER-015",
+    "req_name": "MTP speculative decode fails loud and never silently falls back",
+    "functions": [
+      {
+        "name": "resolve_mtp_effective",
+        "file": "src/inference/orchestrator.cpp",
+        "version": "2.9.4"
+      },
+      {
+        "name": "try_mtp_route",
+        "file": "src/inference/orchestrator.cpp",
+        "version": "2.9.1"
+      },
+      {
+        "name": "mtp_head_guard_fires",
+        "file": "src/inference/orchestrator.cpp",
+        "version": "2.10.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-INFER-019",
+    "req_name": "Model pool dedup and VRAM residency policy govern which tier is resident",
+    "functions": [
+      {
+        "name": "log_fit_recommendation",
+        "file": "src/inference/orchestrator.cpp",
+        "version": "2.11.0"
+      },
+      {
+        "name": "resolve_vram_budget_bytes",
+        "file": "src/inference/orchestrator.cpp",
+        "version": "2.11.1"
+      },
+      {
+        "name": "footprint_inputs_for",
+        "file": "src/inference/orchestrator.cpp",
+        "version": "2.11.0"
+      },
+      {
+        "name": "estimate_footprint_bytes",
+        "file": "src/inference/orchestrator.cpp",
+        "version": "2.11.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-INFER-020",
+    "req_name": "Tier routing, handoff rules and secondary model roles",
+    "functions": [
+      {
+        "name": "build_routing_tables",
+        "file": "src/inference/orchestrator.cpp",
+        "version": "2.0.2"
+      },
+      {
+        "name": "activate_router",
+        "file": "src/inference/orchestrator.cpp",
+        "version": "2.1.11"
+      },
+      {
+        "name": "activate_draft",
+        "file": "src/inference/orchestrator.cpp",
+        "version": "2.9.0"
+      },
+      {
+        "name": "shutdown",
+        "file": "src/inference/orchestrator.cpp",
+        "version": "2.1.11"
+      },
+      {
+        "name": "route",
+        "file": "src/inference/orchestrator.cpp",
+        "version": "2.1.11"
+      },
+      {
+        "name": "classify_task",
+        "file": "src/inference/orchestrator.cpp",
+        "version": "2.8.1"
+      },
+      {
+        "name": "last_routing_result",
+        "file": "src/inference/orchestrator.cpp",
+        "version": "1.8.2"
+      },
+      {
+        "name": "loaded_models",
+        "file": "src/inference/orchestrator.cpp",
+        "version": "2.1.11"
+      },
+      {
+        "name": "can_handoff",
+        "file": "src/inference/orchestrator.cpp",
+        "version": "1.8.2"
+      },
+      {
+        "name": "clear_all_prompt_caches",
+        "file": "src/inference/orchestrator.cpp",
+        "version": "2.1.11"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-INFER-021",
+    "req_name": "Per-tier sampler configuration applies only where the caller did not decide",
+    "functions": [
+      {
+        "name": "apply_tier_sampler_overrides",
+        "file": "src/inference/orchestrator.cpp",
+        "version": "2.8.2"
+      },
+      {
+        "name": "apply_tier_sampler_defaults",
+        "file": "src/inference/orchestrator.cpp",
+        "version": "2.8.2"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-INFER-025",
+    "req_name": "Multimodal input is bounded, tier-gated and degrades gracefully",
+    "functions": [
+      {
+        "name": "has_vision_capable_tier",
+        "file": "src/inference/orchestrator.cpp",
+        "version": "2.1.8"
+      },
+      {
+        "name": "select_vision_tier",
+        "file": "src/inference/orchestrator.cpp",
+        "version": "2.1.8"
+      }
+    ]
+  }
+]

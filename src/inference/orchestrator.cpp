@@ -16,6 +16,9 @@
 #include <entropic/types/logging.h>
 
 #include "llama_cpp_backend.h"
+#include "empty_content_diagnosis.h"
+#include "device_memory.h"
+#include "vram_footprint.h"
 #include "response_parse.h"
 #include "mtp_envelope.h"
 #include <entropic/core/stream_think_filter.h>
@@ -98,8 +101,12 @@ bool ModelOrchestrator::create_tier_backends(const ParsedConfig& config) {
 
 /**
  * @brief Build digit-to-tier and handoff rule maps from config.
+ *
+ * An absent `handoff_rules` block leaves the map empty, which is what makes
+ * can_handoff deny every pair rather than allow them.
+ *
  * @param config Parsed engine config.
- * @utility
+ * @req REQ-INFER-020
  * @version 2.0.2
  */
 void ModelOrchestrator::build_routing_tables(const ParsedConfig& config) {
@@ -140,7 +147,7 @@ bool ModelOrchestrator::activate_default_tier(const ParsedConfig& config) {
  * router still loads at init when `models.router` is configured.
  *
  * @param config Parsed engine config.
- * @utility
+ * @req REQ-INFER-020
  * @version 2.1.11
  */
 void ModelOrchestrator::activate_router(const ParsedConfig& config) {
@@ -160,7 +167,7 @@ void ModelOrchestrator::activate_router(const ParsedConfig& config) {
  * (degrades to plain decode) rather than blocking engine init.
  *
  * @param config Parsed engine config.
- * @internal
+ * @req REQ-INFER-020
  * @version 2.9.0
  */
 void ModelOrchestrator::activate_draft(const ParsedConfig& config) {
@@ -244,7 +251,8 @@ bool ModelOrchestrator::initialize(const ParsedConfig& config) {
  * Main-tier pool is unloaded directly; secondary roles (router, draft,
  * etc.) are released through `secondary_loader_.shutdown()` (v2.1.11).
  *
- * @internal
+ * @req REQ-INFER-002
+ * @req REQ-INFER-020
  * @version 2.1.11
  */
 void ModelOrchestrator::shutdown() {
@@ -261,7 +269,12 @@ void ModelOrchestrator::shutdown() {
 
 /**
  * @brief Orchestrate teardown order (gh#58 close-out). See header.
- * @utility
+ *
+ * Backends first (frees the llama_contexts), LoRA handles second — a LoRA
+ * handle must outlive every context that referenced it, so the reverse
+ * order is a use-after-free.
+ *
+ * @req REQ-INFER-002
  * @version 2.3.0
  */
 ModelOrchestrator::~ModelOrchestrator() {
@@ -277,7 +290,11 @@ ModelOrchestrator::~ModelOrchestrator() {
  * @brief Resolve whether MTP should be attempted for this tier (gh#108,
  *        v2.9.4): `TierConfig::speculative_mtp` overrides the global
  *        `speculative.mtp` flag when set, else inherits it.
- * @internal
+ * @param tier_name Tier whose override to consult.
+ * @return The per-tier `speculative_mtp` value when the tier sets one —
+ *         it wins over the global flag in both directions — else the global
+ *         `inference.speculative.mtp`.
+ * @req REQ-INFER-015
  * @version 2.9.4
  */
 bool ModelOrchestrator::resolve_mtp_effective(const std::string& tier_name) const {
@@ -319,7 +336,17 @@ GenerationResult ModelOrchestrator::run_generate_dispatch(
  * (ENTROPIC_ERROR_SPECULATIVE_INCOMPATIBLE_CONFIG for an out-of-envelope
  * request), which is propagated so the consumer corrects the config rather
  * than getting silent plain decode that masks MTP never engaging.
- * @internal
+ *
+ * @param model Active backend; a non-llama.cpp target yields NOT_SUPPORTED
+ *        with "disable speculative.mtp" rather than a fallback.
+ * @param messages Conversation history.
+ * @param params Generation parameters.
+ * @param on_token Per-token callback (may be empty).
+ * @param cancel Cancel flag.
+ * @param[out] result The MTP outcome — kernel result or typed loud error.
+ * @return Always true: MTP owns the outcome, so the caller never falls
+ *         through to plain decode.
+ * @req REQ-INFER-015
  * @version 2.9.1
  */
 bool ModelOrchestrator::try_mtp_route(
@@ -357,9 +384,11 @@ bool ModelOrchestrator::try_mtp_route(
  * Fail loud with INCOMPATIBLE_CONFIG instead of crashing.
  *
  * @param draft  Draft LlamaCppBackend (model must be loaded for the check).
- * @param result [out] Populated on true return.
+ * @param result [out] Populated on true return with
+ *        SPECULATIVE_INCOMPATIBLE_CONFIG naming the layer count and the
+ *        `speculative.mtp: true` knob.
  * @return True when the guard fires and result is populated; false otherwise.
- * @internal
+ * @req REQ-INFER-015
  * @version 2.10.0
  */
 static bool mtp_head_guard_fires(LlamaCppBackend* draft,
@@ -481,7 +510,9 @@ bool ModelOrchestrator::try_speculative_route(
  *
  * @param model Active backend (may be null / non-LlamaCpp).
  * @param params Resolved generation params (carries `tools`).
- * @utility
+ * @param require_tool_call Per-tier mandatory-tool flag staged alongside the
+ *        defs; drives the render's tool_choice.
+ * @req REQ-INFER-009
  * @version 2.10.4
  */
 static void stage_active_tools(InferenceBackend* model,
@@ -506,7 +537,7 @@ static void stage_active_tools(InferenceBackend* model,
  * @param model Backend that produced the result (for common_chat routing).
  * @param adapter Tier adapter for the autoparser/fallback path (may be null).
  * @param[in,out] result Generation result (content split, tools set).
- * @utility
+ * @req REQ-INFER-010
  * @version 2.10.3
  */
 static void apply_adapter_parse(InferenceBackend* model,
@@ -523,6 +554,32 @@ static void apply_adapter_parse(InferenceBackend* model,
     result.tool_calls = std::move(parsed.tool_calls);
 }
 
+
+/**
+ * @brief Explain a turn that produced tokens but delivered no content (gh#137).
+ *
+ * The reasoning strip legitimately empties a generation that never closed its
+ * reasoning block — surfacing raw reasoning as the answer would be worse. But
+ * the operator has to know WHICH problem they have, and until v2.11.0 the
+ * engine gave one message for both, telling them to raise max_tokens.
+ *
+ * gh#137 reported finish=stop with 154 chars delivering 0 chars. The model
+ * ended that turn itself; no budget increase can help, and the advice sent the
+ * reporter looking in the wrong place. This is the only site that can tell the
+ * difference, because it is the only one holding finish_reason.
+ *
+ * @param result Completed generation result.
+ * @req REQ-INFER-010
+ * @version 2.11.0
+ */
+static void warn_if_content_vanished(const GenerationResult& result) {
+    const auto cause = diagnose_empty_content(
+        result.content.empty(), !result.raw_content.empty(),
+        result.finish_reason);
+    if (cause == EmptyContentCause::not_empty) { return; }
+    logger->warn("Turn produced {} raw chars but delivered no content. {}",
+                 result.raw_content.size(), explain_empty_content(cause));
+}
 
 /**
  * @brief Diagnose a mandatory-tool turn that ran out of budget (gh#134).
@@ -566,6 +623,27 @@ static void warn_if_budget_starved_required_turn(
 }
 
 /**
+ * @brief Report every post-turn diagnostic from one call site (gh#137).
+ *
+ * Folded into a single entry point because the caller is `generate`, which sits
+ * against the knots ABC ceiling — two adjacent warn calls pushed it over. Both
+ * checks are no-ops on a healthy turn.
+ *
+ * @param result Completed generation result.
+ * @param tier_name Selected tier.
+ * @param tiers Configured tiers, for the require_tool_call budget check.
+ * @req REQ-INFER-010
+ * @version 2.11.0
+ */
+static void warn_turn_diagnostics(
+    const GenerationResult& result,
+    const std::string& tier_name,
+    const std::unordered_map<std::string, TierConfig>& tiers) {
+    warn_if_content_vanished(result);
+    warn_if_budget_starved_required_turn(result, tier_name, tiers);
+}
+
+/**
  * @brief Resolve params + stage tools for a generate dispatch (gh#87).
  *
  * gh#105 (v2.8.3): the gh#103 sequential close-marker injection was REMOVED
@@ -577,8 +655,10 @@ static void warn_if_budget_starved_required_turn(
  * @param model Active backend (tools staged here).
  * @param params Incoming generation params.
  * @param tier_name Selected tier.
- * @return Resolved params.
- * @internal
+ * @return Resolved params — grammar_key resolved, per-tier sampler defaults
+ *         applied — with the turn's tools and require_tool_call flag already
+ *         staged on the backend.
+ * @req REQ-INFER-009
  * @version 2.10.4
  */
 GenerationParams ModelOrchestrator::resolve_and_stage(
@@ -642,7 +722,7 @@ static void log_orchestration(const GenerationResult& result,
  * @param tier_name Explicit tier or empty for routing.
  * @return GenerationResult.
  * @internal
- * @version 2.10.4
+ * @version 2.11.0
  */
 GenerationResult ModelOrchestrator::generate(
     const std::vector<Message>& messages,
@@ -676,7 +756,7 @@ GenerationResult ModelOrchestrator::generate(
 
     apply_adapter_parse(model, get_adapter(selected), result);
     // gh#134 (v2.10.4): name a budget-starved mandatory-tool turn.
-    warn_if_budget_starved_required_turn(result, selected,
+    warn_turn_diagnostics(result, selected,
                                          config_.models.tiers);
 
     result.routing_ms = routing_ms;
@@ -696,7 +776,7 @@ GenerationResult ModelOrchestrator::generate(
  * cancel)` which polls cancel per token.
  *
  * @internal
- * @version 2.10.4
+ * @version 2.11.0
  */
 GenerationResult ModelOrchestrator::generate(
     const std::vector<Message>& messages,
@@ -728,7 +808,7 @@ GenerationResult ModelOrchestrator::generate(
 
     apply_adapter_parse(model, get_adapter(selected), result);
     // gh#134 (v2.10.4): name a budget-starved mandatory-tool turn.
-    warn_if_budget_starved_required_turn(result, selected,
+    warn_turn_diagnostics(result, selected,
                                          config_.models.tiers);
 
     result.routing_ms = routing_ms;
@@ -811,8 +891,21 @@ static void stream_token_trampoline(const char* data, std::size_t len,
  * enables MTP streaming (the streaming guard in mtp_unsupported_reason
  * is removed in the same gh#108 v2.10.0 change).
  *
- * @internal
- * @version 2.10.4
+ * gh#108 (v2.10.3): the filter's markers come from the resolved adapter, the
+ * same source the buffered strip uses — v2.10.0 left it on a hardcoded
+ * `<think>` pair that gemma4 never emits.
+ *
+ * @param messages Conversation history.
+ * @param params Generation parameters.
+ * @param on_token Per-token callback, wrapped by the reasoning filter.
+ * @param cancel Cancel flag, polled by the backend once per token.
+ * @param tier_name Explicit tier, or empty to route.
+ * @return GenerationResult with content parsed by the shared rule; an
+ *         ENTROPIC_ERROR_GENERATE_FAILED result when no model resolves for
+ *         the tier.
+ * @req REQ-INFER-011
+ * @req REQ-INFER-005
+ * @version 2.11.0
  */
 GenerationResult ModelOrchestrator::generate_streaming(
     const std::vector<Message>& messages,
@@ -866,7 +959,7 @@ GenerationResult ModelOrchestrator::generate_streaming(
     filter.flush();
     apply_adapter_parse(model, get_adapter(selected), result);
     // gh#134 (v2.10.4): name a budget-starved mandatory-tool turn.
-    warn_if_budget_starved_required_turn(result, selected,
+    warn_turn_diagnostics(result, selected,
                                          config_.models.tiers);
     return result;
 }
@@ -880,9 +973,14 @@ GenerationResult ModelOrchestrator::generate_streaming(
  * configured (was: `router_` non-null). The slot is owned by
  * `secondary_loader_` since gh#27.
  *
+ * Every decision is recorded in `last_routing_result_` — selected tier,
+ * previous tier, raw model output, swap action — and pushed onto a tier
+ * history bounded at 5 entries.
+ *
  * @param messages Current conversation.
- * @return Selected tier name.
- * @internal
+ * @return Selected tier name; the default tier when routing is disabled, no
+ *         router is configured, or classification found no mapped digit.
+ * @req REQ-INFER-020
  * @version 2.1.11
  */
 std::string ModelOrchestrator::route(const std::vector<Message>& messages) {
@@ -924,8 +1022,10 @@ std::string ModelOrchestrator::route(const std::vector<Message>& messages) {
  * behavior for back-compat.
  *
  * @param messages Conversation history.
- * @return Pair of (tier_name, raw_digit), or ("","") on miss.
- * @internal
+ * @return Pair of (tier_name, raw_digit): the mapped tier and the digit that
+ *         selected it; ("","") when the router slot is not loaded; and
+ *         (default_tier_, "") when the router emitted no mapped digit.
+ * @req REQ-INFER-020
  * @version 2.8.1
  */
 std::pair<std::string, std::string> ModelOrchestrator::classify_task(
@@ -1028,6 +1128,48 @@ void ModelOrchestrator::record_activation_reuse(
                             tier_name, path, footprint);
 }
 
+// Defined lower down, beside estimate_footprint_bytes which shares it.
+static FootprintInputs footprint_inputs_for(
+    const TierConfig& tier_cfg, uint64_t weights_bytes, int vram_reserve_mb);
+
+/**
+ * @brief Log what WOULD fit when a tier is refused for VRAM (gh#142).
+ *
+ * Turns a refusal into an actionable setting. Reports the largest context
+ * length that fits the measured budget, or states that the context length is
+ * not the lever when nothing fits at any context.
+ *
+ * @param tier_name Tier being refused.
+ * @internal
+ * @req REQ-INFER-019
+ * @version 2.11.0
+ */
+void ModelOrchestrator::log_fit_recommendation(
+    const std::string& tier_name) const {
+    auto tier_it = config_.models.tiers.find(tier_name);
+    if (tier_it == config_.models.tiers.end()) { return; }
+    const auto& tier_cfg = tier_it->second;
+    std::error_code ec;
+    auto weights = std::filesystem::file_size(tier_cfg.path, ec);
+    if (ec) { return; }
+    FootprintInputs in = footprint_inputs_for(
+        tier_cfg, weights, config_.vram_reserve_mb);
+    int fits = recommend_context_length(in, vram_budget_bytes_);
+    if (fits > 0) {
+        logger->error("[residency] tier '{}' fits at context_length={} "
+                      "(requested {}) — lower it, or reduce gpu_layers to "
+                      "keep the requested context",
+                      tier_name, fits, tier_cfg.context_length);
+    } else {
+        logger->error("[residency] tier '{}' does not fit at ANY context "
+                      "length: weights{} alone exceed the {} MiB budget. "
+                      "Reduce gpu_layers, or use a smaller quantization.",
+                      tier_name,
+                      in.mmproj_bytes > 0 ? " + vision projector" : "",
+                      vram_budget_bytes_ / (1024 * 1024));
+    }
+}
+
 /**
  * @brief VRAM-budget admission test (gh#57).
  *
@@ -1036,7 +1178,7 @@ void ModelOrchestrator::record_activation_reuse(
  * estimate exceeds a known engine VRAM budget. Returns true to admit.
  *
  * @internal
- * @version 2.2.4
+ * @version 2.11.0
  */
 bool ModelOrchestrator::residency_admits(const std::string& tier_name) {
     size_t footprint = estimate_footprint_bytes(tier_name);
@@ -1048,6 +1190,11 @@ bool ModelOrchestrator::residency_admits(const std::string& tier_name) {
                       "exceeds VRAM budget {} bytes — "
                       "TIER_MODEL_TOO_LARGE (gh#57)",
                       tier_name, footprint, vram_budget_bytes_);
+        // gh#142: a bare refusal leaves the operator with nothing to act on.
+        // Say what WOULD fit, so the answer is a setting they can apply rather
+        // than a wall. 0 means even an empty context does not fit, in which
+        // case the context length is not the lever and saying so is honest.
+        log_fit_recommendation(tier_name);
         last_residency_error_ = ENTROPIC_ERROR_TIER_MODEL_TOO_LARGE;
         return false;
     }
@@ -1250,7 +1397,10 @@ void ModelOrchestrator::unload_or_warm_current(InferenceBackend* current) {
 
 /**
  * @brief Last routing result.
- * @internal
+ * @return The RoutingResult recorded by the most recent route() — selected
+ *         tier, previous tier, raw router output, swap action and timings.
+ *         Default-constructed before the first route.
+ * @req REQ-INFER-020
  * @version 1.8.2
  */
 RoutingResult ModelOrchestrator::last_routing_result() const {
@@ -1272,7 +1422,10 @@ std::string ModelOrchestrator::last_used_tier() const {
  * Includes `"router"` when the secondary loader reports the role as
  * loaded (v2.1.11, gh#27 — previously checked the raw `router_` field).
  *
- * @internal
+ * @return Tier names whose backend reports is_loaded(), plus `"router"` when
+ *         the secondary loader holds that role; a role whose load failed is
+ *         absent.
+ * @req REQ-INFER-020
  * @version 2.1.11
  */
 std::vector<std::string> ModelOrchestrator::loaded_models() const {
@@ -1320,7 +1473,11 @@ InferenceBackend* ModelOrchestrator::get_backend(
 
 /**
  * @brief Check if handoff is permitted.
- * @internal
+ * @param from Source tier name.
+ * @param to Candidate destination tier name.
+ * @return true only when `from` has an explicit rule set listing `to`; an
+ *         empty rule set denies every pair.
+ * @req REQ-INFER-020
  * @version 1.8.2
  */
 bool ModelOrchestrator::can_handoff(
@@ -1518,7 +1675,7 @@ size_t ModelOrchestrator::load_grammars_from(
  * against the new system prompt. (P1-7, 2.0.6-rc16). Fans out to
  * secondary roles (router, draft) via SecondaryModelLoader (v2.1.11).
  *
- * @utility
+ * @req REQ-INFER-020
  * @version 2.1.11
  */
 void ModelOrchestrator::clear_all_prompt_caches() {
@@ -1532,8 +1689,10 @@ void ModelOrchestrator::clear_all_prompt_caches() {
 
 /**
  * @brief Vision-capability lookup (gh#41, v2.1.8).
- * @return true if any configured tier declares "vision".
- * @internal
+ * @return true if any configured tier declares "vision"; false lets the
+ *         facade short-circuit with ENTROPIC_ERROR_NO_VISION_TIER instead
+ *         of dispatching a turn no tier can handle.
+ * @req REQ-INFER-025
  * @version 2.1.8
  */
 bool ModelOrchestrator::has_vision_capable_tier() const {
@@ -1545,8 +1704,9 @@ bool ModelOrchestrator::has_vision_capable_tier() const {
 
 /**
  * @brief First vision-capable tier name (gh#41, v2.1.8).
- * @return Tier name, or "" if none configured.
- * @internal
+ * @return The canonical vision tier's name, or "" when no configured tier
+ *         declares the capability.
+ * @req REQ-INFER-025
  * @version 2.1.8
  */
 std::string ModelOrchestrator::select_vision_tier() const {
@@ -1669,9 +1829,12 @@ static std::string normalize_grammar_key(const std::string& grammar_value) {
  * 3. Identity frontmatter grammar: field — normalize and lookup
  * 4. None — unconstrained generation
  *
+ * An unresolvable key logs a warning and leaves the decode unconstrained
+ * rather than failing the turn.
+ *
  * @param params Generation parameters (mutated: grammar field may be set).
  * @param tier_name Active tier for frontmatter grammar resolution.
- * @internal
+ * @req REQ-INFER-007
  * @version 2.0.0
  */
 void ModelOrchestrator::resolve_grammar_key(
@@ -1722,7 +1885,14 @@ inline void apply_if_default(T& field, const std::optional<T>& ov, T dflt) {
 
 /**
  * @brief Pure precedence helper — see header. (gh#82/gh#85)
- * @utility
+ *
+ * Each field takes the tier's value only when the tier set one AND the
+ * caller left that field at its GenerationParams default — so a per-call
+ * knob is never overwritten by tier config.
+ *
+ * @param params Generation parameters (mutated in place).
+ * @param ov The tier's optional sampler overrides.
+ * @req REQ-INFER-021
  * @version 2.8.2
  */
 void apply_tier_sampler_overrides(
@@ -1745,9 +1915,14 @@ void apply_tier_sampler_overrides(
  * @brief Apply per-tier sampler config to params. (gh#82, v2.4.4)
  *
  * Member wrapper: looks the tier up in config and delegates the
- * precedence decision to the free `apply_tier_sampler_overrides`.
+ * precedence decision to the free `apply_tier_sampler_overrides`, which
+ * applies a tier value only where the caller left the struct default —
+ * an explicit caller knob always wins.
  *
- * @internal
+ * @param params Generation parameters (mutated in place).
+ * @param tier_name Tier whose overrides to consult; an unknown tier is a
+ *        no-op.
+ * @req REQ-INFER-021
  * @version 2.8.2
  */
 void ModelOrchestrator::apply_tier_sampler_defaults(
@@ -1783,35 +1958,86 @@ void ModelOrchestrator::apply_tier_sampler_defaults(
 // ── VRAM-aware tier residency (v2.2.4, gh#57) ──────────────
 
 /**
- * @brief Read ENTROPIC_VRAM_BUDGET_BYTES env override.
+ * @brief Resolve the VRAM budget: env override, else the device.
  *
- * Returns the parsed value (decimal bytes) on success, 0 when the
- * variable is unset, empty, or fails to parse. 0 means "budget
- * unknown, gate disabled" — see `get_model` for the gate semantics.
+ * SET wins, always — including empty or unparseable, which resolve to 0 and
+ * DISABLE the gate. That is the operator's escape hatch back to pre-gh#142
+ * behaviour, and it is the v2.3.10 contract; the device fallback must never
+ * override an explicit setting. Only an ABSENT variable reaches the device,
+ * which itself returns 0 (gate disabled) when there is no GPU.
  *
+ * @return Budget in bytes, or 0 meaning "unknown, do not enforce".
  * @internal
- * @version 2.2.4
+ * @req REQ-INFER-019
+ * @version 2.11.1
  */
 size_t ModelOrchestrator::resolve_vram_budget_bytes() {
     const char* env = std::getenv("ENTROPIC_VRAM_BUDGET_BYTES");
-    if (env == nullptr || *env == '\0') { return 0; }
-    try {
-        long long v = std::stoll(env);
-        return (v < 0) ? 0 : static_cast<size_t>(v);
-    } catch (...) {
-        return 0;
+    if (env == nullptr) {
+        // Not set at all: fall through to the device.
+        return static_cast<size_t>(query_device_free_vram_bytes());
     }
+    // SET, so it takes control — including when it is empty or unparseable,
+    // which resolve to 0 and therefore DISABLE the gate. That is the escape
+    // hatch for an operator who wants the pre-gh#142 behaviour back, and it is
+    // what the v2.3.10 contract already specified; the device fallback must not
+    // quietly override an explicit setting.
+    size_t budget = 0;
+    if (*env != '\0') {
+        try {
+            long long v = std::stoll(env);
+            budget = (v < 0) ? 0 : static_cast<size_t>(v);
+        } catch (...) {
+            budget = 0;
+        }
+    }
+    return budget;
+}
+
+
+/**
+ * @brief Gather a tier's footprint inputs for the pure estimator.
+ *
+ * Resolves the vision projector's size when the tier declares one — it is the
+ * allocation that actually aborted the process in gh#142 and the v2.2.4
+ * estimate ignored it entirely.
+ *
+ * @param tier_cfg The tier's configuration.
+ * @param weights_bytes Size of the tier's GGUF on disk.
+ * @return Inputs for estimate_vram_footprint.
+ * @internal
+ * @req REQ-INFER-019
+ * @version 2.11.0
+ */
+static FootprintInputs footprint_inputs_for(
+    const TierConfig& tier_cfg, uint64_t weights_bytes, int vram_reserve_mb) {
+    FootprintInputs in;
+    in.weights_bytes = weights_bytes;
+    in.gpu_layers = tier_cfg.gpu_layers;
+    in.context_length = tier_cfg.context_length;
+    in.cache_type_k = tier_cfg.cache_type_k;
+    in.cache_type_v = tier_cfg.cache_type_v;
+    in.vram_reserve_mb = vram_reserve_mb;
+    if (!tier_cfg.mmproj_path.empty()) {
+        std::error_code proj_ec;
+        auto proj = std::filesystem::file_size(tier_cfg.mmproj_path, proj_ec);
+        if (!proj_ec) { in.mmproj_bytes = proj; }
+    }
+    return in;
 }
 
 /**
  * @brief Estimate per-tier VRAM footprint.
  *
- * Weights file size + context_length × 16 KiB per-token KV estimate +
- * vram_reserve_mb × 1MiB headroom. Returns 0 when the tier or its
- * GGUF file is not resolvable. Pure metadata — no model load.
+ * Delegates the arithmetic to the pure, CPU-unit-tested estimator in
+ * vram_footprint.h, which prices weights by their offload placement, KV by its
+ * cache type, and counts the vision projector. Returns 0 when the tier or its
+ * GGUF is not resolvable, AND when the placement cannot be priced at all —
+ * both mean "unknown" to the gate, which then does not enforce.
  *
  * @internal
- * @version 2.2.4
+ * @req REQ-INFER-019
+ * @version 2.11.0
  */
 size_t ModelOrchestrator::estimate_footprint_bytes(
     const std::string& tier_name) const {
@@ -1821,11 +2047,12 @@ size_t ModelOrchestrator::estimate_footprint_bytes(
     std::error_code ec;
     auto weights = std::filesystem::file_size(tier_cfg.path, ec);
     if (ec) { return 0; }
-    const size_t kv_per_token = 16ull * 1024ull;
-    size_t kv = static_cast<size_t>(tier_cfg.context_length) * kv_per_token;
-    size_t headroom = static_cast<size_t>(config_.vram_reserve_mb)
-        * 1024ull * 1024ull;
-    return static_cast<size_t>(weights) + kv + headroom;
+    FootprintInputs in = footprint_inputs_for(
+        tier_cfg, weights, config_.vram_reserve_mb);
+    // gh#142: an unpriceable placement returns 0 = "unknown", which leaves the
+    // gate open. Guessing here would refuse working configurations — a 13 GB
+    // model at gpu_layers=15 runs fine on an 11 GB card.
+    return static_cast<size_t>(estimate_vram_footprint(in).bytes);
 }
 
 /**

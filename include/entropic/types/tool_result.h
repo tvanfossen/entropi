@@ -26,6 +26,7 @@ namespace entropic {
  * the `result_kind` string. Do NOT reorder or remove values — clients
  * treat the string form as a stable contract.
  *
+ * @req REQ-TYPE-003
  * @version 2.0.6-rc19
  */
 enum class ToolResultKind {
@@ -44,7 +45,7 @@ enum class ToolResultKind {
  * @brief Serialize a ToolResultKind to its wire-stable string form.
  * @param kind Enum value.
  * @return Static null-terminated string. Never NULL.
- * @utility
+ * @req REQ-TYPE-003
  * @version 2.5.2
  */
 inline const char* result_kind_to_string(ToolResultKind kind) {

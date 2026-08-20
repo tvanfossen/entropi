@@ -36,6 +36,9 @@ namespace entropic::config {
  * @param registry Bundled models registry for path resolution.
  * @param[out] config Output parsed config.
  * @return Empty string on success, error message on failure.
+ * @req REQ-CFG-001
+ * @req REQ-CFG-006
+ * @req REQ-CFG-007
  * @version 1.8.1
  */
 ENTROPIC_EXPORT std::string load_config(
@@ -58,6 +61,9 @@ ENTROPIC_EXPORT std::string load_config(
  * @param registry Bundled models registry for path resolution.
  * @param[out] config Output parsed config.
  * @return Empty string on success, error message on failure.
+ * @req REQ-CFG-001
+ * @req REQ-CFG-002
+ * @req REQ-CFG-007
  * @version 2.0.1
  */
 ENTROPIC_EXPORT std::string load_layered(
@@ -76,6 +82,8 @@ ENTROPIC_EXPORT std::string load_layered(
  * @param registry Bundled models registry for path resolution.
  * @param[out] config Output parsed config.
  * @return Empty string on success, error message on failure.
+ * @req REQ-CFG-001
+ * @req REQ-CFG-006
  * @version 1.8.1
  */
 ENTROPIC_EXPORT std::string load_config_from_file(
@@ -93,6 +101,9 @@ ENTROPIC_EXPORT std::string load_config_from_file(
  * @param registry Bundled models for path resolution.
  * @param[in,out] config Config to overlay onto.
  * @return Empty string on success, error message on failure.
+ * @req REQ-CFG-001
+ * @req REQ-CFG-006
+ * @req REQ-TYPE-005
  * @version 1.8.1
  */
 ENTROPIC_EXPORT std::string parse_config_file(
@@ -107,6 +118,7 @@ ENTROPIC_EXPORT std::string parse_config_file(
  * Examples: ENTROPIC_LOG_LEVEL=DEBUG, ENTROPIC_ROUTING__ENABLED=true
  *
  * @param[in,out] config Config to override.
+ * @req REQ-CFG-001
  * @version 1.8.1
  */
 ENTROPIC_EXPORT void apply_env_overrides(ParsedConfig& config);
@@ -121,6 +133,7 @@ ENTROPIC_EXPORT void apply_env_overrides(ParsedConfig& config);
  *
  * @param config Parsed config.
  * @return Resolved data directory path.
+ * @req REQ-CFG-008
  * @version 1.8.1
  */
 ENTROPIC_EXPORT std::filesystem::path resolve_data_dir(const ParsedConfig& config);
@@ -136,6 +149,8 @@ ENTROPIC_EXPORT std::filesystem::path resolve_data_dir(const ParsedConfig& confi
  * @param registry Bundled models registry for path resolution.
  * @param[out] config Output parsed config.
  * @return Empty string on success, error message on failure.
+ * @req REQ-CFG-001
+ * @req REQ-CFG-006
  * @version 2.0.0
  */
 ENTROPIC_EXPORT std::string load_config_from_string(

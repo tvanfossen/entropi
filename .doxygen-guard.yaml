@@ -24,7 +24,6 @@ validate:
   presence:
     require_doxygen: true
     require_return: true
-    skip_forward_declarations: true
 
   version:
     require_present: true

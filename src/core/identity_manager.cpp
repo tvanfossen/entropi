@@ -33,7 +33,7 @@ static const std::regex s_name_regex("^[a-z][a-z0-9_-]{0,63}$");
  * @brief Validate all phases in an identity config.
  * @param phases Phase map to validate.
  * @return Empty string on success, error message on failure.
- * @internal
+ * @req REQ-IDEN-002
  * @version 1.9.9
  */
 static std::string validate_phases(
@@ -57,7 +57,7 @@ static std::string validate_phases(
  * @brief Validate phases and adapter_path fields.
  * @param config Config to validate.
  * @return Empty string on success, error message on failure.
- * @internal
+ * @req REQ-IDEN-002
  * @version 2.1.0
  */
 static std::string validate_fields(const IdentityConfig& config) {
@@ -77,7 +77,7 @@ static std::string validate_fields(const IdentityConfig& config) {
  * @param mgr_config Manager configuration.
  * @param identities Current identity map.
  * @return ENTROPIC_OK if preconditions pass, error code otherwise.
- * @internal
+ * @req REQ-IDEN-002
  * @version 1.9.6
  */
 static entropic_error_t check_create_preconditions(
@@ -108,7 +108,7 @@ static entropic_error_t check_create_preconditions(
  * @param identities Identity map.
  * @return Iterator to identity on success, end() on failure.
  *         Sets out_err to the error code on failure.
- * @internal
+ * @req REQ-IDEN-002
  * @version 1.9.6
  */
 static entropic_error_t check_mutable(
@@ -164,7 +164,7 @@ void IdentityManager::set_mcp_interface(const MCPKeyInterface& iface) {
  * @brief Load static identities from config loader.
  * @param identities Vector of static identity configs.
  * @return Number of identities loaded.
- * @internal
+ * @req REQ-IDEN-002
  * @version 2.0.6-rc16
  */
 size_t IdentityManager::load_static(
@@ -189,7 +189,7 @@ size_t IdentityManager::load_static(
  * @brief Create a new dynamic identity.
  * @param config Identity configuration.
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-IDEN-002
  * @version 2.0.6-rc16
  */
 entropic_error_t IdentityManager::create(const IdentityConfig& config) {
@@ -222,7 +222,7 @@ entropic_error_t IdentityManager::create(const IdentityConfig& config) {
  * @param name Identity name to update.
  * @param config New configuration (name field must match).
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-IDEN-002
  * @version 2.0.6-rc16
  */
 entropic_error_t IdentityManager::update(
@@ -256,7 +256,7 @@ entropic_error_t IdentityManager::update(
  * @brief Destroy a dynamic identity.
  * @param name Identity name to destroy.
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-IDEN-002
  * @version 2.0.6-rc16
  */
 entropic_error_t IdentityManager::destroy(const std::string& name) {
@@ -379,7 +379,7 @@ size_t IdentityManager::count_dynamic() const {
 /**
  * @brief Check if the router classification prompt needs rebuilding.
  * @return true if identity mutations have occurred since last clear.
- * @internal
+ * @req REQ-IDEN-002
  * @version 1.9.6
  */
 bool IdentityManager::is_router_dirty() const {
@@ -446,7 +446,7 @@ void IdentityManager::fire_cache_invalidator() {
  * @brief Validate identity name format.
  * @param name Name to validate.
  * @return Empty string on success, error message on failure.
- * @internal
+ * @req REQ-IDEN-002
  * @version 1.9.6
  */
 std::string IdentityManager::validate_name(const std::string& name) {
@@ -468,7 +468,7 @@ std::string IdentityManager::validate_name(const std::string& name) {
  * @param config Config to validate.
  * @param is_update true if this is an update (name already exists).
  * @return Empty string on success, error message on failure.
- * @internal
+ * @req REQ-IDEN-002
  * @version 1.9.6
  */
 std::string IdentityManager::validate(
@@ -494,7 +494,7 @@ std::string IdentityManager::validate(
 /**
  * @brief Register MCP keys for an identity via callback interface.
  * @param config Identity config with mcp_keys.
- * @internal
+ * @req REQ-IDEN-002
  * @version 1.9.6
  */
 void IdentityManager::register_mcp_keys(const IdentityConfig& config) {
@@ -513,7 +513,7 @@ void IdentityManager::register_mcp_keys(const IdentityConfig& config) {
 /**
  * @brief Unregister MCP keys for an identity via callback interface.
  * @param name Identity name.
- * @internal
+ * @req REQ-IDEN-002
  * @version 1.9.6
  */
 void IdentityManager::unregister_mcp_keys(const std::string& name) {

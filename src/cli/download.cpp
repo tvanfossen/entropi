@@ -55,7 +55,7 @@ std::filesystem::path default_model_dir()
 
 /**
  * @brief Print the registry as a table.
- * @utility
+ * @req REQ-PROD-001
  * @return 0.
  * @version 1
  */
@@ -157,7 +157,7 @@ static bool match_any_value_flag(const std::string& arg, int& i, int argc,
 
 /**
  * @brief Parse command-line args for `entropic download`.
- * @utility
+ * @req REQ-PROD-001
  * @return Parsed args with .error=true on malformed input.
  * @version 2.8.0
  */
@@ -185,7 +185,7 @@ DownloadArgs parse_download_args(int argc, char* argv[])
  * @return Registry key, or "" if unresolved. A partial or unmatched selector
  *         prints a specific error; an absent selector is silent (caller
  *         prints usage).
- * @utility
+ * @req REQ-PROD-001
  * @version 2.8.0
  */
 std::string resolve_selector_key(
@@ -215,7 +215,7 @@ std::string resolve_selector_key(
 
 /**
  * @brief Resolve a registry entry by key with user-friendly error output.
- * @utility
+ * @req REQ-PROD-001
  * @return Pointer to entry, or nullptr on failure (message printed).
  * @version 1
  */
@@ -241,7 +241,7 @@ const entropic::config::BundledModelEntry* resolve_entry(
 
 /**
  * @brief Download one registry entry to a target directory.
- * @utility
+ * @req REQ-PROD-001
  * @return 0 on success (or already-present), non-zero on failure.
  * @version 1
  */
@@ -322,7 +322,7 @@ int fetch_mmproj_if_paired(
  */
 /**
  * @brief Dispatch after args parsed + registry loaded.
- * @utility
+ * @req REQ-PROD-001
  * @return Subcommand exit code.
  * @version 2.8.0
  */
@@ -364,7 +364,7 @@ int dispatch(const DownloadArgs& args,
  * @param argv argv-like vector starting at subcommand name.
  * @return 0 on success, non-zero on usage/runtime error.
  *
- * @internal
+ * @req REQ-PROD-001
  * @version 2.0.5
  */
 int run_download(int argc, char* argv[])

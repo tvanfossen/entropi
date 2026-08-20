@@ -42,7 +42,7 @@ AuditLogger::~AuditLogger() {
 /**
  * @brief Open the log file and prepare for writing.
  * @return true on success, false on I/O error.
- * @internal
+ * @req REQ-STOR-008
  * @version 1.9.5
  */
 bool AuditLogger::initialize() {
@@ -66,7 +66,7 @@ bool AuditLogger::initialize() {
 /**
  * @brief Record a tool call audit entry.
  * @param entry The audit log entry to write.
- * @internal
+ * @req REQ-STOR-008
  * @version 2.0.0
  */
 void AuditLogger::record(const AuditEntry& entry) {
@@ -108,7 +108,7 @@ void AuditLogger::write_line(const std::string& line) {
 
 /**
  * @brief Force flush buffered entries to disk.
- * @internal
+ * @req REQ-STOR-008
  * @version 1.9.5
  */
 void AuditLogger::flush() {
@@ -122,7 +122,7 @@ void AuditLogger::flush() {
 /**
  * @brief Get the number of entries recorded this session.
  * @return Entry count.
- * @internal
+ * @req REQ-STOR-008
  * @version 1.9.5
  */
 size_t AuditLogger::entry_count() const {
@@ -132,7 +132,7 @@ size_t AuditLogger::entry_count() const {
 /**
  * @brief Get the file path of the current audit log.
  * @return Absolute path to audit.jsonl.
- * @internal
+ * @req REQ-STOR-008
  * @version 1.9.5
  */
 std::filesystem::path AuditLogger::log_path() const {
@@ -205,6 +205,7 @@ void AuditLogger::rotate_files() {
  * @param user_data Pointer to AuditHookContext.
  * @return Always 0.
  * @callback
+ * @req REQ-STOR-008
  * @version 1.9.5
  */
 int AuditLogger::hook_callback(

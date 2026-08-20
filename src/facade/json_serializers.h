@@ -33,7 +33,7 @@ namespace facade_json {
  *
  * @param messages Message vector.
  * @return JSON array string.
- * @utility
+ * @req REQ-SAFE-001
  * @version 2.1.1
  */
 inline std::string serialize_messages(

@@ -54,7 +54,7 @@ struct MCPKey {
  * @brief Convert MCPAccessLevel to string representation.
  * @param level Access level.
  * @return Static string: "NONE", "READ", or "WRITE".
- * @utility
+ * @req REQ-TYPE-003
  * @version 1.9.4
  */
 const char* mcp_access_level_name(MCPAccessLevel level);
@@ -64,7 +64,7 @@ const char* mcp_access_level_name(MCPAccessLevel level);
  * @param name String: "NONE", "READ", or "WRITE" (case-sensitive).
  * @param[out] out Parsed access level.
  * @return true if parsed successfully, false on unknown string.
- * @utility
+ * @req REQ-TYPE-003
  * @version 1.9.4
  */
 bool parse_mcp_access_level(const std::string& name, MCPAccessLevel& out);
@@ -143,6 +143,12 @@ struct AdapterInfo {
  * llama.cpp pass-through fields for KV cache, batching, threading, and
  * attention.
  *
+ * Every scalar field carries its default as a member initializer here —
+ * this struct IS the default spec, not the YAML loader. `std::optional`
+ * fields (e.g. allowed_tools) mean "absent", resolved elsewhere, and are
+ * never collapsed into a concrete default.
+ *
+ * @req REQ-TYPE-005
  * @version 1.8.0
  */
 struct ModelConfig {
@@ -297,6 +303,11 @@ struct GPUResourceProfile {
 
 /**
  * @brief Generation parameters for a single inference call.
+ *
+ * Member initializers are the authoritative sampler defaults; a
+ * default-constructed GenerationParams is already a valid request.
+ *
+ * @req REQ-TYPE-005
  * @version 2.3.16 — added logit_bias (gh#23 MVP item 4)
  */
 struct GenerationParams {
@@ -420,6 +431,12 @@ struct GenerationParams {
  *   disabled=true  → disabled entirely
  *   path set       → custom file (must exist, validated at load)
  *
+ * Every `std::optional` member below means "operator did not set this",
+ * NOT "set to the default". The per-tier sampler knobs stay nullopt so
+ * the orchestrator applies the inherited global/profile value instead of
+ * silently overriding it.
+ *
+ * @req REQ-TYPE-005
  * @version 1.9.2 — added adapter_path, adapter_scale
  */
 struct TierConfig : ModelConfig {
@@ -855,7 +872,8 @@ struct ConstitutionalValidationConfig {
  *
  * Every other field comes from `ModelConfig`'s standard defaults.
  *
- * @utility
+ * @return A ModelConfig carrying the draft-model default spec.
+ * @req REQ-TYPE-005
  * @version 2.1.11
  */
 inline ModelConfig make_default_draft_model_config() {
@@ -983,6 +1001,16 @@ struct ParsedConfig {
     /// App context: nullopt = disabled by default
     std::optional<std::filesystem::path> app_context;
     bool app_context_disabled = false; ///< true if app_context explicitly disabled
+    /**
+     * @brief Inline app_context text, supplied instead of a path (gh#141).
+     *
+     * Set by the `app_context: {content: ...}` object form. Takes precedence
+     * over `app_context` when both are present. Exists because a consumer may
+     * hold this text in memory and be unable to write it to disk — the file is
+     * a provenance boundary for them, and on Android there is no stable
+     * writable path to point at.
+     */
+    std::optional<std::string> app_context_content;
 
     bool inject_model_context = true;  ///< Auto-inject model context into system prompt
     int vram_reserve_mb = 512;         ///< Reserved VRAM headroom (MB, 0–65536)

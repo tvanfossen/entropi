@@ -48,7 +48,7 @@ namespace entropic {
  * @param json_str Null-terminated JSON array string.
  * @return Parsed messages. Empty vector if the array is empty.
  * @throws nlohmann::json::parse_error on malformed JSON.
- * @utility
+ * @req REQ-TYPE-006
  * @version 2.1.8
  */
 std::vector<Message> parse_messages_json(const char* json_str);
@@ -57,7 +57,7 @@ std::vector<Message> parse_messages_json(const char* json_str);
  * @brief Convenience: true if any message carries image content_parts.
  * @param messages Parsed message list.
  * @return true if at least one Message has has_images() true.
- * @utility
+ * @req REQ-TYPE-006
  * @version 2.1.8
  */
 bool any_message_has_images(const std::vector<Message>& messages);

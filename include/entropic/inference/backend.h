@@ -504,9 +504,10 @@ protected:
      *
      * @param messages Conversation history.
      * @param params Generation parameters.
-     * @param cancel Atomic cancel flag.
-     * @return Generation result.
-     * @internal
+     * @param cancel Atomic cancel flag; ignored by this default.
+     * @return Generation result from the no-cancel `do_generate` override —
+     *         behaviourally identical to not passing a flag at all.
+     * @req REQ-INFER-005
      * @version 2.4.2
      */
     virtual GenerationResult do_generate(

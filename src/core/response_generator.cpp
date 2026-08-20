@@ -86,7 +86,7 @@ ResponseGenerator::ResponseGenerator(
  * @brief Generate model response, routing first if needed.
  * @param ctx Loop context.
  * @return Generation result.
- * @internal
+ * @req REQ-LOOP-003
  * @version 1.8.4
  */
 GenerateResult ResponseGenerator::generate_response(LoopContext& ctx) {
@@ -103,7 +103,7 @@ GenerateResult ResponseGenerator::generate_response(LoopContext& ctx) {
  * @param content Response content.
  * @param tool_calls_json Tool calls JSON.
  * @return true if complete.
- * @internal
+ * @req REQ-IDEN-003
  * @version 1.8.4
  */
 bool ResponseGenerator::is_response_complete(
@@ -120,7 +120,7 @@ bool ResponseGenerator::is_response_complete(
 /**
  * @brief Route and lock tier before first generation.
  * @param ctx Loop context.
- * @internal
+ * @req REQ-IDEN-001
  * @version 1.8.4
  */
 void ResponseGenerator::lock_tier_if_needed(LoopContext& ctx) {
@@ -189,7 +189,7 @@ struct StreamAccumulator {
  * @param token Token string.
  * @param len Token length.
  * @param user_data StreamAccumulator pointer.
- * @internal
+ * @req REQ-LOOP-008
  * @version 2.1.12
  */
 static void stream_token_callback(
@@ -295,7 +295,7 @@ static std::string resolve_stream_finish_reason(int rc,
  * @param ctx Loop context.
  * @param mode Label for the log line ("stream"/"batch").
  * @return {messages_json, params_json}.
- * @internal
+ * @req REQ-LOOP-007
  * @version 2.7.0
  */
 std::pair<std::string, std::string> ResponseGenerator::prepare_prompts(
@@ -316,7 +316,8 @@ std::pair<std::string, std::string> ResponseGenerator::prepare_prompts(
  * @brief Generate via streaming.
  * @param ctx Loop context.
  * @return Generation result.
- * @internal
+ * @req REQ-LOOP-006
+ * @req REQ-LOOP-008
  * @version 2.3.7
  */
 GenerateResult ResponseGenerator::generate_streaming(LoopContext& ctx) {
@@ -373,7 +374,9 @@ GenerateResult ResponseGenerator::generate_streaming(LoopContext& ctx) {
  */
 /**
  * @brief Dispatch the batch backend call. See header. (gh#81, v2.4.2)
- * @internal
+ * @return Status code from the selected generate entry point, 0 on
+ *         success.
+ * @req REQ-LOOP-006
  * @version 2.9.6
  */
 int ResponseGenerator::dispatch_batch_generate(
@@ -434,7 +437,7 @@ int ResponseGenerator::dispatch_batch_generate(
  * @brief Generate via batch (non-streaming). (gh#81 cancel-aware, v2.4.2)
  * @param ctx Loop context.
  * @return Generation result.
- * @internal
+ * @req REQ-LOOP-003
  * @version 2.4.2
  */
 GenerateResult ResponseGenerator::generate_batch(LoopContext& ctx) {
@@ -500,7 +503,7 @@ GenerateResult ResponseGenerator::generate_batch(LoopContext& ctx) {
  * @param ctx Loop context.
  * @param partial Content generated so far.
  * @return Updated content.
- * @internal
+ * @req REQ-LOOP-006
  * @version 2.1.10
  */
 std::string ResponseGenerator::handle_pause(
@@ -655,7 +658,7 @@ std::string ResponseGenerator::serialize_messages(
  *
  * @param tier Locked tier name.
  * @return JSON string {tier, tools?}.
- * @internal
+ * @req REQ-IDEN-001
  * @version 2.7.0
  */
 std::string ResponseGenerator::build_params_json(
@@ -691,7 +694,9 @@ std::string ResponseGenerator::build_params_json(
  * most-recent context the model sees before generating — and is not
  * persisted into ctx.messages. (#16)
  *
- * @internal
+ * @return A copy of the message list with the reminder appended as a
+ *         trailing user message; the caller's ctx.messages is unchanged.
+ * @req REQ-LOOP-007
  * @version 2.1.4
  */
 std::vector<Message> ResponseGenerator::inject_engine_state_reminder(

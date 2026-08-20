@@ -42,6 +42,7 @@ public:
      * @brief Count tokens in a single message.
      * @param msg Message to count.
      * @return Estimated token count.
+     * @req REQ-COMPACT-001
      * @version 1.8.4
      */
     int count_message(const Message& msg) const;
@@ -50,6 +51,7 @@ public:
      * @brief Count total tokens in a message list.
      * @param messages Messages to count.
      * @return Total estimated token count.
+     * @req REQ-COMPACT-001
      * @version 1.8.4
      */
     int count_messages(const std::vector<Message>& messages) const;
@@ -58,6 +60,7 @@ public:
      * @brief Get usage as fraction of context window (0.0–1.0).
      * @param messages Messages to measure.
      * @return Usage fraction.
+     * @req REQ-COMPACT-001
      * @version 1.8.4
      */
     float usage_percent(const std::vector<Message>& messages) const;
@@ -75,6 +78,7 @@ private:
      * @brief Estimate token count for raw text.
      * @param text Input text.
      * @return Estimated token count.
+     * @req REQ-COMPACT-001
      * @version 1.8.4
      */
     static int count_text(const std::string& text);
@@ -126,6 +130,7 @@ public:
      * @param force Bypass threshold check and compact immediately.
      * @param conversation_id Conversation ID for snapshot (empty = skip).
      * @return Compaction result.
+     * @req REQ-COMPACT-001
      * @version 1.8.8
      */
     CompactionResult check_and_compact(
@@ -142,6 +147,7 @@ public:
      *
      * @param messages Messages to compact.
      * @return CompactionResult with compacted messages and metadata.
+     * @req REQ-COMPACT-001
      * @version 1.9.9
      */
     CompactionResult compact_messages(
@@ -164,6 +170,7 @@ private:
      * @param[out] summary Generated summary text.
      * @param[out] stripped_count Number of messages stripped.
      * @return Compacted message list.
+     * @req REQ-COMPACT-001
      * @version 1.8.4
      */
     std::vector<Message> compact(
@@ -213,6 +220,7 @@ private:
      * @brief Save pre-compaction snapshot via storage interface.
      * @param conversation_id Conversation to snapshot.
      * @param messages Messages before compaction.
+     * @req REQ-COMPACT-001
      * @version 1.8.8
      */
     void save_snapshot(const std::string& conversation_id,

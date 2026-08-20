@@ -167,9 +167,14 @@ bool ChatAdapter::is_response_complete(
 
 /**
  * @brief Parse <tool_call>JSON</tool_call> tagged blocks.
+ *
+ * Part of the ~80% the concrete base owns; concrete adapters override only
+ * their family specifics. Tolerates the asymmetric open tags real families
+ * emit (gemma4's pipe-prefixed `<|tool_call>` against a plain close).
+ *
  * @param content Model output content.
- * @return Vector of parsed tool calls.
- * @internal
+ * @return Vector of parsed tool calls; empty when no tagged block parses.
+ * @req REQ-INFER-012
  * @version 2.3.8
  */
 std::vector<ToolCall> ChatAdapter::parse_tagged_tool_calls(
@@ -284,8 +289,9 @@ static std::optional<ToolCall> action_envelope_to_call(
 /**
  * @brief gh#88 bare-JSON recovery — see header for the full rationale.
  * @param raw Raw assistant output.
- * @return Recovered tool calls (empty when none match).
- * @utility
+ * @return Recovered tool calls; empty when no line parses as a
+ *         `{"action": …}` envelope naming a real meta-tool.
+ * @req REQ-INFER-012
  * @version 2.7.1
  */
 std::vector<ToolCall> recover_action_envelope_calls(const std::string& raw) {
@@ -308,7 +314,7 @@ std::vector<ToolCall> recover_action_envelope_calls(const std::string& raw) {
  * @brief gh#88 reliable-path recovery substitution — see header.
  * @param calls In/out parsed calls; replaced by the recovery iff empty + found.
  * @param raw   Raw assistant output to recover from.
- * @utility
+ * @req REQ-INFER-012
  * @version 2.7.1
  */
 void apply_action_envelope_recovery(std::vector<ToolCall>& calls,
@@ -385,7 +391,7 @@ static void coerce_call_string_args(ToolCall& tc, const nlohmann::json& tools) {
  * @brief gh#90 string-typing coercion entry point — see header.
  * @param calls      In/out parsed calls; numeric args re-typed in place.
  * @param tools_json Staged MCP tool defs (JSON array) carrying the schema.
- * @utility
+ * @req REQ-INFER-012
  * @version 2.7.2
  */
 void coerce_string_typed_args(std::vector<ToolCall>& calls,
@@ -406,10 +412,16 @@ void coerce_string_typed_args(std::vector<ToolCall>& calls,
  * regex metacharacter and the previous std::regex form would have needed
  * escaping to stay correct.
  *
+ * An opening marker with no close means the budget ran out mid-reasoning:
+ * the span is erased to end of content and a WARN is logged, because no
+ * answer was ever produced and returning the reasoning would be worse than
+ * nothing.
+ *
  * @param content Model output.
- * @return Content with reasoning blocks removed and trimmed.
- * @internal
- * @version 2.10.3
+ * @return Content with this family's reasoning blocks removed and trimmed;
+ *         unchanged when the family declares no markers.
+ * @req REQ-INFER-011
+ * @version 2.11.0
  */
 std::string ChatAdapter::strip_think_blocks(const std::string& content) const {
     const auto markers = thinking_markers();
@@ -434,10 +446,11 @@ std::string ChatAdapter::strip_think_blocks(const std::string& content) const {
     if (truncated_unclosed && result.find_first_not_of(" \t\r\n")
             == std::string::npos) {
         logger->warn(
-            "Generation hit its token budget while still inside a reasoning "
-            "block ('{}' never closed with '{}'), so no answer was produced "
-            "and content is empty — this is a budget/convergence issue, not a "
-            "parse error. Raise max_tokens.",
+            "Reasoning block '{}' was never closed with '{}', so the strip "
+            "removed the whole generation and content is empty. Not a parse "
+            "error. The orchestrator reports the actual cause (budget vs the "
+            "model ending the turn) — it is the only layer holding "
+            "finish_reason. gh#137.",
             markers.open, markers.close);
     }
 
@@ -488,8 +501,9 @@ static std::optional<ToolCall> regex_recovered_tool_call(
  * Tries: trailing comma removal, quote normalization, brace matching.
  *
  * @param json_str Potentially malformed JSON.
- * @return Recovered ToolCall if successful.
- * @internal
+ * @return Recovered ToolCall if any repair produced a named call; nullopt
+ *         when even the regex last-ditch pass finds no tool name.
+ * @req REQ-INFER-012
  * @version 2.3.7
  */
 std::optional<ToolCall> ChatAdapter::try_recover_json(

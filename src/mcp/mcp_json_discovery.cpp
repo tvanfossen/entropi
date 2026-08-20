@@ -32,9 +32,15 @@ MCPJsonDiscovery::MCPJsonDiscovery(std::filesystem::path project_dir)
 
 /**
  * @brief Discover servers from .mcp.json files.
- * @param existing_names Already-registered server names.
- * @return Vector of discovered configs.
- * @internal
+ *
+ * Project file first, then `~/.entropic/.mcp.json`, so the first match
+ * for a given name wins and a project can override the global.
+ *
+ * @param existing_names Already-registered server names, passed in so a
+ *                       discovered entry can never shadow one.
+ * @return The discovered server configs, deduped by name; empty when
+ *         neither file exists or every entry was skipped.
+ * @req REQ-MCP-025
  * @version 1.8.7
  */
 std::vector<ExternalServerConfig> MCPJsonDiscovery::discover(
@@ -65,8 +71,8 @@ std::vector<ExternalServerConfig> MCPJsonDiscovery::discover(
  * @param own_socket Own socket path.
  * @param existing_names Already-registered names.
  * @param seen Names discovered so far.
- * @param out Output vector.
- * @utility
+ * @param out Output vector, appended to in place.
+ * @req REQ-MCP-025
  * @version 1.8.7
  */
 void MCPJsonDiscovery::parse_mcp_json(
@@ -105,10 +111,16 @@ void MCPJsonDiscovery::parse_mcp_json(
  * @param name Server name.
  * @param cfg JSON config object.
  * @param own_socket Own socket path for self-detection.
+ * Three skip paths, each of which drops only THIS entry so the rest of
+ * the file still loads: a name already seen from a higher-priority
+ * file, the engine's own socket (matched against the deterministic
+ * project-derived path), and a name that would shadow an
+ * already-registered server.
+ *
  * @param existing_names Already-registered names.
  * @param seen Already-discovered names in this run.
- * @param out Output vector.
- * @utility
+ * @param out Output vector, appended to in place.
+ * @req REQ-MCP-025
  * @version 1.8.7
  */
 void MCPJsonDiscovery::parse_server_entry(
@@ -162,8 +174,11 @@ void MCPJsonDiscovery::parse_server_entry(
  * @param cfg JSON config.
  * @param type Explicit type field (may be empty).
  * @param entry Output config entry.
- * @return true if valid entry.
- * @utility
+ * @return true when the entry resolved to a usable SSE or stdio
+ *         transport; false for a malformed entry with neither url nor
+ *         command, which is logged and skipped rather than aborting
+ *         the whole file.
+ * @req REQ-MCP-025
  * @version 1.8.7
  */
 bool MCPJsonDiscovery::infer_transport(
@@ -192,8 +207,9 @@ bool MCPJsonDiscovery::infer_transport(
  * @brief Parse SSE entry fields.
  * @param cfg JSON config.
  * @param entry Output config.
- * @return true if valid.
- * @utility
+ * @return true when a non-empty `url` is present; false otherwise,
+ *         logged and skipped.
+ * @req REQ-MCP-025
  * @version 1.8.7
  */
 bool MCPJsonDiscovery::parse_sse_entry(
@@ -212,10 +228,16 @@ bool MCPJsonDiscovery::parse_sse_entry(
 
 /**
  * @brief Parse stdio entry fields with env blocklist enforcement.
+ *
+ * Blocked environment variables are filtered out of the entry — the
+ * variable is dropped, the rest of the entry still loads (CWE-426 /
+ * CWE-94).
+ *
  * @param cfg JSON config.
  * @param entry Output config.
- * @return true if valid.
- * @utility
+ * @return true when a non-empty `command` is present; false for a stdio
+ *         entry with no command, logged and skipped.
+ * @req REQ-MCP-025
  * @version 1.8.7
  */
 bool MCPJsonDiscovery::parse_stdio_entry(
@@ -253,9 +275,14 @@ bool MCPJsonDiscovery::parse_stdio_entry(
 
 /**
  * @brief Compute project-unique Unix socket path.
+ *
+ * Deterministic in the canonical project path, which is what lets
+ * discovery recognise and skip the engine's OWN socket rather than
+ * connecting to itself.
+ *
  * @param project_dir Project directory.
- * @return ~/.entropic/socks/{hash8}.sock
- * @utility
+ * @return `~/.entropic/socks/{hash8}.sock` (HOME falling back to /tmp).
+ * @req REQ-MCP-025
  * @version 1.8.7
  */
 std::filesystem::path compute_socket_path(
@@ -289,9 +316,17 @@ static bool has_blocked_prefix(const std::string& key) {
 
 /**
  * @brief Check if an environment variable is blocked.
+ *
+ * The blocklist covers the variables that could hijack the child
+ * process — loader-injection (LD_PRELOAD, LD_LIBRARY_PATH, the DYLD_
+ * family), lookup redirection (PATH, HOME, SHELL) and the engine's own
+ * ENTROPIC_ namespace (CWE-426 / CWE-94).
+ *
  * @param key Variable name.
- * @return true if blocked.
- * @utility
+ * @return true for an exact blocklist match or a blocked prefix
+ *         (ENTROPIC_, DYLD_); false for anything else, which is passed
+ *         through to the child verbatim.
+ * @req REQ-MCP-025
  * @version 1.8.7
  */
 bool is_blocked_env_var(const std::string& key) {

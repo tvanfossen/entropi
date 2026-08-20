@@ -43,8 +43,9 @@ public:
 
     /**
      * @brief Read-only tool — requires READ access.
-     * @return MCPAccessLevel::READ.
-     * @utility
+     * @return MCPAccessLevel::READ, relaxing ToolBase's WRITE default
+     *         because this tool has no side effects.
+     * @req REQ-MCP-011
      * @version 1.9.4
      */
     MCPAccessLevel required_access_level() const override {
@@ -105,8 +106,9 @@ public:
 
     /**
      * @brief Read-only tool — requires READ access.
-     * @return MCPAccessLevel::READ.
-     * @utility
+     * @return MCPAccessLevel::READ, relaxing ToolBase's WRITE default
+     *         because this tool has no side effects.
+     * @req REQ-MCP-011
      * @version 1.9.4
      */
     MCPAccessLevel required_access_level() const override {
@@ -152,8 +154,13 @@ ServerResponse WebSearchTool::execute(const std::string& args_json) {
 
 /**
  * @brief Construct with data dir, register both tools.
+ *
+ * Another override-nothing MCPServerBase subclass: build the two tools,
+ * register them, and inherit dispatch, envelope shape and the default
+ * extension-point behaviour from the base.
+ *
  * @param data_dir Path to bundled data directory.
- * @internal
+ * @req REQ-MCP-001
  * @version 1.8.5
  */
 WebServer::WebServer(const std::string& data_dir)

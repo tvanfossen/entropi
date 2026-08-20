@@ -24,10 +24,18 @@ namespace entropic {
 
 /**
  * @brief Run a git command in a given directory via popen.
+ *
+ * The shared execution path behind all eight git tools: every one is
+ * `git -C <repo root> ...`, so no tool can operate outside the repo the
+ * server was pointed at, and none carries its own command gating —
+ * operator approval is the gate.
+ *
  * @param repo_dir Repository root directory.
  * @param git_args Arguments appended after "git -C repo_dir".
- * @return Pair of output string and exit code.
- * @internal
+ * @return The combined stdout+stderr text paired with the process exit
+ *         code; ("Failed to open git process", -1) when the pipe could
+ *         not be opened.
+ * @req REQ-MCP-023
  * @version 2.0.0
  */
 static std::pair<std::string, int> run_git(
@@ -57,10 +65,16 @@ static std::pair<std::string, int> run_git(
 
 /**
  * @brief Format a git result as JSON ServerResponse.
- * @param output Command output.
+ *
+ * The single response shape all eight git tools answer in.
+ *
+ * @param output Combined stdout+stderr from the git process.
  * @param exit_code Process exit code.
- * @return ServerResponse with JSON result.
- * @internal
+ * @return A ServerResponse with no directives whose result is a JSON
+ *         object carrying exit_code and output — git tools have no
+ *         engine-level side effects.
+ * @req REQ-MCP-023
+ * @req REQ-MCP-002
  * @version 1.8.5
  */
 static ServerResponse make_git_response(
@@ -93,8 +107,12 @@ public:
 
     /**
      * @brief Read-only tool — requires READ access.
+     *
+     * status/diff/log inspect the repo without mutating it, so they
+     * relax the WRITE default; add/commit/branch/checkout/reset keep it.
+     *
      * @return MCPAccessLevel::READ.
-     * @utility
+     * @req REQ-MCP-011
      * @version 1.9.4
      */
     MCPAccessLevel required_access_level() const override {
@@ -141,8 +159,9 @@ public:
 
     /**
      * @brief Read-only tool — requires READ access.
-     * @return MCPAccessLevel::READ.
-     * @utility
+     * @return MCPAccessLevel::READ, relaxing ToolBase's WRITE default
+     *         because this tool only inspects the repo.
+     * @req REQ-MCP-011
      * @version 1.9.4
      */
     MCPAccessLevel required_access_level() const override {
@@ -195,8 +214,9 @@ public:
 
     /**
      * @brief Read-only tool — requires READ access.
-     * @return MCPAccessLevel::READ.
-     * @utility
+     * @return MCPAccessLevel::READ, relaxing ToolBase's WRITE default
+     *         because this tool only inspects the repo.
+     * @req REQ-MCP-011
      * @version 1.9.4
      */
     MCPAccessLevel required_access_level() const override {
@@ -440,9 +460,14 @@ private:
 
 /**
  * @brief Construct with repo directory and data dir.
+ *
+ * A thin MCPServerBase subclass: build the eight tools, register them,
+ * and override only set_working_dir. Every tool runs against repo_dir_.
+ *
  * @param repo_dir Repository root directory.
  * @param data_dir Path to bundled data directory.
- * @internal
+ * @req REQ-MCP-001
+ * @req REQ-MCP-023
  * @version 2.3.7
  */
 GitServer::GitServer(
@@ -460,8 +485,12 @@ GitServer::GitServer(
 
 /**
  * @brief Construct the eight git tool instances (ctor step 1).
+ *
+ * status, diff, log, commit, branch, checkout, add and reset — the
+ * server's whole surface, each built from its bundled JSON descriptor.
+ *
  * @param tools_dir Directory holding the tool JSON definitions.
- * @internal
+ * @req REQ-MCP-023
  * @version 2.3.7
  */
 void GitServer::create_git_tools(const std::string& tools_dir) {
@@ -485,7 +514,11 @@ void GitServer::create_git_tools(const std::string& tools_dir) {
 
 /**
  * @brief Register the eight git tools with the base server (step 2).
- * @internal
+ *
+ * Registration is all it takes — dispatch, envelope shape and anchoring
+ * come from MCPServerBase.
+ *
+ * @req REQ-MCP-001
  * @version 2.3.7
  */
 void GitServer::register_git_tools() {
@@ -508,9 +541,13 @@ GitServer::~GitServer() = default;
 
 /**
  * @brief Set working directory (repo root).
+ *
+ * Re-targets every git tool at once so a sandbox swap does not require
+ * reconstructing the server.
+ *
  * @param path New repo directory.
- * @return true on success.
- * @internal
+ * @return true — the re-target always succeeds.
+ * @req REQ-MCP-023
  * @version 1.8.5
  */
 bool GitServer::set_working_dir(const std::string& path) {
@@ -521,8 +558,8 @@ bool GitServer::set_working_dir(const std::string& path) {
 
 /**
  * @brief Get repo directory.
- * @return Repo root path.
- * @internal
+ * @return The repo root every git tool runs `git -C` against.
+ * @req REQ-MCP-023
  * @version 1.8.5
  */
 const std::filesystem::path& GitServer::repo_dir() const {

@@ -89,7 +89,7 @@ void DelegationManager::set_storage(const StorageInterface* storage) {
  * @param on_start Pre-delegation gate (nullable).
  * @param on_complete Post-delegation result (nullable).
  * @param user_data Forwarded to both callbacks.
- * @internal
+ * @req REQ-DELEG-002
  * @version 2.1.5
  */
 void DelegationManager::set_delegation_callbacks(
@@ -114,7 +114,8 @@ void DelegationManager::set_delegation_callbacks(
  * @param depth         Delegation depth.
  * @param is_pipeline   True for pipeline stages.
  * @return Decision from callback (or ACCEPT if null).
- * @internal
+ * @req REQ-DELEG-002
+ * @req REQ-DELEG-004
  * @version 2.1.6
  */
 ent_decision_t DelegationManager::fire_start_cb(
@@ -238,7 +239,7 @@ void DelegationManager::deliver_sandbox_result(
  * @param res Filled result struct.
  * @param delegation_id For the warn log on throw.
  * @return Consumer decision (REJECT on throw, gh#29).
- * @internal
+ * @req REQ-DELEG-002
  * @version 2.3.7
  */
 ent_decision_t DelegationManager::invoke_complete_cb(
@@ -297,7 +298,9 @@ void DelegationManager::persist_pending_patch(
  * Side effect: on success, populates `sb_info` with a freshly created
  * sandbox when a sandbox manager is configured.
  *
- * @internal
+ * @return Populated DelegationResult when a check fails and the caller
+ *         must early-return; nullopt when all checks pass.
+ * @req REQ-DELEG-002
  * @version 2.1.6
  */
 std::optional<DelegationResult>
@@ -345,7 +348,7 @@ DelegationManager::check_delegation_preconditions(
  * @param task Task description for the child.
  * @param max_turns Optional iteration limit.
  * @return DelegationResult.
- * @internal
+ * @req REQ-DELEG-002
  * @version 2.1.6
  */
 DelegationResult DelegationManager::execute_delegation(
@@ -407,7 +410,9 @@ DelegationResult DelegationManager::execute_delegation(
  * Extracted from `execute_resume_delegation` to keep that function
  * under the knots SLOC gate.
  *
- * @internal
+ * @return Child LoopContext carrying the seed history, the tier system
+ *         prompt, and the new task as a trailing user message.
+ * @req REQ-DELEG-002
  * @version 2.1.6
  */
 LoopContext DelegationManager::build_resumed_child_context(
@@ -447,7 +452,9 @@ LoopContext DelegationManager::build_resumed_child_context(
 
 /**
  * @brief Run a resumed child delegation with seed history (gh#32, v2.1.6).
- * @internal
+ * @return DelegationResult for the resumed child run, or the early
+ *         result produced when a precondition check fails.
+ * @req REQ-DELEG-002
  * @version 2.1.6
  */
 DelegationResult DelegationManager::execute_resume_delegation(
@@ -508,8 +515,8 @@ DelegationResult DelegationManager::execute_resume_delegation(
  * @param prior_output Previous stage's summary/result (empty for
  *                    stage 0).
  * @return Context string prepended to the task.
+ * @req REQ-DELEG-004
  * @version 2.1.4
- * @internal
  */
 static std::string pipeline_context(
     size_t stage_idx, size_t total,
@@ -543,7 +550,7 @@ static std::string pipeline_context(
  * @param task Task description.
  * @param stage_log [out] Per-stage results appended in order.
  * @return DelegationResult from the final stage.
- * @internal
+ * @req REQ-DELEG-004
  * @version 2.10.0
  */
 DelegationResult DelegationManager::execute_pipeline(
@@ -609,7 +616,7 @@ DelegationResult DelegationManager::execute_pipeline(
  * @param last_result In/out: previous-stage result on entry,
  *                    this stage's result on return.
  * @return true to continue to the next stage, false to break.
- * @internal
+ * @req REQ-DELEG-004
  * @version 2.10.0
  */
 bool DelegationManager::run_pipeline_stage(
@@ -665,7 +672,7 @@ bool DelegationManager::run_pipeline_stage(
  * @param info Resolved tier info.
  * @param task Task description.
  * @return Fresh child context.
- * @internal
+ * @req REQ-DELEG-002
  * @version 2.7.4
  */
 LoopContext DelegationManager::build_child_context(
@@ -716,7 +723,7 @@ LoopContext DelegationManager::build_child_context(
  * @brief Extract the delegation summary from child context.
  * @param child_ctx Completed child context.
  * @return Summary text.
- * @internal
+ * @req REQ-DELEG-002
  * @version 2.9.10
  */
 std::string DelegationManager::extract_summary(
@@ -755,7 +762,7 @@ std::string DelegationManager::extract_summary(
  * @param task Task description.
  * @param max_turns Turn limit.
  * @return Delegation ID (empty if no storage).
- * @internal
+ * @req REQ-DELEG-002
  * @version 1.8.8
  */
 std::string DelegationManager::create_storage_record(
@@ -780,7 +787,7 @@ std::string DelegationManager::create_storage_record(
  * @brief Complete delegation storage record.
  * @param delegation_id Delegation ID.
  * @param result Delegation result.
- * @internal
+ * @req REQ-DELEG-002
  * @version 1.8.8
  */
 void DelegationManager::complete_storage_record(
@@ -803,7 +810,7 @@ void DelegationManager::complete_storage_record(
  * @param task Task description.
  * @param max_turns Optional turn limit.
  * @return DelegationResult.
- * @internal
+ * @req REQ-DELEG-002
  * @version 2.0.6-rc18
  */
 DelegationResult DelegationManager::run_child(
@@ -866,7 +873,8 @@ DelegationResult DelegationManager::run_child(
  * @param task Task text.
  * @param child_ctx Terminated child context (messages moved out).
  * @return Fully-populated DelegationResult.
- * @internal
+ * @req REQ-DELEG-002
+ * @req REQ-DELEG-003
  * @version 2.1.4
  */
 DelegationResult DelegationManager::build_child_result(

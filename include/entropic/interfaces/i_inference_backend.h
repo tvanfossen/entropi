@@ -164,7 +164,8 @@ entropic_error_t entropic_inference_generate_with_cancel(
  *        Checked between tokens — cancellation latency is one token.
  *        May be NULL if cancellation is not needed.
  * @return ENTROPIC_OK on success, ENTROPIC_ERROR_CANCELLED if cancelled.
- * @req REQ-INFER-003
+ * @req REQ-ABI-001
+ * @req REQ-INFER-005
  * @version 1.9.13
  */
 entropic_error_t entropic_inference_generate_streaming(

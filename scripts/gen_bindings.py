@@ -761,7 +761,9 @@ class GeneratedSources:
 
 
 ## @brief Run the full parse + emit pipeline; return generated sources.
-## @utility
+## @return GeneratedSources holding the _bindings.py and _bindings_manifest.py
+##         source text derived from the current headers. Writes nothing.
+## @req REQ-API-014
 ## @version 2.2.1
 def generate() -> GeneratedSources:
     """Parse all input headers and return generated source text.
@@ -876,7 +878,7 @@ MANIFEST_OUT = REPO_ROOT / "python" / "src" / "entropic" / "_bindings_manifest.p
 
 
 ## @brief Write generated files. Used by ``inv gen-bindings``.
-## @utility
+## @req REQ-API-014
 ## @version 2.2.1
 def write_outputs(src: GeneratedSources) -> None:
     """Persist generated text to the canonical output paths."""
@@ -885,7 +887,9 @@ def write_outputs(src: GeneratedSources) -> None:
 
 
 ## @brief Compare generated text against committed files; exit 1 on drift.
-## @utility
+## @return 0 when the committed wrapper matches the header-derived output,
+##         1 on drift (with a per-file diagnostic on stderr).
+## @req REQ-API-014
 ## @version 2.2.1
 def check_outputs(src: GeneratedSources) -> int:
     """Return 0 if checked-in files match generated text, else 1 + diagnostic."""
@@ -908,7 +912,9 @@ def check_outputs(src: GeneratedSources) -> int:
 
 
 ## @brief Module entrypoint.
-## @utility
+## @return 0 after a successful write, or check_outputs()'s drift status when
+##         `--check` is passed (the `gen-bindings-check` commit gate).
+## @req REQ-API-014
 ## @version 2.2.1
 def main(argv: list[str]) -> int:
     """Top-level CLI: --check vs default write."""

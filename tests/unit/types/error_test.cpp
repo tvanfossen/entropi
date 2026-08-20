@@ -71,3 +71,32 @@ SCENARIO("Error callback registration rejects NULL handle", "[error][types]") {
         }
     }
 }
+
+SCENARIO("Error callback registration reports that it is not implemented",
+         "[error][types][failloud]") {
+    // Through v2.10.4 this returned ENTROPIC_OK while discarding both the
+    // callback and user_data behind (void) casts, and entropic_error_callback_t
+    // is invoked from nowhere in src/, include/ or python/src/. A consumer got
+    // success and then silence — the engine claiming a capability it does not
+    // have. Same shape as gh#133, where i_mcp_server.h documented a dlopen
+    // plugin contract the engine never implemented.
+    //
+    // Not removed: the symbol is ENTROPIC_EXPORT and reaches the generated
+    // Python wrapper, so deleting it is an ABI break. Reporting
+    // NOT_IMPLEMENTED makes the gap visible at the call site instead, which is
+    // what the error code was added for.
+    GIVEN("a non-NULL handle") {
+        // A non-null pointer is enough: the stub checks only for NULL, and
+        // never dereferences the handle.
+        auto* fake = reinterpret_cast<entropic_handle_t>(0x1);
+
+        WHEN("an error callback is registered") {
+            auto result = entropic_set_error_callback(fake, nullptr, nullptr);
+
+            THEN("the engine admits the feature does not exist") {
+                REQUIRE(result == ENTROPIC_ERROR_NOT_IMPLEMENTED);
+                REQUIRE(result != ENTROPIC_OK);
+            }
+        }
+    }
+}

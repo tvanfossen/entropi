@@ -46,8 +46,9 @@ public:
 
     /**
      * @brief Read-only tool — requires READ access.
-     * @return MCPAccessLevel::READ.
-     * @utility
+     * @return MCPAccessLevel::READ, relaxing ToolBase's WRITE default
+     *         because this tool has no side effects.
+     * @req REQ-MCP-011
      * @version 1.9.4
      */
     MCPAccessLevel required_access_level() const override {
@@ -91,8 +92,9 @@ public:
 
     /**
      * @brief Read-only tool — requires READ access.
-     * @return MCPAccessLevel::READ.
-     * @utility
+     * @return MCPAccessLevel::READ, relaxing ToolBase's WRITE default
+     *         because this tool has no side effects.
+     * @req REQ-MCP-011
      * @version 1.9.4
      */
     MCPAccessLevel required_access_level() const override {
@@ -117,9 +119,15 @@ public:
 
 /**
  * @brief Construct with root directory and data dir.
+ *
+ * The thinnest MCPServerBase subclass in the tree: it builds its two
+ * tools, registers them, and overrides nothing — so it inherits
+ * tool-level permission patterns, duplicate checking, and the standard
+ * envelope purely from the base.
+ *
  * @param root_dir Project root directory.
  * @param data_dir Path to bundled data directory.
- * @internal
+ * @req REQ-MCP-001
  * @version 1.8.5
  */
 DiagnosticsServer::DiagnosticsServer(

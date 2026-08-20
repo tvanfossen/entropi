@@ -31,6 +31,8 @@ extern "C" {
  *
  * ENTROPIC_OK (0) on success. All other values indicate failure.
  * Use entropic_error_name() to get a human-readable string for logging.
+ *
+ * @req REQ-TYPE-002
  */
 typedef enum {
     ENTROPIC_OK = 0,                          ///< Success
@@ -126,6 +128,7 @@ ENTROPIC_EXPORT const char* entropic_last_error(entropic_handle_t handle);
  *         entropic_error_name(err), entropic_last_error(h));
  * }
  * @endcode
+ * @req REQ-TYPE-003
  * @version 1.8.0
  */
 ENTROPIC_EXPORT const char* entropic_error_name(entropic_error_t code);
@@ -149,16 +152,26 @@ typedef void (*entropic_error_callback_t)(
     void* user_data);
 
 /**
- * @brief Register an error callback on a handle.
+ * @brief NOT IMPLEMENTED — reserved. Returns ENTROPIC_ERROR_NOT_IMPLEMENTED.
  *
- * Only one callback per handle. Setting a new one replaces the previous.
- * Pass NULL to remove.
+ * @warning This is a stub. The callback and user_data are discarded and
+ * `entropic_error_callback_t` is invoked from nowhere in the engine. It is
+ * declared here because the symbol is exported and reaches the generated
+ * Python wrapper; removing it would be an ABI break.
+ *
+ * Through v2.10.4 this returned ENTROPIC_OK, so a consumer registering a
+ * callback got success and then silence — the engine claiming a capability it
+ * does not have. As of v2.11.0 it reports ENTROPIC_ERROR_NOT_IMPLEMENTED so the
+ * absence is visible at the call site instead of at 3am.
+ *
+ * Retrieve errors with entropic_last_error() until this is implemented.
  *
  * @param handle Engine handle.
- * @param callback Callback function, or NULL to remove.
- * @param user_data Opaque pointer forwarded to callback.
- * @return ENTROPIC_OK on success, ENTROPIC_ERROR_INVALID_ARGUMENT if handle is NULL.
- * @version 1.8.0
+ * @param callback Ignored.
+ * @param user_data Ignored.
+ * @return ENTROPIC_ERROR_INVALID_ARGUMENT if handle is NULL, otherwise
+ *         ENTROPIC_ERROR_NOT_IMPLEMENTED.
+ * @version 2.11.0
  */
 ENTROPIC_EXPORT entropic_error_t entropic_set_error_callback(
     entropic_handle_t handle,

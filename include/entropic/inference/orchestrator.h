@@ -590,11 +590,11 @@ private:
     /**
      * @brief Cached VRAM budget in bytes. 0 = unknown / unenforced.
      *
-     * Resolved at `initialize()` time from `ENTROPIC_VRAM_BUDGET_BYTES`
-     * env var. CUDA `cudaMemGetInfo` integration is intentionally
-     * deferred — the env var is the supported override surface and is
-     * what unit tests inject.
-     * @version 2.2.4
+     * Resolved at `initialize()` time: `ENTROPIC_VRAM_BUDGET_BYTES` env
+     * override, else the free VRAM reported by the active GPU device
+     * (gh#142). The env var remains the surface unit tests inject.
+     * Sampled once, so a later VRAM consumer is invisible to the gate.
+     * @version 2.11.0
      */
     size_t vram_budget_bytes_{0};
 
@@ -613,27 +613,58 @@ private:
     /**
      * @brief Compute the cached/estimated footprint for a tier in bytes.
      *
-     * Weights file size (`std::filesystem::file_size` on the resolved
-     * GGUF path) + context-length × per-token-KV estimate (16 KiB) +
-     * `vram_reserve_mb` × 1MiB. Used by the budget gate and by the
-     * snapshot.
+     * Weights priced by their offload placement + context-length × a
+     * per-token KV estimate scaled by the cache type + the vision
+     * projector when the tier declares one + `vram_reserve_mb` × 1MiB.
+     * Used by the budget gate and by the snapshot.
+     *
+     * Returns 0 for "unknown", which the gate reads as "do not enforce".
+     * A partially offloaded tier is unknown by construction: how much of
+     * the file lands on the GPU depends on the model's layer count, and
+     * guessing would refuse configurations that demonstrably work
+     * (gh#142).
      *
      * @param tier_name Tier name (must be present in `config_.models.tiers`).
-     * @return Estimated footprint bytes. 0 if the tier or its file is unknown.
+     * @return Estimated footprint bytes. 0 if unknown or unpriceable.
      * @internal
-     * @version 2.2.4
+     * @req REQ-INFER-019
+     * @version 2.11.0
      */
     size_t estimate_footprint_bytes(const std::string& tier_name) const;
 
     /**
+     * @brief Log the largest context that would fit a refused tier (gh#142).
+     *
+     * @param tier_name Tier being refused for VRAM.
+     * @internal
+     * @req REQ-INFER-019
+     * @version 2.11.0
+     */
+    void log_fit_recommendation(const std::string& tier_name) const;
+
+    /**
      * @brief Resolve the VRAM budget at initialize time.
      *
-     * Reads `ENTROPIC_VRAM_BUDGET_BYTES` (decimal bytes). On parse
-     * failure or absence, returns 0 (budget unknown → gate disabled).
+     * `ENTROPIC_VRAM_BUDGET_BYTES` takes precedence whenever it is SET,
+     * including when it is empty or unparseable — those resolve to 0 and
+     * therefore DISABLE the gate, which is the escape hatch for an
+     * operator who wants the pre-gh#142 behaviour back. The device
+     * fallback must not override an explicit setting.
      *
-     * @return Bytes, or 0.
+     * Only when the variable is ABSENT does this fall back to the FREE
+     * VRAM the active GPU device reports. That returns 0 when there is no
+     * GPU device (CPU build or no usable card), where 0 means budget
+     * unknown → gate disabled — correct, since a CPU tier has no VRAM to
+     * exhaust.
+     *
+     * Before gh#142 the fallback was documented here but never
+     * implemented, so the gate was dead on every deployment that did not
+     * set the variable.
+     *
+     * @return Bytes, or 0 when there is no device to ask.
      * @internal
-     * @version 2.2.4
+     * @req REQ-INFER-019
+     * @version 2.11.0
      */
     static size_t resolve_vram_budget_bytes();
 

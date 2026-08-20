@@ -62,7 +62,7 @@ Message parse_one_message(const nlohmann::json& m) {
  * @brief Parse a messages-array JSON string into Message structs.
  * @param json_str Null-terminated JSON. NULL or non-array yields empty.
  * @return Parsed messages (empty on null/non-array input).
- * @internal
+ * @req REQ-TYPE-006
  * @version 2.1.8
  */
 std::vector<Message> parse_messages_json(const char* json_str) {
@@ -80,7 +80,7 @@ std::vector<Message> parse_messages_json(const char* json_str) {
  * @brief True if any parsed message carries image content_parts.
  * @param messages Parsed message list.
  * @return true if at least one ContentPart is IMAGE.
- * @internal
+ * @req REQ-TYPE-006
  * @version 2.1.8
  */
 bool any_message_has_images(const std::vector<Message>& messages) {

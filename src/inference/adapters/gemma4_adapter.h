@@ -54,8 +54,12 @@ public:
      * matching the live emission and `strip_thinking_channels`, whose
      * behaviour this consolidates.
      *
+     * Declared once here and read by both consumers: the buffered strip
+     * (ChatAdapter::strip_think_blocks) and the live StreamThinkFilter that
+     * wraps on_token in generate_streaming.
+     *
      * @return `{"<|channel>", "<channel|>"}`.
-     * @utility
+     * @req REQ-INFER-011
      * @version 2.10.3
      */
     ThinkMarkers thinking_markers() const override {

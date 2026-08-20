@@ -88,9 +88,16 @@ size_t valid_seq_len(const uint8_t* p, const uint8_t* end) {
 
 /**
  * @brief Replace invalid UTF-8 byte sequences with U+FFFD.
+ *
+ * Applied at every inbound boundary that admits untrusted bytes — MCP
+ * server output, hook-transformed results, model text — so nothing
+ * downstream has to defend against malformed UTF-8.
+ *
  * @param input Raw bytes (potentially malformed).
- * @return Sanitized string; equal to input when input is already valid.
- * @utility
+ * @return A string equal to the input when it is already valid UTF-8;
+ *         otherwise the same bytes with each invalid sequence replaced
+ *         by U+FFFD, one replacement per offending byte.
+ * @req REQ-SAFE-001
  * @version 2.1.0
  */
 std::string sanitize_utf8(std::string_view input) {

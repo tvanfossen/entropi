@@ -311,7 +311,7 @@ ENTROPIC_EXPORT int entropic_inference_state(
  * @param params_json JSON-serialized GenerationParams.
  * @param result_json Out-param: newly allocated result JSON (free with entropic_inference_free).
  * @return ENTROPIC_OK on success, result.error_code or ENTROPIC_ERROR_GENERATE_FAILED otherwise.
- * @req REQ-INFER-003
+ * @req REQ-ABI-001
  * @version 2.1.8
  */
 ENTROPIC_EXPORT entropic_error_t entropic_inference_generate(
@@ -357,7 +357,7 @@ ENTROPIC_EXPORT entropic_error_t entropic_inference_generate(
  * @param cancel_flag Optional pointer; setting `*cancel_flag` non-zero stops generation.
  * @return ENTROPIC_OK on success, ENTROPIC_ERROR_CANCELLED on
  *         cancellation, other error codes otherwise.
- * @req REQ-INFER-003
+ * @req REQ-ABI-001
  * @version 2.4.2
  */
 namespace {
@@ -470,7 +470,7 @@ ENTROPIC_EXPORT entropic_error_t entropic_inference_generate_with_cancel(
  * @param user_data Opaque pointer passed to on_token.
  * @param cancel_flag Optional pointer; setting *cancel_flag to non-zero stops generation.
  * @return ENTROPIC_OK on success, result.error_code or ENTROPIC_ERROR_GENERATE_FAILED otherwise.
- * @req REQ-INFER-003
+ * @req REQ-ABI-001
  * @version 2.1.8
  */
 ENTROPIC_EXPORT entropic_error_t entropic_inference_generate_streaming(

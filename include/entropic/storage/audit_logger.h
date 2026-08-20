@@ -77,6 +77,7 @@ public:
      * (it is monotonic per-session, not per-file).
      *
      * @return true on success, false on I/O error.
+     * @req REQ-STOR-008
      * @version 1.9.5
      */
     bool initialize();
@@ -89,12 +90,14 @@ public:
      * one line to the file. Thread-safe.
      *
      * @param entry The audit log entry to write.
+     * @req REQ-STOR-008
      * @version 1.9.5
      */
     void record(const AuditEntry& entry);
 
     /**
      * @brief Force flush buffered entries to disk.
+     * @req REQ-STOR-008
      * @version 1.9.5
      */
     void flush();
@@ -102,6 +105,7 @@ public:
     /**
      * @brief Get the number of entries recorded this session.
      * @return Entry count.
+     * @req REQ-STOR-008
      * @version 1.9.5
      */
     size_t entry_count() const;
@@ -109,6 +113,7 @@ public:
     /**
      * @brief Get the file path of the current audit log.
      * @return Absolute path to audit.jsonl.
+     * @req REQ-STOR-008
      * @version 1.9.5
      */
     std::filesystem::path log_path() const;
@@ -129,6 +134,7 @@ public:
      * @param user_data Pointer to AuditHookContext.
      * @return Always 0 (never cancels).
      * @callback
+     * @req REQ-STOR-008
      * @version 1.9.5
      */
     static int hook_callback(

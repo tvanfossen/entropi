@@ -31,7 +31,7 @@ namespace entropic::config {
  *
  * @return Resolved `<prefix>/share/entropic` path, or empty if dladdr
  *         fails (e.g. statically linked with no exported symbols).
- * @internal
+ * @req REQ-CFG-008
  * @version 1
  */
 static std::filesystem::path share_dir_from_library()
@@ -75,7 +75,7 @@ static std::filesystem::path share_dir_from_library()
  *
  * @param config Parsed config.
  * @return Resolved data directory path (empty if none found).
- * @internal
+ * @req REQ-CFG-008
  * @version 2.0.5.1
  */
 std::filesystem::path resolve_data_dir(const ParsedConfig& config)

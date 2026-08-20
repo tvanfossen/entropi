@@ -49,6 +49,7 @@ struct AuditEntry {
  *
  * @param entry The audit entry to serialize.
  * @return JSON object with all entry fields.
+ * @req REQ-STOR-008
  * @version 1.9.5
  */
 nlohmann::json audit_entry_to_json(const AuditEntry& entry);
@@ -63,6 +64,7 @@ nlohmann::json audit_entry_to_json(const AuditEntry& entry);
  * @param j JSON object (one line from audit.jsonl).
  * @param[out] entry Populated entry.
  * @return true if all required fields were present and valid.
+ * @req REQ-STOR-008
  * @version 1.9.5
  */
 bool audit_entry_from_json(const nlohmann::json& j, AuditEntry& entry);

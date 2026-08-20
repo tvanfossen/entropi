@@ -25,7 +25,8 @@ static auto logger = entropic::log::get("facade.audit");
  * @brief Flush the audit logger to disk.
  *
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-STOR-008
+ * @req REQ-API-005
  * @version 2.0.0
  */
 extern "C" ENTROPIC_EXPORT entropic_error_t
@@ -40,7 +41,8 @@ entropic_audit_flush(entropic_handle_t handle) {
  * @brief Get the number of audit log entries this session.
  *
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-STOR-008
+ * @req REQ-API-005
  * @version 2.0.0
  */
 extern "C" ENTROPIC_EXPORT entropic_error_t
@@ -60,7 +62,10 @@ entropic_audit_count(entropic_handle_t handle, size_t* count) {
  * @param path Filesystem path to the JSONL audit log file.
  * @param result_json Out-param: newly allocated JSON string (caller owns; free with entropic_free).
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-STOR-008
+ * @req REQ-API-008
+ * @req REQ-API-005
+ * @req REQ-ABI-002
  * @version 2.1.1
  */
 extern "C" ENTROPIC_EXPORT entropic_error_t

@@ -218,7 +218,7 @@ bool extract_path(ryml::ConstNodeRef node, c4::csubstr key,
  * @param[out] disabled Set to true if value is explicitly false.
  * @return true if key was found.
  * @version 1.8.2
- * @utility
+ * @req REQ-TYPE-005
  */
 bool extract_tri_state_path(
     ryml::ConstNodeRef node, c4::csubstr key,
@@ -237,6 +237,38 @@ bool extract_tri_state_path(
         ? std::nullopt
         : std::optional{expand_home(std::filesystem::path(val))};
     return true;
+}
+
+/**
+ * @brief Extract inline text from an object-form value (gh#141).
+ *
+ * Deliberately narrow: it matches ONLY a map carrying a `content` child, and
+ * returns false for everything else. A wider match would change the meaning of
+ * existing configs, and `app_context` has three established spellings (path
+ * string, `true`, `false`) that all had to keep working.
+ *
+ * @param node The ryml node to extract from.
+ * @param key The key to look up.
+ * @param[out] out Receives the content when the object form matched.
+ * @return true only if the object form matched.
+ * @req REQ-TYPE-005
+ * @version 2.11.0
+ */
+bool extract_inline_content(
+    ryml::ConstNodeRef node, c4::csubstr key, std::optional<std::string>& out)
+{
+    bool matched = false;
+    if (node.is_map() && node.has_child(key)) {
+        auto child = node[key];
+        if (child.is_map() && child.has_child("content")) {
+            auto content = child["content"];
+            if (content.has_val()) {
+                out = to_string(content.val());
+                matched = true;
+            }
+        }
+    }
+    return matched;
 }
 
 /**
@@ -272,7 +304,7 @@ bool extract_string_list(ryml::ConstNodeRef node, c4::csubstr key,
  * @param[out] out Output optional vector.
  * @return true if key was found.
  * @version 1.8.2
- * @utility
+ * @req REQ-TYPE-005
  */
 bool extract_string_list_opt(ryml::ConstNodeRef node, c4::csubstr key,
                              std::optional<std::vector<std::string>>& out)

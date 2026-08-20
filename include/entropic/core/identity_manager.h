@@ -132,6 +132,7 @@ public:
      * @brief Load static identities from config loader.
      * @param identities Vector of static identity configs.
      * @return Number of identities loaded.
+     * @req REQ-IDEN-002
      * @version 1.9.6
      *
      * Called once at engine startup. Static identities have
@@ -146,6 +147,7 @@ public:
      *         ENTROPIC_ERROR_INVALID_CONFIG if validation fails.
      *         ENTROPIC_ERROR_LIMIT_REACHED if max_identities exceeded.
      *         ENTROPIC_ERROR_ALREADY_EXISTS if name already taken.
+     * @req REQ-IDEN-002
      * @version 1.9.6
      */
     entropic_error_t create(const IdentityConfig& config);
@@ -158,6 +160,7 @@ public:
      *         ENTROPIC_ERROR_IDENTITY_NOT_FOUND if identity doesn't exist.
      *         ENTROPIC_ERROR_PERMISSION_DENIED if identity is static.
      *         ENTROPIC_ERROR_INVALID_CONFIG if validation fails.
+     * @req REQ-IDEN-002
      * @version 1.9.6
      */
     entropic_error_t update(const std::string& name,
@@ -171,6 +174,7 @@ public:
      *         ENTROPIC_ERROR_PERMISSION_DENIED if identity is static.
      *         ENTROPIC_ERROR_IN_USE if identity is currently active in
      *         a delegation (locked_tier matches name).
+     * @req REQ-IDEN-002
      * @version 1.9.6
      */
     entropic_error_t destroy(const std::string& name);
@@ -228,6 +232,7 @@ public:
     /**
      * @brief Check if the router classification prompt needs rebuilding.
      * @return true if create/update/destroy has been called since last clear.
+     * @req REQ-IDEN-002
      * @version 1.9.6
      */
     bool is_router_dirty() const;
@@ -282,6 +287,7 @@ private:
      * @param config Config to validate.
      * @param is_update true if this is an update (name must already exist).
      * @return Empty string on success, error message on failure.
+     * @req REQ-IDEN-002
      * @version 1.9.6
      */
     std::string validate(const IdentityConfig& config,
@@ -291,6 +297,7 @@ private:
      * @brief Validate identity name format.
      * @param name Name to validate.
      * @return Empty string on success, error message on failure.
+     * @req REQ-IDEN-002
      * @version 1.9.6
      */
     static std::string validate_name(const std::string& name);
@@ -298,6 +305,7 @@ private:
     /**
      * @brief Register MCP keys for an identity via callback interface.
      * @param config Identity config with mcp_keys.
+     * @req REQ-IDEN-002
      * @version 1.9.6
      */
     void register_mcp_keys(const IdentityConfig& config);
@@ -305,6 +313,7 @@ private:
     /**
      * @brief Unregister MCP keys for an identity via callback interface.
      * @param name Identity name.
+     * @req REQ-IDEN-002
      * @version 1.9.6
      */
     void unregister_mcp_keys(const std::string& name);

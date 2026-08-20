@@ -232,49 +232,47 @@ TEST_CASE("test_write_file_requires_read", "[filesystem]") {
             "read_before_write");
 }
 
-TEST_CASE("test_write_file_detects_external_change",
+TEST_CASE("test_write_file_allows_write_after_read_even_if_changed",
           "[filesystem]") {
     /**
-     * @brief Read a file, modify it externally, then write via
-     *        server. Verifies the server detects external change
-     *        via mismatched content hash.
+     * @brief Pin what the read-before-write gate ACTUALLY does.
+     *
+     * This test was previously named ..._detects_external_change and
+     * asserted on FileAccessTracker::was_read_unchanged directly. Its own
+     * comment conceded the write succeeds — so it never exercised a refused
+     * write, and passed while the behaviour its name claimed did not exist.
+     * was_read_unchanged had no production caller at all; the gate
+     * (check_read_before_write) only ever consults was_read(). The dead
+     * method was removed in v2.11.0 and this now pins the real contract.
+     *
+     * Catalog REQ-MCP-021 records the external-modification gate as absent.
+     * If it is ever implemented, this test should flip to expecting a refusal.
+     *
      * @internal
-     * @version 1.8.5
+     * @version 2.11.0
      */
     TempDir tmp;
     write_test_file(tmp.path(), "mutable.txt", "original");
     auto server = make_server(tmp.path());
 
-    // Read to satisfy read-before-write
+    // Read to satisfy read-before-write.
     json read_args;
     read_args["path"] = "mutable.txt";
     server.execute("read_file", read_args.dump());
 
-    // Modify the file externally (simulates editor or other process)
+    // Modify externally (simulates an editor or another process).
     write_test_file(tmp.path(), "mutable.txt", "externally changed");
 
-    // Write via server — tracker recorded hash of "original",
-    // but write_file uses check_read_before_write which only
-    // checks was_read (not hash). The hash mismatch detection
-    // surfaces through was_read_unchanged on subsequent reads.
-    // For write_file, the write should succeed because was_read
-    // returns true. This test verifies the tracker *has* stale
-    // hash data that a future read would detect.
     json write_args;
     write_args["path"] = "mutable.txt";
     write_args["content"] = "new content";
     auto envelope = server.execute("write_file", write_args.dump());
     auto result = parse_result(envelope);
 
-    // Write succeeds (was_read check passes), but tracker hash
-    // is stale. Verify the tracker detects the mismatch.
-    auto canonical = fs::weakly_canonical(
-        tmp.path() / "mutable.txt").string();
-    auto current_hash = std::hash<std::string>{}(
-        "externally changed");
-    REQUIRE_FALSE(
-        server.tracker().was_read_unchanged(
-            canonical, current_hash));
+    // The write is ALLOWED: the gate is read-before-write, not
+    // read-and-unchanged. Documenting this honestly beats a test whose name
+    // promises detection that no code performs.
+    REQUIRE_FALSE(result.contains("error"));
 }
 
 TEST_CASE("test_edit_str_replace", "[filesystem]") {

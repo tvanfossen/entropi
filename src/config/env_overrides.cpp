@@ -63,7 +63,7 @@ static void apply_env(const char* key, Setter setter) {
  * @brief Apply ENTROPIC_* environment variable overrides.
  * @param[in,out] config Config to override.
  * @version 2.3.7
- * @utility
+ * @req REQ-CFG-001
  */
 void apply_env_overrides(ParsedConfig& config)
 {

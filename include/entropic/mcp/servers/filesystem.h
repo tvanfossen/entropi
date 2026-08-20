@@ -37,15 +37,6 @@ public:
      */
     void record_read(const std::string& path, size_t hash);
 
-    /**
-     * @brief Check if a file was read and content unchanged.
-     * @param path Canonical file path.
-     * @param current_hash Current content hash.
-     * @return true if read and unchanged.
-     * @version 1.8.5
-     */
-    bool was_read_unchanged(const std::string& path,
-                            size_t current_hash) const;
 
     /**
      * @brief Check if a file was ever read.

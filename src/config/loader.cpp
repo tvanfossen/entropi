@@ -59,8 +59,8 @@ static void parse_model_runtime_knobs(
  * default in place (same precedence as the frontmatter path,
  * thread_frontmatter_sampler). YAML is loaded before init_orchestrator, so
  * unlike frontmatter these land in the orchestrator's config snapshot.
- * @utility
- * @internal
+ * @req REQ-CFG-005
+ * @req REQ-TYPE-005
  * @version 2.8.2
  */
 static void parse_sampler_overrides(
@@ -91,7 +91,8 @@ static void parse_sampler_overrides(
  *
  * @param node YAML node for a single tier.
  * @param[out] config Output tier config.
- * @internal
+ * @req REQ-CFG-005
+ * @req REQ-TYPE-005
  * @version 2.9.4
  */
 static void parse_tier_speculative_override(
@@ -111,8 +112,9 @@ static void parse_tier_speculative_override(
  * bundled registry (`find_by` → `resolve`). A partial selector (some but not
  * all three) or an unmatched triple is a clear error. Absent both leaves
  * `config.path` untouched (downstream validation reports the missing model).
- * @utility
- * @internal
+ * @return Empty string on success, error message on a bad/unmatched selector.
+ * @req REQ-CFG-003
+ * @req REQ-CFG-006
  * @version 2.8.0
  */
 static std::string resolve_model_path(
@@ -155,7 +157,9 @@ static std::string resolve_model_path(
  * @param registry Bundled models for path resolution.
  * @param[out] config Output model config.
  * @return Empty string on success, error message on failure.
- * @internal
+ * @req REQ-CFG-003
+ * @req REQ-CFG-005
+ * @req REQ-TYPE-005
  * @version 2.8.0
  */
 static std::string parse_model_config(
@@ -198,7 +202,8 @@ static std::string parse_model_config(
  * @param registry Bundled models for path resolution.
  * @param[out] config Output tier config.
  * @return Empty string on success, error message on failure.
- * @internal
+ * @req REQ-CFG-005
+ * @req REQ-TYPE-005
  * @version 2.10.4
  */
 static std::string parse_tier_config(
@@ -259,7 +264,8 @@ static std::string parse_tier_config(
  * @param registry Bundled models for path resolution.
  * @param[out] config Output models config.
  * @return Empty string on success, error message on failure.
- * @internal
+ * @req REQ-CFG-001
+ * @req REQ-CFG-002
  * @version 1.8.2
  */
 static std::string parse_models_config(
@@ -561,7 +567,8 @@ static void parse_constitutional_validation_config(
  *
  * @param node YAML node for `inference.speculative`.
  * @param[out] config Output speculative config.
- * @internal
+ * @req REQ-CFG-005
+ * @req REQ-TYPE-005
  * @version 2.9.0
  */
 static void parse_speculative_config(
@@ -650,7 +657,7 @@ static void parse_optional_subsections(
  * @param root YAML root node.
  * @param config Config to populate.
  * @internal
- * @version 2.3.7
+ * @version 2.11.0
  */
 static void extract_scalar_fields(ryml::ConstNodeRef root,
                                   ParsedConfig& config)
@@ -666,8 +673,15 @@ static void extract_scalar_fields(ryml::ConstNodeRef root,
 
     extract_tri_state_path(root, "constitution",
                            config.constitution, config.constitution_disabled);
-    extract_tri_state_path(root, "app_context",
-                           config.app_context, config.app_context_disabled);
+    /* gh#141 (v2.11.0): app_context accepts an object carrying the text
+     * inline, for consumers that hold it in memory and cannot write it to
+     * disk. Checked BEFORE the tri-state path parse, because the object form
+     * has no meaning as a path and would otherwise be stringified into one. */
+    if (!extract_inline_content(root, "app_context",
+                                config.app_context_content)) {
+        extract_tri_state_path(root, "app_context",
+                               config.app_context, config.app_context_disabled);
+    }
 }
 
 /**
@@ -725,6 +739,8 @@ static std::string parse_top_sections(
  * @param[in,out] config Config to overlay onto.
  * @return Empty string on success, error message on failure.
  * @req REQ-CFG-001
+ * @req REQ-CFG-006
+ * @req REQ-TYPE-005
  * @version 2.3.7
  */
 std::string parse_config_file(
@@ -754,7 +770,7 @@ std::string parse_config_file(
  * @param registry Bundled models registry.
  * @param[in,out] config Config to populate.
  * @return Empty string on success, error message on failure.
- * @internal
+ * @req REQ-CFG-007
  * @version 2.9.5
  */
 static std::string load_bundled_default(
@@ -795,7 +811,8 @@ static std::string load_bundled_default(
  * @param registry Bundled models registry.
  * @param[in,out] config Config to overlay onto.
  * @return Empty string on success, error message on failure.
- * @internal
+ * @req REQ-CFG-001
+ * @req REQ-CFG-007
  * @version 2.0.0
  */
 static std::string load_config_layers(
@@ -832,7 +849,9 @@ static std::string load_config_layers(
  * @param registry Bundled models registry.
  * @param[out] config Output parsed config.
  * @return Empty string on success, error message on failure.
- * @internal
+ * @req REQ-CFG-001
+ * @req REQ-CFG-006
+ * @req REQ-CFG-007
  * @version 2.0.0
  */
 std::string load_config(
@@ -858,7 +877,8 @@ std::string load_config(
  * @param registry Bundled models registry.
  * @param[out] config Output parsed config.
  * @return Empty string on success, error message on failure.
- * @internal
+ * @req REQ-CFG-001
+ * @req REQ-CFG-006
  * @version 1.8.2
  */
 std::string load_config_from_file(
@@ -987,7 +1007,7 @@ static void discover_mcp_json(
 
 /**
  * @brief Load the global user config layer if present.
- * @utility
+ * @req REQ-CFG-001
  * @return Empty on success or absence; error message on parse failure.
  * @version 1
  */
@@ -1023,7 +1043,7 @@ static std::string load_global_layer(
  * if found, else returns the original (so the caller's error
  * messages remain sensible).
  *
- * @internal
+ * @req REQ-CFG-001
  * @return Path to use for config loading.
  * @version 1
  */
@@ -1066,7 +1086,7 @@ static std::filesystem::path resolve_consumer_defaults(
  * @param path File path.
  * @param key Key to look for.
  * @return true if the file parses and has the key at root level.
- * @utility
+ * @req REQ-CFG-002
  * @version 2.0.6
  */
 static bool yaml_has_key(const std::filesystem::path& path,
@@ -1091,7 +1111,9 @@ static bool yaml_has_key(const std::filesystem::path& path,
  * @param consumer_defaults_in Consumer defaults path.
  * @param registry Bundled models registry.
  * @param[in,out] config Config to overlay onto.
- * @utility
+ * @req REQ-CFG-001
+ * @req REQ-CFG-002
+ * @req REQ-CFG-007
  * @version 2.0.6
  */
 static void load_consumer_layer(
@@ -1135,7 +1157,8 @@ static void load_consumer_layer(
  * defines a `models:` or `routing:` block, existing entries from
  * prior layers are cleared before parsing.
  *
- * @utility
+ * @req REQ-CFG-001
+ * @req REQ-CFG-002
  * @return Empty on success or absence; error message on parse failure.
  * @version 2.0.6
  */
@@ -1189,7 +1212,9 @@ static std::string load_project_layer(
  * @param registry Bundled models registry.
  * @param config Output config.
  * @return Empty string on success.
- * @internal
+ * @req REQ-CFG-001
+ * @req REQ-CFG-002
+ * @req REQ-CFG-007
  * @version 2.0.6
  */
 std::string load_layered(
@@ -1226,7 +1251,8 @@ std::string load_layered(
  * @param registry Bundled models for path resolution.
  * @param[in,out] config Config to overlay onto.
  * @return Empty string on success, error message on failure.
- * @internal
+ * @req REQ-CFG-001
+ * @req REQ-CFG-006
  * @version 2.1.11
  */
 static std::string parse_config_string(
@@ -1265,7 +1291,8 @@ static std::string parse_config_string(
  * @param registry Bundled models registry.
  * @param[out] config Output parsed config.
  * @return Empty string on success, error message on failure.
- * @internal
+ * @req REQ-CFG-001
+ * @req REQ-CFG-006
  * @version 2.0.0
  */
 std::string load_config_from_string(

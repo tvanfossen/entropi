@@ -23,7 +23,9 @@ static auto logger = entropic::log::get("facade.storage");
  * @param handle Engine handle returned by entropic_create.
  * @param db_path Filesystem path to the SQLite database file.
  * @return ENTROPIC_OK on success.
- * @internal
+ * @req REQ-STOR-001
+ * @req REQ-API-005
+ * @req REQ-ABI-002
  * @version 2.0.0
  */
 extern "C" ENTROPIC_EXPORT entropic_error_t
@@ -56,7 +58,8 @@ entropic_storage_open(
  *
  * @param handle Engine handle returned by entropic_create.
  * @return ENTROPIC_OK (no-op if storage not opened).
- * @internal
+ * @req REQ-STOR-001
+ * @req REQ-API-005
  * @version 2.0.0
  */
 extern "C" ENTROPIC_EXPORT entropic_error_t

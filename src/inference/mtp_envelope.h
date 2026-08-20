@@ -83,8 +83,12 @@ namespace entropic {
  *        see v2.10.0 grammar note — propagated via to_common_sampling).
  * @param streaming True when a per-token callback is bound (unused; see
  *        v2.10.0 streaming note above).
- * @return Actionable message when MTP is unsupported for the request, else "".
- * @utility
+ * @return Actionable message when MTP is unsupported for the request, else
+ *         "". Every former condition has been removed as its underlying gap
+ *         was actually fixed, so the envelope is now fully open and this
+ *         always returns "" — narrowing it again means reinstating a guard,
+ *         never a silent fallback.
+ * @req REQ-INFER-015
  * @version 2.10.0 [reviewed]
  */
 inline std::string mtp_unsupported_reason(float temperature, bool has_grammar,
@@ -104,8 +108,10 @@ inline std::string mtp_unsupported_reason(float temperature, bool has_grammar,
  * is supplied without setting speculative.mtp: true.
  *
  * @param n_layer Layer count from llama_model_n_layer.
- * @return True for 1–2 layers; false otherwise.
- * @utility
+ * @return True for 1–2 layers; false otherwise. A true result means the
+ *         classical separate-draft path must refuse the config rather than
+ *         crash in fattn.cu.
+ * @req REQ-INFER-015
  * @version 2.10.0
  */
 inline bool looks_like_mtp_head(int n_layer) {
@@ -120,8 +126,9 @@ inline bool looks_like_mtp_head(int n_layer) {
  * corrective config knob.
  *
  * @param n_layer Layer count from llama_model_n_layer.
- * @return Actionable INCOMPATIBLE_CONFIG message.
- * @utility
+ * @return Actionable INCOMPATIBLE_CONFIG message naming both the layer count
+ *         and the corrective `speculative.mtp: true` knob.
+ * @req REQ-INFER-015
  * @version 2.10.0
  */
 inline std::string mtp_head_classical_path_error(int n_layer) {
