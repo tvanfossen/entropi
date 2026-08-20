@@ -27,7 +27,7 @@ namespace entropic {
  * @param loop_config Loop configuration.
  * @param callbacks Shared callbacks.
  * @param hooks Optional engine-level hooks.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 ToolExecutor::ToolExecutor(
@@ -43,7 +43,7 @@ ToolExecutor::ToolExecutor(
 /**
  * @brief Set permission persistence interface.
  * @param persist Permission persist callbacks.
- * @internal
+ * @dg_internal
  * @version 1.8.8
  */
 void ToolExecutor::set_permission_persist(
@@ -623,7 +623,7 @@ Message ToolExecutor::create_error_message(
 /**
  * @brief Fire state change callback.
  * @param ctx Loop context.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 void ToolExecutor::fire_state_callback(const LoopContext& ctx) {
@@ -732,7 +732,7 @@ std::optional<Message> ToolExecutor::check_dup_or_approval(
  * @param ctx Loop context.
  * @param call Tool call.
  * @return Rejection message if blocked, nullopt if clear.
- * @internal
+ * @dg_internal
  * @version 1.9.4
  */
 /**
@@ -924,7 +924,7 @@ static ToolResultKind classify_tool_result(const std::string& content) {
  * @param exec_ms Execution time (ms).
  * @param raw_result Raw server result (for size).
  * @param kind Classified result kind.
- * @internal
+ * @dg_internal
  * @version 2.3.7
  */
 void ToolExecutor::log_tool_call(LoopContext& ctx, const ToolCall& call,
@@ -1183,7 +1183,7 @@ void ToolExecutor::fire_post_tool_hook(
  * @param ctx Loop context.
  * @param results Results so far.
  * @return true if batch should stop.
- * @internal
+ * @dg_internal
  * @version 2.0.2
  */
 bool ToolExecutor::should_stop_batch(
@@ -1198,7 +1198,7 @@ bool ToolExecutor::should_stop_batch(
 /**
  * @brief Run post-tool hooks (after_tool callback).
  * @param ctx Loop context.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 void ToolExecutor::run_post_tool_hooks(LoopContext& ctx) {
@@ -1296,7 +1296,7 @@ std::string ToolExecutor::serialize_args(const ToolCall& call) {
  * @brief Serialize a tool call to JSON for callbacks.
  * @param call Tool call.
  * @return JSON string.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 std::string ToolExecutor::serialize_tool_call(const ToolCall& call) {
@@ -1315,7 +1315,7 @@ std::string ToolExecutor::serialize_tool_call(const ToolCall& call) {
  * @param call Tool call.
  * @param result Result text.
  * @param ms Duration in milliseconds.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 void ToolExecutor::fire_tool_complete_callback(
@@ -1404,14 +1404,14 @@ std::string ToolExecutor::build_pre_tool_json(
  *
  * @param ctx Loop context (mutated by directive handlers).
  * @param raw_result ServerResponse JSON string.
- * @internal
+ * @dg_internal
  * @version 2.0.1
  */
 /**
  * @brief Extract pipeline stage names from a result JSON object.
  * @param result_json Parsed result JSON.
  * @return Stage tier names (empty if absent).
- * @internal
+ * @dg_internal
  * @version 2.0.2
  */
 static std::vector<std::string> extract_pipeline_stages(
@@ -1434,7 +1434,7 @@ static std::vector<std::string> extract_pipeline_stages(
  * @param d Directive JSON ("type": ...).
  * @param result_json Parsed result JSON for parameter lookup.
  * @return Owned Directive (nullptr if type is unrecognized).
- * @internal
+ * @dg_internal
  * @version 2.1.6
  */
 /**

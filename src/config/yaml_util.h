@@ -8,7 +8,7 @@
  * returns true if the key was found and extracted, false if absent.
  * The output parameter is unchanged when the key is absent.
  *
- * @internal Implementation detail of librentropic-config. Not a public header.
+ * @dg_internal Implementation detail of librentropic-config. Not a public header.
  * @version 1.8.1
  */
 

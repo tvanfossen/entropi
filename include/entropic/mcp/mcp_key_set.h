@@ -129,7 +129,7 @@ private:
      * @brief Extract server prefix from a fully-qualified tool name.
      * @param tool_name Tool name (e.g., "filesystem.read_file").
      * @return Server prefix with wildcard (e.g., "filesystem.*"), or empty.
-     * @internal
+     * @dg_internal
      * @version 1.9.4
      */
     static std::string server_wildcard(const std::string& tool_name);
@@ -138,7 +138,7 @@ private:
      * @brief Find the best matching access level for a tool name.
      * @param tool_name Fully-qualified tool name.
      * @return Granted MCPAccessLevel, or NONE if no match.
-     * @internal
+     * @dg_internal
      * @version 1.9.4
      */
     MCPAccessLevel find_best_match(const std::string& tool_name) const;

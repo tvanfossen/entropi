@@ -148,7 +148,7 @@ private:
      * @brief Take a priority-sorted snapshot of entries for a point.
      * @param point Hook point.
      * @return Copy of entry vector.
-     * @internal
+     * @dg_internal
      * @version 1.9.1
      */
     std::vector<HookEntry> snapshot(entropic_hook_point_t point) const;

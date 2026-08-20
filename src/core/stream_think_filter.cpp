@@ -56,7 +56,7 @@ void StreamThinkFilter::set_raw_callback(TokenCallback cb, void* ud) {
  * @param buf Buffer to check.
  * @param is_open Output: true for the opening delimiter, false for closing.
  * @return true if a complete delimiter was matched.
- * @internal
+ * @dg_internal
  * @version 2.10.3
  */
 bool StreamThinkFilter::match_tag(const std::string& buf, bool& is_open) const {
@@ -127,13 +127,13 @@ void StreamThinkFilter::emit_utf8_safe(const char* data, size_t len) {
  * @brief Process a chunk of tokens.
  * @param chunk Token data.
  * @param len Byte length.
- * @internal
+ * @dg_internal
  * @version 2.0.2
  */
 /**
  * @brief Process one byte through the tag-buffering state machine.
  * @param c Byte to process.
- * @internal
+ * @dg_internal
  * @version 2.10.3
  */
 void StreamThinkFilter::process_byte(char c) {

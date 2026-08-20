@@ -223,7 +223,7 @@ std::string IgnoreMatcher::pattern_to_regex(const std::string& pattern) {
  * anchored at the base; otherwise the pattern matches against any
  * path component.
  *
- * @internal
+ * @dg_internal
  * @version 2.1.4
  */
 namespace {

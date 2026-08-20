@@ -70,7 +70,7 @@ namespace {
 
 /**
  * @brief Directories to skip during recursive traversal.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 const std::vector<std::string> SKIP_DIRS = {
@@ -81,7 +81,7 @@ const std::vector<std::string> SKIP_DIRS = {
  * @brief Check if a directory name should be skipped.
  * @param name Directory name to check.
  * @return true if name is in the skip list.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 bool should_skip_dir(const std::string& name) {
@@ -98,7 +98,7 @@ bool should_skip_dir(const std::string& name) {
  * @param path File path.
  * @return File contents.
  * @throws std::runtime_error if file cannot be opened.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 std::string read_file_contents(const fs::path& path) {
@@ -116,7 +116,7 @@ std::string read_file_contents(const fs::path& path) {
  * @brief Write string contents to a file, creating parent dirs.
  * @param path File path.
  * @param content Content to write.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 void write_file_contents(const fs::path& path,
@@ -134,7 +134,7 @@ void write_file_contents(const fs::path& path,
  * @brief Hash a string using std::hash.
  * @param s String to hash.
  * @return Hash value.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 size_t hash_content(const std::string& s) {
@@ -204,7 +204,7 @@ std::string build_read_result(const std::string& path,
  * @param pat     Pattern string.
  * @param i       Current position (the first star); advanced in-place.
  * @param out     Regex output buffer.
- * @internal
+ * @dg_internal
  * @version 2.10.0
  */
 void emit_glob_star(const std::string& pat, size_t& i, std::string& out) {
@@ -226,7 +226,7 @@ void emit_glob_star(const std::string& pat, size_t& i, std::string& out) {
  * @param filename Workspace-relative path to test.
  * @param pattern  Glob pattern (already brace-expanded).
  * @return true if filename matches.
- * @internal
+ * @dg_internal
  * @version 2.10.0
  */
 bool glob_match(const std::string& filename,
@@ -276,14 +276,14 @@ bool glob_match(const std::string& filename,
  * @param pattern Source pattern.
  * @return Vector of brace-expanded patterns. At minimum a single entry
  *         (the input verbatim) when no braces are present.
- * @internal
+ * @dg_internal
  * @version 2.1.4
  */
 /**
  * @brief Split the body of a `{a,b,c}` group into alternatives.
  * @param body Text between the braces (no `{` or `}`).
  * @return Vector of alternative strings. At least one entry.
- * @internal
+ * @dg_internal
  * @version 2.1.4
  */
 std::vector<std::string> split_brace_alternatives(
@@ -304,7 +304,7 @@ std::vector<std::string> split_brace_alternatives(
 
 /**
  * @brief Multiply existing patterns by alternatives.
- * @internal
+ * @dg_internal
  * @version 2.1.4
  */
 std::vector<std::string> multiply_alternatives(
@@ -328,7 +328,7 @@ std::vector<std::string> multiply_alternatives(
  * (`*.{c,h}.{old,new}` → 4 patterns). Nested braces are not supported;
  * unbalanced braces pass through verbatim.
  *
- * @internal
+ * @dg_internal
  * @version 2.1.4
  */
 std::vector<std::string> expand_braces(const std::string& pattern) {
@@ -379,16 +379,11 @@ std::string check_read_before_write(
 }
 
 /**
- * @brief Apply string replacement to content.
- * @param content Original content.
- * @param old_str String to find.
- * @param new_str Replacement string.
- * @param replace_all Replace all occurrences if true.
  * @brief Count occurrences of a substring.
  * @param content Text to search.
  * @param needle Substring to count.
  * @return Occurrence count.
- * @internal
+ * @dg_internal
  * @version 1.8.6
  */
 int count_occurrences(const std::string& content,
@@ -410,7 +405,7 @@ int count_occurrences(const std::string& content,
  * @param replace_all Replace all occurrences vs single.
  * @param error_type Output: "not_found" or "multiple_matches" on failure.
  * @return Modified content, or nullopt on error.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 std::optional<std::string>
@@ -442,7 +437,7 @@ apply_str_replace(const std::string& content, const std::string& old_str, const 
  * @param line_num 1-based line number.
  * @param new_str Text to insert.
  * @return Modified content.
- * @internal
+ * @dg_internal
  * @version 2.1.4
  */
 std::string apply_insert(const std::string& content,
@@ -475,7 +470,7 @@ std::string apply_insert(const std::string& content,
  * @param filename Filename to test.
  * @param patterns Patterns (post brace expansion).
  * @return true if any pattern matches.
- * @internal
+ * @dg_internal
  * @version 2.1.4
  */
 bool any_glob_match(const std::string& filename,
@@ -499,7 +494,7 @@ bool any_glob_match(const std::string& filename,
  * @param max_results Maximum number of results.
  * @param ignore Optional ignore matcher (nullptr disables filtering).
  * @return Vector of matching absolute path strings (deduped).
- * @internal
+ * @dg_internal
  * @version 2.1.4
  */
 /**
@@ -508,7 +503,7 @@ bool any_glob_match(const std::string& filename,
  * Encapsulates the decision tree for "skip me / prune below / take me"
  * so collect_glob_matches can stay flat and within the complexity gate.
  *
- * @internal
+ * @dg_internal
  * @version 2.1.4
  */
 enum class EntryAction {
@@ -649,7 +644,7 @@ void grep_file(const fs::path& path,
  * @brief Convert a directory entry to a JSON object.
  * @param entry Directory entry.
  * @return JSON with name, type, and size fields.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 json entry_to_json(const fs::directory_entry& entry) {
@@ -742,7 +737,7 @@ std::string do_str_replace(const json& args,
  * @param content Current file content.
  * @param out Modified content (output).
  * @return Empty string (always succeeds).
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 std::string do_insert(const json& args,
@@ -802,7 +797,7 @@ std::string apply_edit(const json& args,
 
 /**
  * @brief Tool for reading file contents with line numbering.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 class ReadFileTool : public ToolBase {
@@ -811,7 +806,7 @@ public:
      * @brief Construct from server reference and data directory.
      * @param server Owning filesystem server.
      * @param data_dir Path to bundled data directory.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     ReadFileTool(FilesystemServer& server,
@@ -836,7 +831,7 @@ public:
      * @brief Read a file and return numbered lines as JSON.
      * @param args_json JSON with "path" key.
      * @return ServerResponse with file content or error.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     ServerResponse execute(const std::string& args_json) override;
@@ -867,7 +862,7 @@ private:
  * @brief Execute read_file: resolve, size-check, read, hash, track.
  * @param args_json JSON arguments.
  * @return ServerResponse with content or error.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 /**
@@ -962,7 +957,7 @@ ServerResponse ReadFileTool::execute(const std::string& args_json) {
 
 /**
  * @brief Tool for writing file contents with read-before-write.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 class WriteFileTool : public ToolBase {
@@ -971,7 +966,7 @@ public:
      * @brief Construct from server reference and data directory.
      * @param server Owning filesystem server.
      * @param data_dir Path to bundled data directory.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     WriteFileTool(FilesystemServer& server,
@@ -985,7 +980,7 @@ public:
      * @brief Write content to a file after read-before-write check.
      * @param args_json JSON with "path" and "content" keys.
      * @return ServerResponse with result or error.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     ServerResponse execute(const std::string& args_json) override;
@@ -1038,7 +1033,7 @@ ServerResponse WriteFileTool::execute(
 
 /**
  * @brief Tool for in-place file editing (string replace or insert).
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 class EditFileTool : public ToolBase {
@@ -1047,7 +1042,7 @@ public:
      * @brief Construct from server reference and data directory.
      * @param server Owning filesystem server.
      * @param data_dir Path to bundled data directory.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     EditFileTool(FilesystemServer& server,
@@ -1061,7 +1056,7 @@ public:
      * @brief Edit a file via string replacement or line insertion.
      * @param args_json JSON with edit parameters.
      * @return ServerResponse with result or error.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     ServerResponse execute(const std::string& args_json) override;
@@ -1074,7 +1069,7 @@ private:
  * @brief Execute edit_file: read, apply edit, write back.
  * @param args_json JSON arguments.
  * @return ServerResponse with result.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 ServerResponse EditFileTool::execute(const std::string& args_json) {
@@ -1099,7 +1094,7 @@ ServerResponse EditFileTool::execute(const std::string& args_json) {
 
 /**
  * @brief Tool for recursive file pattern matching.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 class GlobTool : public ToolBase {
@@ -1108,7 +1103,7 @@ public:
      * @brief Construct with server reference and data directory.
      * @param server Owning FilesystemServer (for root_dir).
      * @param data_dir Path to bundled data directory.
-     * @internal
+     * @dg_internal
      * @version 2.0.4
      */
     GlobTool(FilesystemServer& server, const std::string& data_dir)
@@ -1132,7 +1127,7 @@ public:
      * @brief Find files matching a glob pattern.
      * @param args_json JSON with "pattern" key.
      * @return ServerResponse with matched file paths.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     ServerResponse execute(const std::string& args_json) override;
@@ -1149,7 +1144,7 @@ private:
  *
  * @param args_json JSON arguments.
  * @return ServerResponse with matched paths.
- * @internal
+ * @dg_internal
  * @version 2.1.4
  */
 ServerResponse GlobTool::execute(const std::string& args_json) {
@@ -1175,7 +1170,7 @@ ServerResponse GlobTool::execute(const std::string& args_json) {
 
 /**
  * @brief Tool for regex content search across files.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 class GrepTool : public ToolBase {
@@ -1183,7 +1178,7 @@ public:
     /**
      * @brief Construct from data directory.
      * @param data_dir Path to bundled data directory.
-     * @internal
+     * @dg_internal
      * @version 2.1.4
      */
     GrepTool(FilesystemServer& server, const std::string& data_dir)
@@ -1207,7 +1202,7 @@ public:
      * @brief Search files for regex pattern matches.
      * @param args_json JSON with "pattern" and optional "glob" keys.
      * @return ServerResponse with match results.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     ServerResponse execute(const std::string& args_json) override;
@@ -1245,7 +1240,7 @@ std::regex compile_grep_or_error(const std::string& pattern,
  *
  * Issues #13/#15 (v2.1.4).
  *
- * @internal
+ * @dg_internal
  * @version 2.1.4
  */
 /**
@@ -1317,7 +1312,7 @@ ServerResponse GrepTool::execute(const std::string& args_json) {
 
 /**
  * @brief Tool for listing directory contents.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 class ListDirectoryTool : public ToolBase {
@@ -1326,7 +1321,7 @@ public:
      * @brief Construct from server reference and data directory.
      * @param server Owning filesystem server.
      * @param data_dir Path to bundled data directory.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     ListDirectoryTool(FilesystemServer& server,
@@ -1351,7 +1346,7 @@ public:
      * @brief List directory entries with optional recursion.
      * @param args_json JSON with "path" and optional depth params.
      * @return ServerResponse with directory listing.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     ServerResponse execute(const std::string& args_json) override;
@@ -1507,7 +1502,7 @@ void FilesystemServer::register_fs_tools() {
 
 /**
  * @brief Destructor (default, unique_ptr cleanup).
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 FilesystemServer::~FilesystemServer() = default;
@@ -1596,7 +1591,7 @@ const IgnoreMatcher& FilesystemServer::ignore() const {
 /**
  * @brief Get the filesystem config.
  * @return Config reference.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 const FilesystemConfig& FilesystemServer::config() const {

@@ -47,7 +47,7 @@ static const char INIT_BOARD[8][8] = {
  * Tracks the 8x8 board, move history, and accumulated streaming
  * output for AI move parsing.
  *
- * @internal
+ * @dg_internal
  * @version 1
  */
 struct GameState {
@@ -320,7 +320,7 @@ static bool read_human_move(char* buf, size_t size)
  * @param state  Game state to update.
  * @return true if a move was played, false if the player quit.
  *
- * @internal
+ * @dg_internal
  * @version 1
  */
 static bool play_human_turn(GameState& state)
@@ -347,7 +347,7 @@ static bool play_human_turn(GameState& state)
  * @param state   Game state to update.
  * @return true if the AI played a move, false on error.
  *
- * @internal
+ * @dg_internal
  * @version 1
  */
 static bool play_ai_turn(entropic_handle_t handle, GameState& state)
@@ -389,7 +389,7 @@ static bool play_ai_turn(entropic_handle_t handle, GameState& state)
  * @param project_dir  Project config directory (e.g. ".pychess").
  * @return Configured engine handle, or nullptr on failure.
  *
- * @internal
+ * @dg_internal
  * @version 2
  */
 static entropic_handle_t setup_engine(const char* project_dir)
@@ -426,7 +426,7 @@ static entropic_handle_t setup_engine(const char* project_dir)
  *
  * @param handle  Configured engine handle.
  *
- * @internal
+ * @dg_internal
  * @version 1
  */
 static void game_loop(entropic_handle_t handle)
@@ -451,7 +451,7 @@ static void game_loop(entropic_handle_t handle)
  *
  * @return EXIT_SUCCESS or EXIT_FAILURE.
  *
- * @internal
+ * @dg_internal
  * @version 1
  */
 static int run_game()
@@ -473,7 +473,7 @@ static int run_game()
  * @param argv  Argument vector.
  * @return EXIT_SUCCESS or EXIT_FAILURE.
  *
- * @internal
+ * @dg_internal
  * @version 1
  */
 int main(int argc, char* argv[])

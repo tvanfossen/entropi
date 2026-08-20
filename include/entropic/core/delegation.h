@@ -336,7 +336,7 @@ private:
     /**
      * @brief Emit "Child loop done:" log branched on terminal_reason.
      * @param result Delegation result with terminal_reason populated.
-     * @internal
+     * @dg_internal
      * @version 2.0.6-rc18
      */
     void log_child_result(const DelegationResult& result);
@@ -435,7 +435,7 @@ private:
      * @param sb_info        Sandbox identity (for delegation_id).
      * @param sandbox_result Patch artifact from finalize_sandbox().
      * @param result         Original DelegationResult (for success/summary).
-     * @internal
+     * @dg_internal
      * @version 2.1.5
      */
     void deliver_sandbox_result(
@@ -468,7 +468,7 @@ private:
      * @param sb_info Sandbox identity (for delegation_id + log fmt).
      * @param sandbox_result Patch artifact.
      * @param reason Short reason string for the log line.
-     * @internal
+     * @dg_internal
      * @version 2.1.5
      */
     void persist_pending_patch(

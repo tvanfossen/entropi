@@ -212,7 +212,7 @@ static entropic_error_t check_identity(entropic_handle_t h) {
  * @param tier_name Tier name string.
  * @return Non-null backend pointer in ACTIVE state.
  * @throws std::runtime_error if tier not found or not active.
- * @internal
+ * @dg_internal
  * @version 2.0.0
  */
 static entropic::InferenceBackend* require_active_backend(
@@ -277,7 +277,7 @@ entropic_error_t entropic_create(entropic_handle_t* handle) {
  *
  * @param h Engine handle.
  * @return ENTROPIC_OK or error code.
- * @internal
+ * @dg_internal
  * @version 2.0.0
  */
 /**
@@ -287,7 +287,7 @@ entropic_error_t entropic_create(entropic_handle_t* handle) {
  * is parsed, so registry keys resolve during config loading.
  *
  * @param h Engine handle.
- * @internal
+ * @dg_internal
  * @version 2.0.1
  */
 /* preload_bundled_models moved to BundledModels::auto_discover_and_load() — Step 6 */
@@ -556,7 +556,7 @@ static void populate_tier_info(entropic_handle_t h,
 /**
  * @brief Initialize persistence: storage + session logger.
  * @param h Engine handle with config.log_dir set.
- * @internal
+ * @dg_internal
  * @version 2.0.1
  */
 /**
@@ -709,7 +709,7 @@ static bool si_load_delegation_with_messages(
  *
  * @param sb Storage backend (non-owning).
  * @return StorageInterface ready to pass to `AgentEngine::set_storage`.
- * @internal
+ * @dg_internal
  * @version 2.1.12
  */
 static entropic::StorageInterface build_storage_iface(
@@ -727,7 +727,7 @@ static entropic::StorageInterface build_storage_iface(
 
 /**
  * @brief Initialize persistence: storage + session logger + StorageInterface.
- * @internal
+ * @dg_internal
  * @version 2.1.6
  */
 static void init_persistence(entropic_handle_t h) {
@@ -787,7 +787,7 @@ static std::vector<std::string> collect_delegatable_tiers(
  * @brief Initialize MCP servers with resolved working directory.
  * @param h Engine handle with config loaded.
  * @param data_dir Bundled data directory path.
- * @internal
+ * @dg_internal
  * @version 2.10.1
  */
 static void init_mcp_servers(entropic_handle_t h,
@@ -837,7 +837,7 @@ static std::string build_shared_prompt_prefix(
  * @brief Cache per-tier frontmatter fields (allowed_tools, validation_rules, relay).
  * @param h Engine handle with config + engine constructed.
  * @param data_dir Bundled data directory.
- * @internal
+ * @dg_internal
  * @version 2.0.11
  */
 /**
@@ -986,7 +986,7 @@ static void thread_frontmatter_samplers(
 /**
  * @brief Wire the ToolExecutor and attach it to the engine.
  * @param h Engine handle with engine + server_manager constructed.
- * @internal
+ * @dg_internal
  * @version 2.0.3
  */
 /**
@@ -1112,7 +1112,7 @@ static char* sp_get_validation(void* ud) {
  * @param h Engine handle with engine constructed.
  * @param iface Inference interface (passed to validator for critique generation).
  * @param constitution_text Constitution text (may be empty).
- * @internal
+ * @dg_internal
  * @version 2.10.3
  */
 static void wire_hooks_and_validator(
@@ -1463,7 +1463,7 @@ static char* sp_load_delegation_conversation(
  * residency set alongside config/identities/tools/history/metrics.
  *
  * @param h Engine handle with all subsystems constructed.
- * @internal
+ * @dg_internal
  * @version 2.2.4
  */
 static void wire_state_provider(entropic_handle_t h) {
@@ -1493,7 +1493,7 @@ static void wire_state_provider(entropic_handle_t h) {
 /**
  * @brief Pass per-identity validation rules to the validator.
  * @param h Engine handle with validator + tier_validation_rules populated.
- * @internal
+ * @dg_internal
  * @version 2.0.6
  */
 static void wire_tier_validation_rules(entropic_handle_t h) {
@@ -1579,7 +1579,7 @@ static void start_external_bridge(entropic_handle_t h) {
  *
  * @param h Engine handle with config populated.
  * @return ENTROPIC_OK or error code.
- * @internal
+ * @dg_internal
  * @version 2.1.10.1
  */
 /**
@@ -1603,7 +1603,7 @@ static entropic_error_t reject_if_configured(entropic_handle_t h) {
 
 /**
  * @brief Shared body of all entropic_configure* entry points.
- * @internal
+ * @dg_internal
  * @version 2.2.6
  */
 /**
@@ -1644,7 +1644,7 @@ static entropic_error_t init_orchestrator(
  *
  * @param h Engine handle.
  * @param data_dir Resolved data directory.
- * @internal
+ * @dg_internal
  * @version 2.3.8
  */
 static void init_engine_and_interfaces(
@@ -1692,7 +1692,7 @@ static void init_engine_and_interfaces(
  *
  * @param h Engine handle.
  * @param data_dir Resolved data directory.
- * @internal
+ * @dg_internal
  * @version 2.9.19
  */
 static void wire_prompts_and_persistence(
@@ -2346,7 +2346,7 @@ entropic_error_t entropic_run_streaming(
  * @param[out] out_rc Set to ENTROPIC_OK on success, or to a specific
  *        error code (NO_VISION_TIER) when validation fails.
  * @return Parsed messages on success, empty vector on failure.
- * @internal
+ * @dg_internal
  * @version 2.1.8
  */
 static std::vector<entropic::Message> parse_and_check_vision(
@@ -2366,7 +2366,7 @@ static std::vector<entropic::Message> parse_and_check_vision(
 
 /**
  * @brief Blocking multimodal run (gh#37, v2.1.8).
- * @internal
+ * @dg_internal
  * @version 2.1.8
  */
 /**
@@ -2378,7 +2378,7 @@ static std::vector<entropic::Message> parse_and_check_vision(
  * stream-observer completion sentinel. Returns the canonical
  * entropic_error_t status — single exit.
  *
- * @internal
+ * @dg_internal
  * @version 2.1.8
  */
 static entropic_error_t run_messages_inner(
@@ -2440,12 +2440,12 @@ entropic_error_t entropic_run_messages(
 
 /**
  * @brief Streaming multimodal run (gh#37, v2.1.8).
- * @internal
+ * @dg_internal
  * @version 2.1.8
  */
 /**
  * @brief Inner streaming dispatch — no front validation (gh#37).
- * @internal
+ * @dg_internal
  * @version 2.1.8
  */
 static entropic_error_t run_messages_stream_inner(
@@ -2904,7 +2904,7 @@ entropic_error_t entropic_context_usage(
 
 /**
  * @brief Save tier's KV cache to file body (gh#23 v2.3.25).
- * @internal
+ * @dg_internal
  * @version 2.3.25
  */
 static entropic_error_t do_state_save(
@@ -2943,7 +2943,7 @@ entropic_error_t entropic_state_save(
 
 /**
  * @brief Load tier's KV cache from file body (gh#23 v2.3.25).
- * @internal
+ * @dg_internal
  * @version 2.3.25
  */
 /**
@@ -2965,7 +2965,7 @@ static bool read_state_file(const char* path, std::vector<uint8_t>& out_buf) {
 
 /**
  * @brief Load tier's KV cache from file body (gh#23 v2.3.25).
- * @internal
+ * @dg_internal
  * @version 2.3.25
  */
 static entropic_error_t do_state_load(

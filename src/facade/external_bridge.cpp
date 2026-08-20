@@ -313,7 +313,7 @@ static json handle_status(entropic_handle_t handle) {
  * @brief Handle entropic.context_clear.
  * @param handle Engine handle.
  * @return MCP tool result JSON.
- * @internal
+ * @dg_internal
  * @version 2.0.8
  */
 /**
@@ -327,7 +327,7 @@ static json handle_status(entropic_handle_t handle) {
  *
  * @param handle Engine handle (for interrupt).
  * @param bridge Bridge whose tasks_ registry is being canceled.
- * @internal (P1-8, 2.0.6-rc16)
+ * @dg_internal (P1-8, 2.0.6-rc16)
  * @version 2.0.6-rc16
  */
 /**
@@ -336,7 +336,7 @@ static json handle_status(entropic_handle_t handle) {
  * Groups the three status/phase/text outputs so run_async_ask stays
  * under the 50-SLOC quality gate. (2.0.6-rc16)
  *
- * @internal
+ * @dg_internal
  */
 struct AsyncFinalState {
     std::string status;   ///< done | error | cancelled
@@ -881,7 +881,7 @@ void ExternalBridge::stop() {
  * ``finished`` flag right before exit; the accept loop calls this
  * after every new connection to harvest exited entries.
  *
- * @internal
+ * @dg_internal
  * @version 2.1.2
  */
 void ExternalBridge::reap_finished_clients_locked() {
@@ -1073,7 +1073,7 @@ std::string ExternalBridge::dispatch(
 
 /**
  * @brief State observer that projects VERIFYING onto task phase.
- * @internal
+ * @dg_internal
  * @version 2.1.0
  */
 static void phase_observer_cb(int state, void* ud) {
@@ -1231,7 +1231,7 @@ void ExternalBridge::run_async_ask(
 
 /**
  * @brief Remove tasks older than 15 minutes from the registry.
- * @internal
+ * @dg_internal
  * @version 2.0.11
  */
 /**
@@ -1407,7 +1407,7 @@ void ExternalBridge::set_async_sentinel_root(
 
 /**
  * @brief Map a terminal status string to a sentinel filename suffix.
- * @internal
+ * @dg_internal
  * @version 2.1.4
  */
 static const char* sentinel_suffix_for_status(

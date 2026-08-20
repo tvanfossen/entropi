@@ -95,7 +95,7 @@ void ConstitutionalValidator::detach(HookInterface* hook_iface) {
  *
  * @param identity_name Identity name to check.
  * @return true if validation should run.
- * @internal
+ * @dg_internal
  * @version 2.0.7
  */
 bool ConstitutionalValidator::should_validate(
@@ -272,7 +272,7 @@ void ConstitutionalValidator::set_identity_validation(
  * @brief Set per-identity validation rules from frontmatter.
  * @param identity_name Identity/tier name.
  * @param rules Validation rules for this identity.
- * @internal
+ * @dg_internal
  * @version 2.0.6
  */
 void ConstitutionalValidator::set_tier_rules(
@@ -734,7 +734,7 @@ CritiqueResult ConstitutionalValidator::run_critique(
  * @brief Build messages JSON for critique generation.
  * @param content Text to critique.
  * @return JSON array with system + user messages.
- * @internal
+ * @dg_internal
  * @version 1.9.8
  */
 std::string ConstitutionalValidator::build_critique_messages(
@@ -746,7 +746,7 @@ std::string ConstitutionalValidator::build_critique_messages(
 /**
  * @brief Build params JSON for critique generation.
  * @return JSON string with grammar_key, max_tokens, temperature, tier.
- * @internal
+ * @dg_internal
  * @version 2.0.6-rc17
  */
 std::string ConstitutionalValidator::build_critique_params() const {
@@ -848,7 +848,7 @@ static std::string json_escape(const std::string& s) {
  * @brief Build a single-turn messages JSON (system + user).
  * @param prompt Full prompt text (system role).
  * @return JSON array string.
- * @internal
+ * @dg_internal
  * @version 1.9.8
  */
 std::string ConstitutionalValidator::build_single_turn_json(
@@ -865,7 +865,7 @@ std::string ConstitutionalValidator::build_single_turn_json(
  * @param critique Critique with violations.
  * @param messages_json Original conversation context.
  * @return Augmented messages JSON.
- * @internal
+ * @dg_internal
  * @version 1.9.8
  */
 std::string ConstitutionalValidator::build_revision_messages(
@@ -881,7 +881,7 @@ std::string ConstitutionalValidator::build_revision_messages(
  * @brief Build human-readable feedback text from violations.
  * @param critique Critique result with violations.
  * @return Feedback string for re-generation prompt.
- * @internal
+ * @dg_internal
  * @version 1.9.8
  */
 std::string ConstitutionalValidator::build_feedback_text(
@@ -908,7 +908,7 @@ std::string ConstitutionalValidator::build_feedback_text(
  * @param feedback The feedback message.
  * @param messages_json Base conversation messages (may be NULL).
  * @return Augmented JSON array with assistant + user feedback appended.
- * @internal
+ * @dg_internal
  * @version 2.0.7
  */
 std::string ConstitutionalValidator::inject_feedback_into_messages(
@@ -1064,7 +1064,7 @@ int ConstitutionalValidator::handle_hook(
  * @brief Write revised content into the modified_json output.
  * @param content Revised content.
  * @param modified_json Output buffer.
- * @internal
+ * @dg_internal
  * @version 1.9.8
  */
 void ConstitutionalValidator::write_modified_json(

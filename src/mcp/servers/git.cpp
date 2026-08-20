@@ -90,7 +90,7 @@ static ServerResponse make_git_response(
 
 /**
  * @brief Tool: git status --short.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 class GitStatusTool : public ToolBase {
@@ -99,7 +99,7 @@ public:
      * @brief Construct with definition and repo dir ref.
      * @param def Tool definition.
      * @param server Owning GitServer.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     GitStatusTool(ToolDefinition def, GitServer& server)
@@ -123,7 +123,7 @@ public:
      * @brief Run git status --short.
      * @param args_json Unused.
      * @return ServerResponse with status output.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     ServerResponse execute(const std::string& args_json) override {
@@ -142,7 +142,7 @@ private:
 
 /**
  * @brief Tool: git diff [--staged] [file].
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 class GitDiffTool : public ToolBase {
@@ -151,7 +151,7 @@ public:
      * @brief Construct with definition and server ref.
      * @param def Tool definition.
      * @param server Owning GitServer.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     GitDiffTool(ToolDefinition def, GitServer& server)
@@ -172,7 +172,7 @@ public:
      * @brief Run git diff with optional flags.
      * @param args_json JSON with optional "staged" and "file".
      * @return ServerResponse with diff output.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     ServerResponse execute(const std::string& args_json) override {
@@ -197,7 +197,7 @@ private:
 
 /**
  * @brief Tool: git log -N [--oneline].
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 class GitLogTool : public ToolBase {
@@ -206,7 +206,7 @@ public:
      * @brief Construct with definition and server ref.
      * @param def Tool definition.
      * @param server Owning GitServer.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     GitLogTool(ToolDefinition def, GitServer& server)
@@ -227,7 +227,7 @@ public:
      * @brief Run git log with count and format options.
      * @param args_json JSON with optional "count" and "oneline".
      * @return ServerResponse with log output.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     ServerResponse execute(const std::string& args_json) override {
@@ -250,7 +250,7 @@ private:
 
 /**
  * @brief Tool: git commit -m "message", optionally git add -A first.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 class GitCommitTool : public ToolBase {
@@ -259,7 +259,7 @@ public:
      * @brief Construct with definition and server ref.
      * @param def Tool definition.
      * @param server Owning GitServer.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     GitCommitTool(ToolDefinition def, GitServer& server)
@@ -269,7 +269,7 @@ public:
      * @brief Run git commit with optional add-all.
      * @param args_json JSON with "message" and optional "add_all".
      * @return ServerResponse with commit output.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     ServerResponse execute(const std::string& args_json) override {
@@ -299,7 +299,7 @@ private:
 
 /**
  * @brief Tool: git branch -a, or git checkout -b name.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 class GitBranchTool : public ToolBase {
@@ -308,7 +308,7 @@ public:
      * @brief Construct with definition and server ref.
      * @param def Tool definition.
      * @param server Owning GitServer.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     GitBranchTool(ToolDefinition def, GitServer& server)
@@ -318,7 +318,7 @@ public:
      * @brief List branches or create a new one.
      * @param args_json JSON with optional "create" branch name.
      * @return ServerResponse with branch output.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     ServerResponse execute(const std::string& args_json) override {
@@ -341,7 +341,7 @@ private:
 
 /**
  * @brief Tool: git checkout target.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 class GitCheckoutTool : public ToolBase {
@@ -350,7 +350,7 @@ public:
      * @brief Construct with definition and server ref.
      * @param def Tool definition.
      * @param server Owning GitServer.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     GitCheckoutTool(ToolDefinition def, GitServer& server)
@@ -360,7 +360,7 @@ public:
      * @brief Checkout a branch or commit.
      * @param args_json JSON with "target".
      * @return ServerResponse with checkout output.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     ServerResponse execute(const std::string& args_json) override {
@@ -380,7 +380,7 @@ private:
 
 /**
  * @brief Tool: git add files (space-separated).
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 class GitAddTool : public ToolBase {
@@ -389,7 +389,7 @@ public:
      * @brief Construct with definition and server ref.
      * @param def Tool definition.
      * @param server Owning GitServer.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     GitAddTool(ToolDefinition def, GitServer& server)
@@ -399,7 +399,7 @@ public:
      * @brief Stage files for commit.
      * @param args_json JSON with "files" (space-separated string).
      * @return ServerResponse with add output.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     ServerResponse execute(const std::string& args_json) override {
@@ -419,7 +419,7 @@ private:
 
 /**
  * @brief Tool: git reset HEAD [files].
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 class GitResetTool : public ToolBase {
@@ -428,7 +428,7 @@ public:
      * @brief Construct with definition and server ref.
      * @param def Tool definition.
      * @param server Owning GitServer.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     GitResetTool(ToolDefinition def, GitServer& server)
@@ -438,7 +438,7 @@ public:
      * @brief Unstage files.
      * @param args_json JSON with optional "files".
      * @return ServerResponse with reset output.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     ServerResponse execute(const std::string& args_json) override {
@@ -534,7 +534,7 @@ void GitServer::register_git_tools() {
 
 /**
  * @brief Destructor.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 GitServer::~GitServer() = default;

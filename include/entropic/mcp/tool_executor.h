@@ -86,7 +86,7 @@ public:
      *
      * @param map Pointer to the tier→allowed_tools map (facade-owned;
      *        must outlive the executor). nullptr disables enforcement.
-     * @internal
+     * @dg_internal
      * @version 2.5.2
      */
     void set_tier_allowed_tools(
@@ -185,7 +185,7 @@ private:
      * @param result_text Parsed result text (for status/summary).
      * @param ms Elapsed milliseconds.
      * @param iteration Loop iteration the call ran in.
-     * @internal
+     * @dg_internal
      * @version 2.3.7
      */
     void record_tool_history(const ToolCall& call,
@@ -206,7 +206,7 @@ private:
      * @param[in,out] msg Result message (content may be capped).
      * @param raw_result Raw server result string.
      * @param exec_ms Execution time (ms).
-     * @internal
+     * @dg_internal
      * @version 2.3.7
      */
     void finalize_tool_call(LoopContext& ctx, const ToolCall& call,
@@ -220,7 +220,7 @@ private:
      * @param exec_ms Execution time (ms).
      * @param raw_result Raw server result (for size).
      * @param kind Classified result kind.
-     * @internal
+     * @dg_internal
      * @version 2.3.7
      */
     void log_tool_call(LoopContext& ctx, const ToolCall& call,
@@ -269,7 +269,7 @@ private:
     /**
      * @brief Fire state change callback.
      * @param ctx Loop context.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     void fire_state_callback(const LoopContext& ctx);
@@ -278,7 +278,7 @@ private:
      * @brief Truncate to effective per-turn call limit.
      * @param calls Tool calls (mutated).
      * @param limit Effective call limit (after per-identity override applied).
-     * @internal
+     * @dg_internal
      * @version 2.0.6-rc16
      */
     void truncate_to_limit(std::vector<ToolCall>& calls, int limit) const;
@@ -288,7 +288,7 @@ private:
      * @param ctx Loop context.
      * @param call Tool call.
      * @return PreconditionCheck with rejection + typed kind.
-     * @internal
+     * @dg_internal
      * @version 2.0.6-rc19
      */
     PreconditionCheck check_call_preconditions(
@@ -299,7 +299,7 @@ private:
      * @param ctx Loop context.
      * @param call Tool call.
      * @return PreconditionCheck with rejection+kind on denial.
-     * @internal
+     * @dg_internal
      * @version 2.0.6-rc19
      */
     PreconditionCheck check_approval_pc(
@@ -318,7 +318,7 @@ private:
      * @param ctx Loop context.
      * @param call Tool call.
      * @return Rejection message if blocked, nullopt if clear.
-     * @internal
+     * @dg_internal
      * @version 1.9.4
      */
     std::optional<Message> check_dup_or_approval(
@@ -329,7 +329,7 @@ private:
      * @param ctx Loop context.
      * @param call Tool call.
      * @return Result messages.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     std::vector<Message> process_single_call(
@@ -340,7 +340,7 @@ private:
      * @param ctx Loop context.
      * @param results Results so far.
      * @return true if stop.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     bool should_stop_batch(const LoopContext& ctx,
@@ -349,7 +349,7 @@ private:
     /**
      * @brief Run post-tool hooks.
      * @param ctx Loop context.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     void run_post_tool_hooks(LoopContext& ctx);
@@ -357,7 +357,7 @@ private:
     /**
      * @brief Create circuit breaker message.
      * @return Feedback message.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     static Message create_circuit_breaker_message();
@@ -367,7 +367,7 @@ private:
      * @param call Duplicate tool call.
      * @param previous_result Previous result.
      * @return Feedback message.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     static Message create_duplicate_message(
@@ -378,7 +378,7 @@ private:
      * @brief Serialize tool call arguments to JSON.
      * @param call Tool call.
      * @return JSON string.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     static std::string serialize_args(const ToolCall& call);
@@ -387,7 +387,7 @@ private:
      * @brief Serialize full tool call to JSON.
      * @param call Tool call.
      * @return JSON string.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     static std::string serialize_tool_call(const ToolCall& call);
@@ -402,7 +402,7 @@ private:
      * @param kind Typed outcome category (E10).
      * @return JSON string with tool_name, args, result, directives,
      *         elapsed_ms, tier, iteration, result_kind.
-     * @internal
+     * @dg_internal
      * @version 2.0.6-rc19
      */
     static std::string build_post_tool_json(
@@ -429,7 +429,7 @@ private:
      *
      * @param ctx Loop context (mutates anti-spiral fields).
      * @param tool_name Name of the tool that just executed.
-     * @internal
+     * @dg_internal
      * @version 2.1.0
      */
     void update_anti_spiral_tracking(LoopContext& ctx,
@@ -445,7 +445,7 @@ private:
      * soft advisory warning.
      *
      * @return Effective hard-block threshold (>=1 in practice).
-     * @internal
+     * @dg_internal
      * @version 2.1.4
      */
     int effective_hard_block_threshold() const;
@@ -464,7 +464,7 @@ private:
      * @param call Tool call about to be dispatched.
      * @return PreconditionCheck with rejection + kind=rejected_anti_spiral
      *         when blocked; default-constructed (no rejection) otherwise.
-     * @internal
+     * @dg_internal
      * @version 2.1.4
      */
     PreconditionCheck check_anti_spiral_hard_block(
@@ -484,7 +484,7 @@ private:
      * Demo ask #6, v2.1.0.
      *
      * @param content Tool-result text to bound (mutated in place).
-     * @internal
+     * @dg_internal
      * @version 2.1.1-rc1
      */
     void apply_result_size_cap(std::string& content) const;
@@ -495,7 +495,7 @@ private:
      * @param tier Active tier (empty → "lead" fallback).
      * @param iteration Loop iteration at dispatch time.
      * @return JSON string with tool_name, args, tier, iteration.
-     * @internal
+     * @dg_internal
      * @version 2.0.6-rc19
      */
     static std::string build_pre_tool_json(
@@ -527,7 +527,7 @@ private:
      * @param kind Typed outcome category.
      * @param msg The message this call produced; ``msg.content`` is
      *            replaced if the hook returns a non-null transformation.
-     * @internal
+     * @dg_internal
      * @version 2.1.1
      */
     void fire_post_tool_hook(const LoopContext& ctx,
@@ -542,7 +542,7 @@ private:
      * @param ctx Loop context.
      * @param call Tool call.
      * @return true if hook returned non-zero (cancel).
-     * @internal
+     * @dg_internal
      * @version 2.0.6-rc19
      */
     bool fire_pre_tool_hook(const LoopContext& ctx,
@@ -553,7 +553,7 @@ private:
      * @param call Tool call.
      * @param result Result text.
      * @param ms Duration in milliseconds.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     void fire_tool_complete_callback(const ToolCall& call,
@@ -610,7 +610,7 @@ private:
      * @param ctx Loop context (provides current identity).
      * @param call Tool call to check.
      * @return Error message if denied, nullopt if authorized.
-     * @internal
+     * @dg_internal
      * @version 1.9.4
      */
     std::optional<Message> check_mcp_authorization(

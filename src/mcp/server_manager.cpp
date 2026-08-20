@@ -26,7 +26,7 @@ namespace entropic {
  * @brief Construct with permission config and project directory.
  * @param permissions Permission configuration.
  * @param project_dir Project root directory.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 ServerManager::ServerManager(
@@ -136,7 +136,7 @@ entropic_error_t ServerManager::load_plugins(const MCPConfig& mcp) {
 /**
  * @brief Register a built-in server.
  * @param server Server instance (ownership transferred).
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 void ServerManager::register_server(
@@ -152,7 +152,7 @@ void ServerManager::register_server(
 
 /**
  * @brief Initialize all registered servers + external connections.
- * @internal
+ * @dg_internal
  * @version 1.8.7
  */
 void ServerManager::initialize() {
@@ -770,7 +770,7 @@ std::string ServerManager::args_to_pattern(
 /**
  * @brief Set MCP config for external server initialization.
  * @param config MCP configuration.
- * @internal
+ * @dg_internal
  * @version 1.8.7
  */
 void ServerManager::set_mcp_config(const MCPConfig& config) {
@@ -974,7 +974,7 @@ std::vector<std::string> ServerManager::connect_external_server(
  * Retained for in-tree callers that pre-date #9. New code should use
  * the spec-based overload.
  *
- * @internal
+ * @dg_internal
  * @version 2.1.4
  */
 std::vector<std::string> ServerManager::connect_external_server(
@@ -993,7 +993,7 @@ std::vector<std::string> ServerManager::connect_external_server(
 /**
  * @brief Disconnect and remove an external server.
  * @param name Server name.
- * @internal
+ * @dg_internal
  * @version 1.8.7
  */
 void ServerManager::disconnect_external_server(

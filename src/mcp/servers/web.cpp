@@ -27,7 +27,7 @@ namespace entropic {
 
 /**
  * @brief Tool for fetching web page content by URL.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 class WebFetchTool : public ToolBase {
@@ -35,7 +35,7 @@ public:
     /**
      * @brief Construct from tool definition.
      * @param def Tool definition loaded from web/web_fetch.json.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     explicit WebFetchTool(ToolDefinition def)
@@ -56,7 +56,7 @@ public:
      * @brief Fetch web page content (placeholder).
      * @param args_json JSON with "url" and optional "max_length".
      * @return ServerResponse with placeholder text.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     ServerResponse execute(const std::string& args_json) override;
@@ -66,7 +66,7 @@ public:
  * @brief Parse fetch args and return placeholder.
  * @param args_json JSON with "url" and optional "max_length".
  * @return ServerResponse with placeholder result.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 ServerResponse WebFetchTool::execute(const std::string& args_json) {
@@ -90,7 +90,7 @@ ServerResponse WebFetchTool::execute(const std::string& args_json) {
 
 /**
  * @brief Tool for web search queries.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 class WebSearchTool : public ToolBase {
@@ -98,7 +98,7 @@ public:
     /**
      * @brief Construct from tool definition.
      * @param def Tool definition loaded from web/web_search.json.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     explicit WebSearchTool(ToolDefinition def)
@@ -119,7 +119,7 @@ public:
      * @brief Execute web search (placeholder).
      * @param args_json JSON with "query" and optional "max_results".
      * @return ServerResponse with placeholder text.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     ServerResponse execute(const std::string& args_json) override;
@@ -129,7 +129,7 @@ public:
  * @brief Parse search args and return placeholder.
  * @param args_json JSON with "query" and optional "max_results".
  * @return ServerResponse with placeholder result.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 ServerResponse WebSearchTool::execute(const std::string& args_json) {
@@ -186,7 +186,7 @@ WebServer::WebServer(const std::string& data_dir)
 
 /**
  * @brief Destructor.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 WebServer::~WebServer() = default;

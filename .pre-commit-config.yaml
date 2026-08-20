@@ -74,7 +74,10 @@ repos:
         exclude: ^(extern/|tests/|build/|\.build/|\.old/|\.venv/)
 
   - repo: https://github.com/tvanfossen/doxygen-guard
-    rev: main
+    # Pinned, not `main`: a mutable ref meant CI and local installed different
+    # builds hours apart, disagreeing 3 violations vs 578 on identical code.
+    # Upgrades are now a deliberate, reviewed act.
+    rev: v1.4.2
     hooks:
       - id: doxygen-guard
         files: \.(h|hpp|c|cpp|cc|cxx|py)$

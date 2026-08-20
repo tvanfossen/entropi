@@ -18,7 +18,7 @@ namespace entropic {
  * @brief Construct with initial allow/deny lists.
  * @param allow_patterns Allow list patterns.
  * @param deny_patterns Deny list patterns.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 PermissionManager::PermissionManager(

@@ -367,7 +367,7 @@ public:
      * @param messages Conversation history.
      * @param params Generation parameters (enable_thinking honored).
      * @return Formatted prompt string.
-     * @internal
+     * @dg_internal
      * @version 2.7.0
      */
     std::string render_with_tools(
@@ -387,7 +387,7 @@ public:
      *
      * @param raw Raw model output (assistant turn only, no generation prompt).
      * @return Parsed tool calls + cleaned content + reasoning.
-     * @internal
+     * @dg_internal
      * @version 2.7.0
      */
     CommonChatResult parse_response(const std::string& raw) const;
@@ -638,7 +638,7 @@ protected:
      * @param seq_id Sequence id (default 0 from the C API path).
      * @param buffer Output buffer; resized to exact state size.
      * @return true on success; false when not active or copy short-reads.
-     * @internal
+     * @dg_internal
      * @version 2.4.0
      */
     bool do_save_state(int seq_id,
@@ -653,7 +653,7 @@ protected:
      * @param seq_id Sequence id.
      * @param buffer Source buffer (output of a prior save_state).
      * @return true when llama_state_seq_set_data accepts the buffer.
-     * @internal
+     * @dg_internal
      * @version 2.4.0
      */
     bool do_restore_state(int seq_id,
@@ -799,7 +799,7 @@ protected:
      * @param messages Conversation history.
      * @param params Generation parameters.
      * @return Formatted prompt string.
-     * @internal
+     * @dg_internal
      * @version 2.7.0
      */
     std::string render_prompt(
@@ -848,7 +848,7 @@ protected:
      * @param on_token Streaming callback (empty for batch).
      * @param cancel Cancel flag (nullptr for batch).
      * @return GenerationResult with content/finish_reason/token_count.
-     * @internal
+     * @dg_internal
      * @version 2.8.0
      */
     GenerationResult generate_after_prefill(
@@ -1021,7 +1021,7 @@ protected:
      * speculative) that mutates seq 0 out-of-band, so the next text turn
      * cannot reuse a stale record.
      * @utility
-     * @internal
+     * @dg_internal
      * @version 2.7.5
      */
     void invalidate_resident_kv();
@@ -1191,7 +1191,7 @@ protected:
      * vocab_ on success; sets last_error_ and returns false otherwise.
      *
      * @return true on success.
-     * @internal
+     * @dg_internal
      * @version 2.3.7
      */
     bool load_gpu_model();
@@ -1203,7 +1203,7 @@ protected:
      * configured context params, then lazily creates the prompt cache.
      *
      * @return true on success; sets last_error_ on failure.
-     * @internal
+     * @dg_internal
      * @version 2.3.7
      */
     bool create_inference_context();
@@ -1219,7 +1219,7 @@ protected:
      * @param head_path Path to the MTP head GGUF.
      * @param n_max Draft window (stored for the decode loop).
      * @return true when mtp_draft_ctx_ is live; false (with last_error_) on failure.
-     * @internal
+     * @dg_internal
      * @version 2.9.0
      */
     bool setup_mtp_draft(const std::string& head_path, int n_max);
@@ -1230,7 +1230,7 @@ protected:
      * Helper extracted from setup_mtp_draft to keep both under the knots
      * returns gate. On success sets mtp_draft_model_/ctx_ + mtp_head_path_;
      * on failure sets last_error_ and tears down any partial state.
-     * @internal
+     * @dg_internal
      * @version 2.9.0
      */
     bool build_mtp_head(const std::string& head_path);
@@ -1240,7 +1240,7 @@ protected:
      *
      * Must run BEFORE ctx_ is freed (mtp_draft_ctx_ borrows it via
      * ctx_other). Called from do_deactivate / do_unload and idempotent.
-     * @internal
+     * @dg_internal
      * @version 2.9.0
      */
     void teardown_mtp_draft();
@@ -1249,7 +1249,7 @@ protected:
      * @brief Reload the model CPU-only for the WARM state (do_deactivate tail).
      *
      * Extracted from do_deactivate to keep it under the knots ABC gate.
-     * @internal
+     * @dg_internal
      * @version 2.9.0
      */
     void reload_model_cpu_only();
@@ -1260,7 +1260,7 @@ protected:
      * ACTIVE → envelope (temp/grammar/streaming via mtp_unsupported_reason)
      * → head setup → draft-window bound. Returns an ENTROPIC_OK result to
      * proceed, or a typed loud error (caller propagates it — no fallback).
-     * @internal
+     * @dg_internal
      * @version 2.9.3
      */
     GenerationResult mtp_guard(

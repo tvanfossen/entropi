@@ -53,7 +53,7 @@ static std::string trim(const std::string& s)
  * @param[out] body Output markdown body after frontmatter.
  * @return Empty string on success, error on failure.
  * @version 1.8.2
- * @internal
+ * @dg_internal
  */
 static std::string parse_frontmatter(
     const std::string& content,
@@ -182,7 +182,7 @@ std::string parse_prompt_file(
  * @param root ryml root node.
  * @param[out] fm Output identity frontmatter.
  * @version 1.8.2
- * @internal
+ * @dg_internal
  */
 static void extract_phases(
     ryml::ConstNodeRef root, IdentityFrontmatter& fm)
@@ -208,7 +208,7 @@ static void extract_phases(
  * @param root ryml root node.
  * @param[out] fm Output identity frontmatter.
  * @version 1.8.2
- * @internal
+ * @dg_internal
  */
 static void extract_benchmark(
     ryml::ConstNodeRef root, IdentityFrontmatter& fm)
@@ -240,7 +240,7 @@ static void extract_benchmark(
  * @param root ryml root node of the frontmatter.
  * @param[out] fm Output identity frontmatter.
  * @version 2.0.6-rc18
- * @internal
+ * @dg_internal
  */
 /**
  * @brief Extract the per-tier sampler knobs (gh#82/gh#85/gh#86).
@@ -299,7 +299,7 @@ static void extract_identity_flags(ryml::ConstNodeRef root,
 
 /**
  * @brief Extract all identity frontmatter fields into the struct.
- * @internal
+ * @dg_internal
  * @version 2.3.7
  */
 static void extract_identity_fields(
@@ -437,7 +437,7 @@ std::string load_constitution(
  * @param data_dir Bundled data directory.
  * @param[out] body Receives the parsed prompt body.
  * @return Empty string on success, an error message otherwise.
- * @internal
+ * @dg_internal
  * @version 2.11.0
  */
 static std::string load_app_context_file(
@@ -585,7 +585,7 @@ std::string resolve_tier_identity(
  * @param config Parsed engine config.
  * @param data_dir Bundled data directory.
  * @return Assembled system prompt string.
- * @internal
+ * @dg_internal
  * @version 2.11.0
  */
 std::string assemble(

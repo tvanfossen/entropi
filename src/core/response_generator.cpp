@@ -69,7 +69,7 @@ static void log_prompt(const std::vector<Message>& messages,
  * @param loop_config Loop configuration.
  * @param callbacks Shared callbacks.
  * @param events Interrupt/pause flags.
- * @internal
+ * @dg_internal
  * @version 1.8.4
  */
 ResponseGenerator::ResponseGenerator(
@@ -162,7 +162,7 @@ void ResponseGenerator::lock_tier_if_needed(LoopContext& ctx) {
 
 /**
  * @brief Context passed to the streaming token callback.
- * @internal
+ * @dg_internal
  * @version 1.8.4
  */
 struct StreamAccumulator {
@@ -369,7 +369,7 @@ GenerateResult ResponseGenerator::generate_streaming(LoopContext& ctx) {
  * @brief Generate via batch (non-streaming).
  * @param ctx Loop context.
  * @return Generation result.
- * @internal
+ * @dg_internal
  * @version 2.3.7
  */
 /**
@@ -564,12 +564,12 @@ std::string ResponseGenerator::handle_pause(
  * @brief Serialize messages to JSON for inference interface.
  * @param messages Message list.
  * @return JSON array string (minimal format).
- * @internal
+ * @dg_internal
  * @version 1.8.4
  */
 /**
  * @brief JSON-escape one string into a growing buffer.
- * @internal
+ * @dg_internal
  * @version 2.1.8
  */
 static void json_escape_into(const std::string& s, std::string& out) {
@@ -591,7 +591,7 @@ static void json_escape_into(const std::string& s, std::string& out) {
  * Emits `[{"type":"text","text":"..."}, {"type":"image","path":"..."}]`
  * directly — keeps core free of nlohmann/json (design rule #21).
  *
- * @internal
+ * @dg_internal
  * @version 2.1.8
  */
 static void serialize_content_parts(
@@ -625,7 +625,7 @@ static void serialize_content_parts(
  *
  * @param messages Message vector to serialize.
  * @return JSON array string ready for entropic_inference_generate.
- * @internal
+ * @dg_internal
  * @version 2.1.8
  */
 std::string ResponseGenerator::serialize_messages(

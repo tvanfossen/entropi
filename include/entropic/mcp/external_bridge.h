@@ -62,8 +62,8 @@ namespace entropic {
  * `<log_dir>/async/<task_id>.{done,failed,cancelled}` so external
  * monitors can use inotify rather than parsing log output.
  *
- * @internal
- * @version 2.9.12
+ * @dg_internal
+ * @version 2.11.0
  */
 class ENTROPIC_EXPORT ExternalBridge {
 public:
@@ -120,7 +120,7 @@ public:
      * @brief Handle entropic.ask_status — check async task state.
      * @param args Tool arguments (JSON with task_id).
      * @return MCP tool result JSON.
-     * @internal
+     * @dg_internal
      * @version 2.0.11
      */
     nlohmann::json handle_ask_status(const nlohmann::json& args);
@@ -130,7 +130,7 @@ public:
      * @param prompt User prompt.
      * @param task_id Assigned task ID.
      * @param client_fd Socket fd for completion notification.
-     * @internal
+     * @dg_internal
      * @version 2.0.11
      */
     /**
@@ -143,14 +143,14 @@ public:
      * (P1-5 follow-up, 2.0.6-rc16.2)
      *
      * @param task_id Task whose phase will be updated.
-     * @internal
+     * @dg_internal
      * @version 2.0.6-rc16.2
      */
     void attach_phase_observer(const std::string& task_id);
 
     /**
      * @brief Clear the phase observer installed by attach_phase_observer.
-     * @internal
+     * @dg_internal
      * @version 2.0.6-rc16.2
      */
     void detach_phase_observer();
@@ -216,7 +216,7 @@ public:
 
     /**
      * @brief Remove tasks older than TTL from the registry.
-     * @internal
+     * @dg_internal
      * @version 2.0.11
      */
     void cleanup_expired_tasks();
@@ -230,7 +230,7 @@ public:
      * Moved to public section in 2.0.6-rc16 so cancel-on-clear can
      * flip task statuses with the mutex held. (P1-5, P1-8)
      *
-     * @internal
+     * @dg_internal
      * @version 2.0.6-rc16
      */
     struct AsyncTask {
@@ -269,7 +269,7 @@ public:
     /**
      * @brief Add a connected fd to the subscriber set.
      * @param fd Connected client socket fd.
-     * @internal (public for unit test access)
+     * @dg_internal (public for unit test access)
      * @version 2.0.6-rc16
      */
     void subscribe(int fd);
@@ -277,7 +277,7 @@ public:
     /**
      * @brief Remove an fd from the subscriber set.
      * @param fd Client socket fd being closed.
-     * @internal (public for unit test access)
+     * @dg_internal (public for unit test access)
      * @version 2.0.6-rc16
      */
     void unsubscribe(int fd);
@@ -290,7 +290,7 @@ public:
      * write are removed from the set.
      *
      * @param notif JSON-RPC notification object.
-     * @internal (public for unit test access)
+     * @dg_internal (public for unit test access)
      * @version 2.0.6-rc16
      */
     void broadcast_notification(const nlohmann::json& notif);
@@ -343,7 +343,7 @@ public:
 private:
     /**
      * @brief Background thread: accept connections and serve.
-     * @internal
+     * @dg_internal
      * @version 2.0.8
      */
     void accept_loop();
@@ -351,7 +351,7 @@ private:
     /**
      * @brief Serve a single connected client until disconnect.
      * @param client_fd Connected socket file descriptor.
-     * @internal
+     * @dg_internal
      * @version 2.0.8
      */
     void serve_client(int client_fd);
@@ -361,7 +361,7 @@ private:
      * @param request Raw JSON-RPC request string.
      * @param client_fd Socket fd for streaming progress notifications.
      * @return JSON-RPC response string, or empty for notifications.
-     * @internal
+     * @dg_internal
      * @version 2.0.10
      */
     std::string dispatch(const std::string& request, int client_fd);
@@ -373,7 +373,7 @@ private:
      * vector doesn't grow unbounded over a long-running bridge. Joins
      * any thread whose ``finished`` flag is set, then erases the
      * entry. Must be called with client_threads_mutex_ held.
-     * @internal
+     * @dg_internal
      * @version 2.1.2
      */
     void reap_finished_clients_locked();

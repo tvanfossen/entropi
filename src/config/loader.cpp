@@ -28,7 +28,7 @@ namespace entropic::config {
  * Extracted (gh#23 v2.3.19) to keep `parse_model_config` under the
  * knots ABC gate as new MVP-10 model-load knobs land.
  * @utility
- * @internal
+ * @dg_internal
  * @version 2.3.19
  */
 static void parse_model_runtime_knobs(
@@ -312,7 +312,7 @@ static std::string parse_models_config(
  * @param node YAML node for "routing" section.
  * @param[out] config Output routing config.
  * @return Empty string on success, error message on failure.
- * @internal
+ * @dg_internal
  * @version 1.8.2
  */
 static std::string parse_routing_config(
@@ -338,7 +338,7 @@ static std::string parse_routing_config(
  * @param node YAML node for "compaction" section.
  * @param[out] config Output compaction config.
  * @return Empty string on success, error message on failure.
- * @internal
+ * @dg_internal
  * @version 1.8.2
  */
 static std::string parse_compaction_config(
@@ -362,7 +362,7 @@ static std::string parse_compaction_config(
  * @param node YAML node for "permissions" section.
  * @param[out] config Output permissions config.
  * @return Empty string on success, error message on failure.
- * @internal
+ * @dg_internal
  * @version 1.8.2
  */
 static std::string parse_permissions_config(
@@ -380,7 +380,7 @@ static std::string parse_permissions_config(
  * @param node YAML node for "filesystem" section.
  * @param[out] config Output filesystem config.
  * @return Empty string on success, error message on failure.
- * @internal
+ * @dg_internal
  * @version 1.8.2
  */
 static std::string parse_filesystem_config(
@@ -406,7 +406,7 @@ static std::string parse_filesystem_config(
  * @param node YAML node for "external" section.
  * @param[out] config Output external MCP config.
  * @return Empty string on success, error message on failure.
- * @internal
+ * @dg_internal
  * @version 2.9.12
  */
 static std::string parse_external_mcp_config(
@@ -432,7 +432,7 @@ static std::string parse_external_mcp_config(
  * @param node YAML node for "mcp" section.
  * @param[out] config Output MCP config.
  * @return Empty string on success, error message on failure.
- * @internal
+ * @dg_internal
  * @version 2.10.1
  */
 static std::string parse_mcp_config(
@@ -473,7 +473,7 @@ static std::string parse_mcp_config(
  * @param node YAML node for "generation" section.
  * @param[out] config Output generation config.
  * @return Empty string on success, error message on failure.
- * @internal
+ * @dg_internal
  * @version 2.9.6
  */
 static std::string parse_generation_config(
@@ -496,7 +496,7 @@ static std::string parse_generation_config(
  * @param node YAML node for "lsp" section.
  * @param[out] config Output LSP config.
  * @return Empty string on success, error message on failure.
- * @internal
+ * @dg_internal
  * @version 1.8.2
  */
 static std::string parse_lsp_config(
@@ -514,7 +514,7 @@ static std::string parse_lsp_config(
  * @param node YAML node for "inference.prompt_cache" section.
  * @param[out] config Output prompt cache config.
  * @return Empty string on success, error message on failure.
- * @internal
+ * @dg_internal
  * @version 1.8.3
  */
 static std::string parse_prompt_cache_config(
@@ -536,7 +536,7 @@ static std::string parse_prompt_cache_config(
  * @brief Parse constitutional_validation section.
  * @param node YAML node for "constitutional_validation" section.
  * @param[out] config Output constitutional validation config.
- * @internal
+ * @dg_internal
  * @version 2.0.7
  */
 static void parse_constitutional_validation_config(
@@ -597,7 +597,7 @@ static void parse_speculative_config(
  * @param root YAML root node.
  * @param registry Bundled models for path resolution.
  * @param config Config to populate.
- * @internal
+ * @dg_internal
  * @version 2.3.7
  */
 /**
@@ -605,7 +605,7 @@ static void parse_speculative_config(
  * @param root YAML root node.
  * @param registry Bundled models for path resolution.
  * @param config Config to populate.
- * @internal
+ * @dg_internal
  * @version 2.3.7
  */
 static void parse_inference_subsections(
@@ -627,7 +627,7 @@ static void parse_inference_subsections(
  * @param root YAML root node.
  * @param registry Bundled models for path resolution.
  * @param config Config to populate.
- * @internal
+ * @dg_internal
  * @version 2.3.7
  */
 static void parse_optional_subsections(
@@ -656,7 +656,7 @@ static void parse_optional_subsections(
  * @brief Extract the top-level scalar/path config fields.
  * @param root YAML root node.
  * @param config Config to populate.
- * @internal
+ * @dg_internal
  * @version 2.11.0
  */
 static void extract_scalar_fields(ryml::ConstNodeRef root,
@@ -688,7 +688,7 @@ static void extract_scalar_fields(ryml::ConstNodeRef root,
  * @brief Parse optional config sections that don't return errors.
  * @param root YAML root node.
  * @param config Config to populate.
- * @internal
+ * @dg_internal
  * @version 2.3.7
  */
 static void parse_optional_sections(
@@ -706,7 +706,7 @@ static void parse_optional_sections(
  * @param registry Bundled models for path resolution.
  * @param[in,out] config Config to overlay onto.
  * @return Empty string on success, error message on failure.
- * @internal
+ * @dg_internal
  * @version 2.3.7
  */
 static std::string parse_top_sections(
@@ -954,7 +954,7 @@ static ExternalServerEntry parse_mcp_json_entry(
  * @brief Read + validate the mcpServers object from a .mcp.json file.
  * @param path Path to .mcp.json.
  * @return The mcpServers object node, or nullopt if missing/malformed.
- * @internal
+ * @dg_internal
  * @version 2.3.7
  */
 static std::optional<nlohmann::json> read_mcp_servers(
@@ -978,7 +978,7 @@ static std::optional<nlohmann::json> read_mcp_servers(
 
 /**
  * @brief Discover + merge external MCP servers from <dir>/.mcp.json.
- * @internal
+ * @dg_internal
  * @version 2.3.7
  */
 static void discover_mcp_json(

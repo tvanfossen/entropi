@@ -517,7 +517,7 @@ public:
      *
      * @param params Generation params (mutated in place).
      * @param tier_name Tier whose frontmatter sampler config to apply.
-     * @internal
+     * @dg_internal
      * @version 2.8.0
      */
     void apply_tier_sampler_defaults_for_test(GenerationParams& params,
@@ -626,7 +626,7 @@ private:
      *
      * @param tier_name Tier name (must be present in `config_.models.tiers`).
      * @return Estimated footprint bytes. 0 if unknown or unpriceable.
-     * @internal
+     * @dg_internal
      * @req REQ-INFER-019
      * @version 2.11.0
      */
@@ -636,7 +636,7 @@ private:
      * @brief Log the largest context that would fit a refused tier (gh#142).
      *
      * @param tier_name Tier being refused for VRAM.
-     * @internal
+     * @dg_internal
      * @req REQ-INFER-019
      * @version 2.11.0
      */
@@ -662,7 +662,7 @@ private:
      * set the variable.
      *
      * @return Bytes, or 0 when there is no device to ask.
-     * @internal
+     * @dg_internal
      * @req REQ-INFER-019
      * @version 2.11.0
      */
@@ -675,7 +675,7 @@ private:
      * @param tier_name   Tier name.
      * @param model_path  Resolved GGUF path.
      * @param footprint   Bytes (0 if unknown).
-     * @internal
+     * @dg_internal
      * @version 2.2.4
      */
     void fire_residency_observer(
@@ -708,7 +708,7 @@ private:
      * @brief Record activation timestamp and fire ActivationSwap when
      *        the active tier changes during a reuse hit. Extracted to
      *        keep `get_model` under the knots SLOC/complexity gate.
-     * @internal
+     * @dg_internal
      * @version 2.2.4
      */
     void record_activation_reuse(const std::string& tier_name);
@@ -717,7 +717,7 @@ private:
      * @brief Run the VRAM-budget gate for a tier. Returns true to
      *        proceed with load; false (with `last_residency_error_`
      *        set to `TIER_MODEL_TOO_LARGE`) means refuse the activation.
-     * @internal
+     * @dg_internal
      * @version 2.2.4
      */
     bool residency_admits(const std::string& tier_name);
@@ -725,7 +725,7 @@ private:
     /**
      * @brief Load + activate a tier with residency bookkeeping. Returns
      *        the backend pointer on success, nullptr on failure.
-     * @internal
+     * @dg_internal
      * @version 2.2.4
      */
     InferenceBackend* activate_and_track(
@@ -736,7 +736,7 @@ private:
      * @brief Build the failing GenerationResult for a missing/oversize
      *        tier. Translates the orchestrator's residency-error stash
      *        into a typed C ABI error code and clears it.
-     * @internal
+     * @dg_internal
      * @version 2.2.4
      */
     GenerationResult build_no_model_error(const std::string& tier_name);
@@ -756,7 +756,7 @@ private:
      *
      * @param tier_name Tier whose adapter to ensure.
      * @param result Active backend (LoRA applied to its context).
-     * @internal
+     * @dg_internal
      * @version 2.3.7
      */
     void ensure_tier_lora(const std::string& tier_name,
@@ -769,7 +769,7 @@ private:
      * deactivate; false → unload + fire Evicted residency event.
      *
      * @param current The backend leaving the active slot.
-     * @internal
+     * @dg_internal
      * @version 2.3.7
      */
     void unload_or_warm_current(InferenceBackend* current);
@@ -813,7 +813,7 @@ private:
      * @brief Build per-tier backends and adapters from config.
      * @param config Full engine config.
      * @return true on success, false if any tier model file is missing.
-     * @internal
+     * @dg_internal
      * @version 2.0.2
      */
     bool create_tier_backends(const ParsedConfig& config);
@@ -821,7 +821,7 @@ private:
     /**
      * @brief Build routing maps (tier_map_, handoff_rules_) from config.
      * @param config Full engine config.
-     * @internal
+     * @dg_internal
      * @version 2.0.2
      */
     void build_routing_tables(const ParsedConfig& config);
@@ -830,7 +830,7 @@ private:
      * @brief Activate the default tier (and load if not yet loaded).
      * @param config Full engine config.
      * @return true on success.
-     * @internal
+     * @dg_internal
      * @version 2.0.2
      */
     bool activate_default_tier(const ParsedConfig& config);
@@ -838,7 +838,7 @@ private:
     /**
      * @brief Activate the router model if configured.
      * @param config Full engine config.
-     * @internal
+     * @dg_internal
      * @version 2.0.2
      */
     void activate_router(const ParsedConfig& config);
@@ -855,7 +855,7 @@ private:
      * blocking startup.
      *
      * @param config Full engine config.
-     * @internal
+     * @dg_internal
      * @version 2.1.11
      */
     void activate_draft(const ParsedConfig& config);
@@ -902,7 +902,7 @@ private:
      * @param params Incoming generation params.
      * @param tier_name Selected tier.
      * @return Resolved params (tools staged as a side effect on `model`).
-     * @internal
+     * @dg_internal
      * @version 2.7.0
      */
     GenerationParams resolve_and_stage(InferenceBackend* model,
@@ -916,7 +916,7 @@ private:
      * @param[out] target_out Active main-tier llama_model, or nullptr.
      * @param[out] draft_out  Configured draft llama_model, or nullptr.
      * @return Empty string on success; diagnostic on missing side.
-     * @internal
+     * @dg_internal
      * @version 2.1.11
      */
     std::string resolve_speculative_pair(
@@ -928,7 +928,7 @@ private:
      *        (result populated); false to fall back to plain decode.
      * @param tier_name Resolved tier name, for the per-tier `speculative.mtp`
      *        override (gh#108, v2.9.4) — empty when no tier context applies.
-     * @internal
+     * @dg_internal
      * @version 2.9.4
      */
     bool try_speculative_route(
@@ -945,7 +945,7 @@ private:
      *        the SLOC gate.
      * @param tier_name Resolved tier name, threaded through to the
      *        per-tier `speculative.mtp` override (gh#108, v2.9.4).
-     * @internal
+     * @dg_internal
      * @version 2.9.4
      */
     GenerationResult run_generate_dispatch(
@@ -960,7 +960,7 @@ private:
      *        through to the kernel.
      * @param tier_name Resolved tier name, for the per-tier `speculative.mtp`
      *        override (gh#108, v2.9.4).
-     * @internal
+     * @dg_internal
      * @version 2.9.4
      */
     bool try_speculative_route_streaming(
@@ -979,7 +979,7 @@ private:
      *        the draft window is `speculative.n_draft`. Returns true when
      *        the kernel ran (result populated); false to fall back to
      *        plain decode (non-llama backend, or kernel NOT_SUPPORTED).
-     * @internal
+     * @dg_internal
      * @version 2.9.0
      */
     bool try_mtp_route(
@@ -996,7 +996,7 @@ private:
      *        the global `speculative.mtp` flag when set; the request-level
      *        grammar safety net (a dynamic `params.grammar` on an
      *        MTP-effective tier) is applied by the caller, not here.
-     * @internal
+     * @dg_internal
      * @version 2.9.4
      */
     bool resolve_mtp_effective(const std::string& tier_name) const;

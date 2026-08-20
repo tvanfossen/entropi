@@ -21,7 +21,7 @@ namespace entropic {
 /**
  * @brief Construct with a pre-built definition.
  * @param def Tool definition.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 ToolBase::ToolBase(ToolDefinition def)
@@ -30,7 +30,7 @@ ToolBase::ToolBase(ToolDefinition def)
 /**
  * @brief Get the tool name.
  * @return Tool name from definition.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 const std::string& ToolBase::name() const {
@@ -40,7 +40,7 @@ const std::string& ToolBase::name() const {
 /**
  * @brief Get the full tool definition.
  * @return Tool definition reference.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 const ToolDefinition& ToolBase::definition() const {

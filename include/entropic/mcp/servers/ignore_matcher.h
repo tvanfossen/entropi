@@ -176,7 +176,7 @@ private:
      *
      * @param canonical_root Canonical project root.
      * @param root_gi The root .gitignore (skipped during the scan).
-     * @internal
+     * @dg_internal
      * @version 2.3.7
      */
     void load_nested_gitignores(const std::filesystem::path& canonical_root,

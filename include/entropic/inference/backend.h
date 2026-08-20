@@ -530,7 +530,7 @@ protected:
      * @param params Per-request generation params.
      * @param cancel Atomic cancel flag.
      * @return One result per request, in input order.
-     * @internal
+     * @dg_internal
      * @version 2.8.0
      */
     virtual std::vector<GenerationResult> do_generate_batch(
@@ -732,7 +732,7 @@ protected:
      * @return true if hook cancelled the load.
      * @version 1.9.1
      */
-    bool fire_model_load_hook(const ModelConfig& config);  ///< @internal
+    bool fire_model_load_hook(const ModelConfig& config);  ///< @dg_internal
 
     /**
      * @brief Set the hook dispatch interface.
