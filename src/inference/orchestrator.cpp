@@ -1958,33 +1958,42 @@ void ModelOrchestrator::apply_tier_sampler_defaults(
 // ── VRAM-aware tier residency (v2.2.4, gh#57) ──────────────
 
 /**
- * @brief Read ENTROPIC_VRAM_BUDGET_BYTES env override.
+ * @brief Resolve the VRAM budget: env override, else the device.
  *
- * Returns the parsed value (decimal bytes) on success, 0 when the
- * variable is unset, empty, or fails to parse. 0 means "budget
- * unknown, gate disabled" — see `get_model` for the gate semantics.
+ * SET wins, always — including empty or unparseable, which resolve to 0 and
+ * DISABLE the gate. That is the operator's escape hatch back to pre-gh#142
+ * behaviour, and it is the v2.3.10 contract; the device fallback must never
+ * override an explicit setting. Only an ABSENT variable reaches the device,
+ * which itself returns 0 (gate disabled) when there is no GPU.
  *
+ * @return Budget in bytes, or 0 meaning "unknown, do not enforce".
  * @internal
- * @version 2.11.0
+ * @req REQ-INFER-019
+ * @version 2.11.1
  */
 size_t ModelOrchestrator::resolve_vram_budget_bytes() {
     const char* env = std::getenv("ENTROPIC_VRAM_BUDGET_BYTES");
-    if (env != nullptr && *env != '\0') {
+    if (env == nullptr) {
+        // Not set at all: fall through to the device.
+        return static_cast<size_t>(query_device_free_vram_bytes());
+    }
+    // SET, so it takes control — including when it is empty or unparseable,
+    // which resolve to 0 and therefore DISABLE the gate. That is the escape
+    // hatch for an operator who wants the pre-gh#142 behaviour back, and it is
+    // what the v2.3.10 contract already specified; the device fallback must not
+    // quietly override an explicit setting.
+    size_t budget = 0;
+    if (*env != '\0') {
         try {
             long long v = std::stoll(env);
-            return (v < 0) ? 0 : static_cast<size_t>(v);
+            budget = (v < 0) ? 0 : static_cast<size_t>(v);
         } catch (...) {
-            return 0;
+            budget = 0;
         }
     }
-    // gh#142: this fallback is what the header has always documented and what
-    // was never implemented. Without it the budget is 0 on every deployment
-    // that does not set the env var, the gate is disabled, and a tier that
-    // cannot fit aborts the host process inside llama.cpp instead of being
-    // refused. Free rather than total: the reporter hit this on a GPU busier
-    // than the developer's.
-    return static_cast<size_t>(query_device_free_vram_bytes());
+    return budget;
 }
+
 
 /**
  * @brief Gather a tier's footprint inputs for the pure estimator.

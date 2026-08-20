@@ -137,56 +137,64 @@ DEFAULT_MODEL_TEST_TIMEOUT_S = 600
 MODEL_TEST_SETTLE_S = 30
 
 
-## @brief Read each model test's CMake-declared TIMEOUT property.
+## @brief Enumerate the model tests exactly as ctest has them registered.
 ## @utility
-## @return Dict of {executable_name: timeout_seconds}. Missing/unset
-##         TIMEOUT (CMake reports 0 for "no timeout set") falls back to
-##         DEFAULT_MODEL_TEST_TIMEOUT_S.
-## @version 2.9.7
-def _get_model_test_timeouts(build_dir):
-    """Query ctest for the CMake TIMEOUT property of every model/* test.
+## @return List of {name, command, timeout} dicts; empty on any failure.
+## @version 2.11.0
+def _model_ctest_tests(build_dir):
+    """Enumerate model tests from ctest — argv, timeout and all.
 
-    gh#111 fallout: _run_one_model_test previously hardcoded a 600s
-    per-attempt timeout regardless of each test's own declared CMake
-    TIMEOUT (e.g. test-gh108-agentic-benchmark: 900s,
-    test-gh108-cpu-feasibility: 3600s), so legitimately slow-but-passing
-    tests were killed and reported FAIL. This reads the real budget per
-    test so the runner's timeout can never be tighter than what the test
-    author declared.
+    v2.11.0: ctest's registration is the SINGLE SOURCE OF TRUTH for what a
+    model test is. A directory glob of executables is not the same set, and the
+    difference is not cosmetic: it includes [.]-hidden bench binaries that
+    collect nothing, orphaned binaries whose sources were deleted, and it
+    collapses the per-case ctest entries (add_model_test_per_case) back into one
+    process — which is the exact VRAM accumulation those entries exist to avoid.
+
+    Taking `command` verbatim means a per-case entry keeps its case filter and
+    its own process, so results.json describes the same run as the gate.
+
+    gh#111: TIMEOUT comes from each test's own CMake property, never a blanket
+    constant, so a legitimately slow test is not killed and misreported.
     """
     try:
         out = subprocess.check_output(
-            [
-                "ctest",
-                "--test-dir",
-                build_dir,
-                "--show-only=json-v1",
-                "-L",
-                "model",
-            ],
+            ["ctest", "--test-dir", build_dir, "--show-only=json-v1", "-L", "model"],
             stderr=subprocess.DEVNULL,
         )
     except (subprocess.CalledProcessError, FileNotFoundError):
-        return {}
+        return []
 
-    data = json.loads(out)
-    timeouts = {}
-    for test in data.get("tests", []):
-        name = test.get("name", "").rsplit("/", 1)[-1]
+    tests = []
+    for test in json.loads(out).get("tests", []):
+        command = test.get("command") or []
+        if not command:
+            continue
+        timeout_s = DEFAULT_MODEL_TEST_TIMEOUT_S
         for prop in test.get("properties", []):
-            if prop.get("name") == "TIMEOUT":
-                value = prop.get("value") or 0
-                timeouts[name] = int(value) if value else DEFAULT_MODEL_TEST_TIMEOUT_S
+            if prop.get("name") == "TIMEOUT" and prop.get("value"):
+                timeout_s = int(prop["value"])
                 break
-    return timeouts
+        tests.append(
+            {
+                "name": test.get("name", "").rsplit("/", 1)[-1],
+                "command": command,
+                "timeout": timeout_s,
+            }
+        )
+    return tests
 
 
-## @brief Run one model test exe with retries + a per-attempt timeout.
+## @brief Run one model test's ctest argv with retries + a per-attempt timeout.
 ## @utility
 ## @return Tuple of (status, retries, duration_ms). status: pass|skipped|fail.
-## @version 2.11.0
-def _run_one_model_test(exe_path, timeout_s=DEFAULT_MODEL_TEST_TIMEOUT_S, case=None):
-    """Run one model test exe (retries + a per-attempt timeout).
+## @version 2.11.1
+def _run_one_model_test(command, timeout_s=DEFAULT_MODEL_TEST_TIMEOUT_S):
+    """Run one model test's argv (retries + a per-attempt timeout).
+
+    v2.11.0: takes the full argv ctest registered rather than a bare executable
+    path, so a per-case entry carries its own case filter and stays in its own
+    process.
 
     gh#89-C: a Catch2 SKIP (all scenarios SKIP — e.g. a GGUF/VRAM-gated test or
     an intentionally-disabled gate) exits 4 with no assertions. Model tests have
@@ -198,15 +206,15 @@ def _run_one_model_test(exe_path, timeout_s=DEFAULT_MODEL_TEST_TIMEOUT_S, case=N
     Treated as SKIP — the binary has no runnable tests in the standard suite.
 
     gh#111 fallout: timeout_s must come from the test's own CMake TIMEOUT
-    property (see _get_model_test_timeouts), not a blanket constant —
-    otherwise legitimately slow tests are killed and misreported as failed.
+    property (see _model_ctest_tests), not a blanket constant — otherwise
+    legitimately slow tests are killed and misreported as failed.
     """
     t0 = time.monotonic()
     retries = 0
     for attempt in range(MAX_MODEL_RETRIES + 1):
         try:
             rc = subprocess.call(
-                [exe_path] + ([case] if case else []),
+                command,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 timeout=timeout_s,
@@ -224,33 +232,39 @@ def _run_one_model_test(exe_path, timeout_s=DEFAULT_MODEL_TEST_TIMEOUT_S, case=N
 ## @brief Run model tests 1:1; a Catch2 SKIP (rc=4) is reported, not failed.
 ## @utility
 ## @return Tuple of (results list, failed count). Skips do NOT count as failures.
-## @version 2.11.0
+## @version 2.11.1
 def _run_model_tests(build_dir):
     """Run model tests 1:1. Returns (results, failed_count). gh#89: a Catch2
     SKIP (GGUF/VRAM-gated or a disabled gate) reports SKIP, not PASS/FAIL.
 
     gh#111 fallout: per-test timeout comes from each test's own CMake
-    TIMEOUT property (_get_model_test_timeouts), not a blanket constant.
+    TIMEOUT property (_model_ctest_tests), not a blanket constant.
     """
-    test_dir = os.path.join(build_dir, "tests", "model")
-    executables = sorted(
-        f
-        for f in os.listdir(test_dir)
-        if os.path.isfile(os.path.join(test_dir, f))
-        and os.access(os.path.join(test_dir, f), os.X_OK)
-        and f.startswith("test-")
-    )
+    # v2.11.0: enumerate from CTEST, not from a directory glob. The glob was a
+    # SECOND, DIVERGING GATE and it was wrong three ways at once:
+    #   - it picked up the [.]-hidden bench binaries, which collect no tests on
+    #     a bare run, exit 2, and were recorded as SKIPs
+    #   - it picked up ORPHANED binaries whose sources had been deleted
+    #     (test-gh87-verify-qwen35, test-speculative-*), which a rebuild does
+    #     not remove, and reported those as SKIPs too
+    #   - it ran the per-case-split binaries (gh106, gh108-mtp-stream-grammar)
+    #     as ONE process, re-creating the VRAM accumulation that splitting them
+    #     into separate ctest entries fixed in 1ca75b9 — so they FAILED here
+    #     while passing the real gate
+    # ctest's registration is the single source of truth for what a model test
+    # IS, including its argv and its per-case isolation. results.json is the
+    # release audit record; it has to describe the same run the gate describes.
+    tests = _model_ctest_tests(build_dir)
 
-    if not executables:
-        print("ERROR: No model test executables found")
+    if not tests:
+        print("ERROR: No model tests registered in ctest")
         return [], 1
-
-    timeouts = _get_model_test_timeouts(build_dir)
 
     results = []
     passed = failed = flaky = skipped = 0
 
-    for idx, exe in enumerate(executables):
+    for idx, test in enumerate(tests):
+        name = test["name"]
         # gh#142: settle between model tests so the previous process's pages are
         # reclaimed before the next one maps its model.
         #
@@ -266,42 +280,34 @@ def _run_model_tests(build_dir):
         # one of them passes in isolation.
         if idx > 0:
             time.sleep(MODEL_TEST_SETTLE_S)
-        timeout_s = timeouts.get(exe, DEFAULT_MODEL_TEST_TIMEOUT_S)
-        # gh#142: per-CASE isolation is owned by ctest, which has explicit
-        # per-case entries (add_model_test_per_case in tests/model/CMakeLists.txt)
-        # for the binaries that accumulate across cases. Deriving case names here
-        # by parsing --list-tests is fragile: Catch2 wraps long names across
-        # lines, and a mis-parse produces a phantom filter that matches nothing,
-        # exits 2, and is recorded as a FALSE SKIP. Use `ctest -L model` when
-        # per-case isolation matters.
-        status, retries, duration_ms = _run_one_model_test(os.path.join(test_dir, exe), timeout_s)
+        # argv comes from ctest, so a per-case entry carries its own case
+        # filter and runs in its own process — the isolation that
+        # add_model_test_per_case exists to provide.
+        status, retries, duration_ms = _run_one_model_test(test["command"], test["timeout"])
         if status == "pass":
             passed += 1
             if retries > 0:
                 flaky += 1
-                print(f"  FLAKY  {exe} (retry {retries})")
+                print(f"  FLAKY  {name} (retry {retries})")
             else:
-                print(f"  PASS   {exe}")
+                print(f"  PASS   {name}")
         elif status == "skipped":
             skipped += 1
-            print(f"  SKIP   {exe}")
+            print(f"  SKIP   {name}")
         else:
             failed += 1
-            print(f"  FAIL   {exe} (after {MAX_MODEL_RETRIES} retries)")
+            print(f"  FAIL   {name} (after {MAX_MODEL_RETRIES} retries)")
 
         results.append(
             {
-                "name": exe,
+                "name": name,
                 "status": status,
                 "retries": retries,
                 "duration_ms": duration_ms,
             }
         )
 
-    print(
-        f"\n{passed}/{len(executables)} passed, "
-        f"{skipped} skipped, {flaky} flaky, {failed} failed"
-    )
+    print(f"\n{passed}/{len(tests)} passed, " f"{skipped} skipped, {flaky} flaky, {failed} failed")
     return results, failed
 
 

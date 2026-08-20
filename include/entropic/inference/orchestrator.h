@@ -645,11 +645,17 @@ private:
     /**
      * @brief Resolve the VRAM budget at initialize time.
      *
-     * Reads `ENTROPIC_VRAM_BUDGET_BYTES` (decimal bytes) as an override.
-     * Absent or unparseable, falls back to the FREE VRAM the active GPU
-     * device reports. Returns 0 only when there is no GPU device at all
-     * (CPU build or no usable card), where 0 means budget unknown →
-     * gate disabled, which is correct: a CPU tier has no VRAM to exhaust.
+     * `ENTROPIC_VRAM_BUDGET_BYTES` takes precedence whenever it is SET,
+     * including when it is empty or unparseable — those resolve to 0 and
+     * therefore DISABLE the gate, which is the escape hatch for an
+     * operator who wants the pre-gh#142 behaviour back. The device
+     * fallback must not override an explicit setting.
+     *
+     * Only when the variable is ABSENT does this fall back to the FREE
+     * VRAM the active GPU device reports. That returns 0 when there is no
+     * GPU device (CPU build or no usable card), where 0 means budget
+     * unknown → gate disabled — correct, since a CPU tier has no VRAM to
+     * exhaust.
      *
      * Before gh#142 the fallback was documented here but never
      * implemented, so the gate was dead on every deployment that did not
