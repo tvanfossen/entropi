@@ -1,60 +1,34 @@
 [
   {
-    "req_id": "REQ-INFER-002",
-    "req_name": "Teardown releases every model, context and adapter handle",
+    "req_id": "REQ-CFG-001",
+    "req_name": "Layered configuration resolution with most-specific-layer-wins precedence",
     "functions": [
       {
-        "name": "teardown_mtp_draft",
-        "file": "src/inference/llama_cpp_backend.cpp",
-        "version": "2.9.1"
-      }
-    ]
-  },
-  {
-    "req_id": "REQ-INFER-008",
-    "req_name": "Every declared grammar source reaches the sampler and exactly one wins",
-    "functions": [
-      {
-        "name": "apply_grammar_source",
-        "file": "src/inference/llama_cpp_backend.cpp",
-        "version": "2.10.5"
-      }
-    ]
-  },
-  {
-    "req_id": "REQ-INFER-015",
-    "req_name": "MTP speculative decode fails loud and never silently falls back",
-    "functions": [
-      {
-        "name": "effective_n_draft",
-        "file": "src/inference/llama_cpp_backend.cpp",
-        "version": "2.11.0"
-      }
-    ]
-  },
-  {
-    "req_id": "REQ-INFER-019",
-    "req_name": "Model pool dedup and VRAM residency policy govern which tier is resident",
-    "functions": [
-      {
-        "name": "log_fit_recommendation",
-        "file": "src/inference/orchestrator.cpp",
-        "version": "2.11.0"
-      },
-      {
-        "name": "resolve_vram_budget_bytes",
-        "file": "src/inference/orchestrator.cpp",
+        "name": "load_layered",
+        "file": "src/config/loader.cpp",
         "version": "2.11.1"
-      },
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-CFG-002",
+    "req_name": "Whole-block replace semantics for models and routing across layers",
+    "functions": [
       {
-        "name": "footprint_inputs_for",
-        "file": "src/inference/orchestrator.cpp",
-        "version": "2.11.0"
-      },
+        "name": "load_layered",
+        "file": "src/config/loader.cpp",
+        "version": "2.11.1"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-CFG-007",
+    "req_name": "Usable configuration with no user config present",
+    "functions": [
       {
-        "name": "estimate_footprint_bytes",
-        "file": "src/inference/orchestrator.cpp",
-        "version": "2.11.0"
+        "name": "load_layered",
+        "file": "src/config/loader.cpp",
+        "version": "2.11.1"
       }
     ]
   }

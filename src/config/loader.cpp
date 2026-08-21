@@ -1215,7 +1215,7 @@ static std::string load_project_layer(
  * @req REQ-CFG-001
  * @req REQ-CFG-002
  * @req REQ-CFG-007
- * @version 2.0.6
+ * @version 2.11.1
  */
 std::string load_layered(
     const std::filesystem::path& project_dir,
@@ -1232,7 +1232,25 @@ std::string load_layered(
         err = load_project_layer(project_dir, registry, config);
     }
     if (err.empty() && config.models.tiers.empty()) {
-        err = load_bundled_default(std::filesystem::path{}, registry, config);
+        // v2.11.1: parse into a SCRATCH config and transplant only the model
+        // block. Previously this re-parsed the whole bundled default straight
+        // over `config`, AFTER the project layer had already run — so a
+        // fresh-install machine silently lost every setting an explicit layer
+        // had established. data/default_config.yaml sets `mcp.enable_bash:
+        // true`, so a project asking for false got true back, and REQ-CFG-001's
+        // most-specific-layer-wins rule was violated by the layer that is
+        // supposed to be LEAST specific.
+        //
+        // Invisible on any machine whose ~/.entropic/config.yaml declares tiers
+        // (the fallback never fires there) and hit on every CI runner and every
+        // fresh install. The condition that triggers it is a MISSING MODEL SET,
+        // so the model set is the only thing it may supply.
+        ParsedConfig fallback;
+        fallback.config_dir = config.config_dir;
+        err = load_bundled_default(std::filesystem::path{}, registry, fallback);
+        if (err.empty()) {
+            config.models = std::move(fallback.models);
+        }
     }
     if (err.empty()) {
         apply_env_overrides(config);
