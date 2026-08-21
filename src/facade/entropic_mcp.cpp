@@ -55,7 +55,7 @@ static entropic_error_t check_server_mgr(entropic_handle_t h) {
  * @param name MCP server name (must be unique).
  * @param config_json JSON-serialized MCP server configuration.
  * @return ENTROPIC_OK or error code.
- * @internal
+ * @dg_internal
  * @version 2.1.4
  */
 /**

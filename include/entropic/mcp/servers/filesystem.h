@@ -148,14 +148,14 @@ private:
     /**
      * @brief Construct the six filesystem tool instances (ctor step 1).
      * @param data_dir Directory holding tool JSON definitions.
-     * @internal
+     * @dg_internal
      * @version 2.3.7
      */
     void create_fs_tools(const std::string& data_dir);
 
     /**
      * @brief Register the six filesystem tools (ctor step 2).
-     * @internal
+     * @dg_internal
      * @version 2.3.7
      */
     void register_fs_tools();

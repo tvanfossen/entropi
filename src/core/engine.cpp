@@ -31,7 +31,7 @@ namespace entropic {
  * @param hooks Hook interface.
  * @param point Hook point.
  * @param json Context JSON.
- * @internal
+ * @dg_internal
  * @version 1.9.1
  */
 static void fire_hook_info(const HookInterface& hooks,
@@ -113,7 +113,7 @@ static void remove_anchor_messages(LoopContext& ctx,
 /**
  * @brief Get current time as seconds since epoch.
  * @return Time in seconds (double).
- * @internal
+ * @dg_internal
  * @version 1.8.4
  */
 static double now_seconds() {
@@ -129,7 +129,7 @@ static double now_seconds() {
  * @param inference Inference interface.
  * @param loop_config Loop configuration.
  * @param compaction_config Compaction configuration.
- * @internal
+ * @dg_internal
  * @version 2.0.4
  */
 AgentEngine::AgentEngine(
@@ -154,7 +154,7 @@ AgentEngine::AgentEngine(
 /**
  * @brief Set callback functions for loop events.
  * @param callbacks Callback configuration.
- * @internal
+ * @dg_internal
  * @version 1.8.4
  */
 void AgentEngine::set_callbacks(const EngineCallbacks& callbacks) {
@@ -164,7 +164,7 @@ void AgentEngine::set_callbacks(const EngineCallbacks& callbacks) {
 /**
  * @brief Set the tool execution interface.
  * @param tool_exec Tool execution interface.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 void AgentEngine::set_tool_executor(
@@ -186,7 +186,7 @@ void AgentEngine::set_tier_resolution(
 /**
  * @brief Set the storage interface for persistence.
  * @param storage Storage callbacks (nullable).
- * @internal
+ * @dg_internal
  * @version 1.8.8
  */
 void AgentEngine::set_storage(const StorageInterface& storage) {
@@ -215,7 +215,7 @@ void AgentEngine::set_hooks(const HookInterface& hooks) {
  *
  * @param observer Token callback (nullable).
  * @param user_data Forwarded to observer.
- * @internal
+ * @dg_internal
  * @version 2.0.6-rc16
  */
 void AgentEngine::set_stream_observer(
@@ -442,7 +442,7 @@ void AgentEngine::init_session_conversation(LoopContext& ctx) {
 /**
  * @brief Fold a finished run's metrics into the per-tier totals.
  * @param ctx Loop context (with completed metrics).
- * @internal
+ * @dg_internal
  * @version 2.3.7
  */
 void AgentEngine::accumulate_run_metrics(LoopContext& ctx) {
@@ -1098,7 +1098,7 @@ void AgentEngine::reinject_context_anchors(LoopContext& ctx) {
 
 /**
  * @brief Register all 11 directive handlers.
- * @internal
+ * @dg_internal
  * @version 1.8.4
  */
 void AgentEngine::register_directive_handlers() {
@@ -1126,7 +1126,7 @@ void AgentEngine::register_directive_handlers() {
 
 /**
  * @brief Handle stop_processing directive.
- * @internal
+ * @dg_internal
  * @version 1.8.4
  */
 void AgentEngine::dir_stop(
@@ -1234,7 +1234,7 @@ void AgentEngine::dir_complete(
 
 /**
  * @brief Handle clear_self_todos directive (no-op).
- * @internal
+ * @dg_internal
  * @version 1.8.4
  */
 void AgentEngine::dir_clear_todos(
@@ -1244,7 +1244,7 @@ void AgentEngine::dir_clear_todos(
 
 /**
  * @brief Handle inject_context directive.
- * @internal
+ * @dg_internal
  * @version 1.8.4
  */
 void AgentEngine::dir_inject(
@@ -1299,7 +1299,7 @@ void AgentEngine::dir_anchor(
 
 /**
  * @brief Handle phase_change directive.
- * @internal
+ * @dg_internal
  * @version 1.8.4
  */
 void AgentEngine::dir_phase(
@@ -1311,7 +1311,7 @@ void AgentEngine::dir_phase(
 
 /**
  * @brief Handle notify_presenter directive.
- * @internal
+ * @dg_internal
  * @version 1.8.4
  */
 void AgentEngine::dir_notify(
@@ -1330,7 +1330,7 @@ void AgentEngine::dir_notify(
  * @brief Parse tool calls from raw model output.
  * @param raw_content Raw model output.
  * @return (cleaned content, parsed tool calls).
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 /**
@@ -1338,7 +1338,7 @@ void AgentEngine::dir_notify(
  * @param obj JSON object with "name" and optional "arguments".
  * @param tc_str Original JSON string (used in id hash).
  * @return Populated ToolCall.
- * @internal
+ * @dg_internal
  * @version 2.0.2
  */
 static ToolCall build_tool_call_from_json(
@@ -1361,7 +1361,7 @@ static ToolCall build_tool_call_from_json(
  * @brief Decode a JSON tool-calls array string into ToolCall vector.
  * @param tc_str JSON array string ("[]" or "" yields empty result).
  * @return Parsed ToolCall vector (empty on parse failure or empty input).
- * @internal
+ * @dg_internal
  * @version 2.0.2
  */
 static std::vector<ToolCall> decode_tool_calls_json(
@@ -1819,7 +1819,7 @@ void AgentEngine::fire_post_generate_hook(
  * clears the field at the top of the iteration that consumes it.
  *
  * @param ctx Loop context (writes pending_validation_feedback).
- * @internal
+ * @dg_internal
  * @version 2.1.1-rc1
  */
 /**
@@ -2006,7 +2006,7 @@ bool AgentEngine::fire_delegate_pre_hook(
  * but left this dump sink unguarded.
  *
  * @return Compact JSON string safe for hook dispatch.
- * @internal
+ * @dg_internal
  * @version 2.9.9
  */
 std::string entropic::detail::build_delegate_complete_json(
@@ -2058,7 +2058,7 @@ void AgentEngine::fire_delegate_complete_hook(
  * @brief Trampoline for DelegationManager to call engine loop.
  * @param ctx Child loop context.
  * @param user_data AgentEngine pointer.
- * @internal
+ * @dg_internal
  * @version 2.4.3
  */
 static void run_child_loop_trampoline(LoopContext& ctx, void* user_data) {
@@ -2627,7 +2627,7 @@ bool AgentEngine::try_auto_chain(
  * no writes to the user's directory.
  *
  * @return Project directory path.
- * @internal
+ * @dg_internal
  * @version 2.1.6
  */
 std::filesystem::path AgentEngine::get_repo_dir() {
@@ -2657,7 +2657,7 @@ std::filesystem::path AgentEngine::get_repo_dir() {
  * previous lookup already settled on the CWD fallback.
  *
  * @param project_dir Project root (empty resets to CWD fallback).
- * @internal
+ * @dg_internal
  * @version 2.1.6
  */
 void AgentEngine::set_project_dir(const std::filesystem::path& project_dir) {
@@ -2673,7 +2673,7 @@ void AgentEngine::set_project_dir(const std::filesystem::path& project_dir) {
  * than per-delegation.
  *
  * @return Pointer to engine-owned manager, or nullptr if no repo_dir.
- * @internal
+ * @dg_internal
  * @version 2.1.6
  */
 /**
@@ -2830,7 +2830,7 @@ SandboxManager* AgentEngine::ensure_sandbox_manager() {
 /**
  * @brief Set the system prompt for conversation state.
  * @param prompt Assembled system prompt.
- * @internal
+ * @dg_internal
  * @version 2.0.2
  */
 void AgentEngine::set_system_prompt(const std::string& prompt) {
@@ -2840,7 +2840,7 @@ void AgentEngine::set_system_prompt(const std::string& prompt) {
 /**
  * @brief Set session logger for model transcript logging.
  * @param log Non-owning pointer (nullable).
- * @internal
+ * @dg_internal
  * @version 2.0.2
  */
 void AgentEngine::set_session_logger(SessionLogger* log) {
@@ -2934,7 +2934,7 @@ void AgentEngine::seed_system_prompt_for_tier(const std::string& tier) {
  * @param pending First user turn for this call.
  * @param tier_override Tier to lock the run to ("" = route).
  * @return Result messages from the final turn.
- * @internal
+ * @dg_internal
  * @version 2.8.0
  */
 std::vector<Message> AgentEngine::run_drain_loop(
@@ -2972,13 +2972,13 @@ std::vector<Message> AgentEngine::run_drain_loop(
  *
  * @param new_messages Messages to add this turn.
  * @return Result messages from the loop.
- * @internal
+ * @dg_internal
  * @version 2.1.10
  */
 /**
  * @brief Prepend the configured system prompt if this turn needs it.
  * @param new_messages The messages the caller is adding this turn.
- * @internal
+ * @dg_internal
  * @version 2.3.7
  */
 void AgentEngine::seed_system_prompt(
@@ -3000,7 +3000,7 @@ void AgentEngine::seed_system_prompt(
  * @brief Pull the next queued user message into `pending` (gh#40).
  * @param pending Out: cleared and set to the next user turn.
  * @return true if a queued message was dequeued; false if empty.
- * @internal
+ * @dg_internal
  * @version 2.3.7
  */
 bool AgentEngine::prepare_next_turn(std::vector<Message>& pending) {
@@ -3107,7 +3107,7 @@ int AgentEngine::run_streaming(
  * @brief Concatenate user-role message text for session-log echo.
  * @param messages Incoming messages for the streaming turn.
  * @return Newline-joined user text (skips system/assistant turns).
- * @internal
+ * @dg_internal
  * @version 2.1.8
  */
 static std::string concat_user_echo(
@@ -3185,7 +3185,7 @@ int AgentEngine::run_streaming(
 
 /**
  * @brief Clear conversation history.
- * @internal
+ * @dg_internal
  * @version 2.0.2
  */
 void AgentEngine::clear_conversation() {
@@ -3196,7 +3196,7 @@ void AgentEngine::clear_conversation() {
 /**
  * @brief Get conversation message count.
  * @return Number of messages.
- * @internal
+ * @dg_internal
  * @version 2.0.2
  */
 size_t AgentEngine::message_count() const {
@@ -3206,7 +3206,7 @@ size_t AgentEngine::message_count() const {
 /**
  * @brief Get conversation messages.
  * @return Const reference to messages.
- * @internal
+ * @dg_internal
  * @version 2.0.2
  */
 const std::vector<Message>& AgentEngine::get_messages() const {
@@ -3217,7 +3217,7 @@ const std::vector<Message>& AgentEngine::get_messages() const {
 
 /**
  * @brief Enqueue a user message subject to the configured cap.
- * @internal
+ * @dg_internal
  * @version 2.1.10
  */
 bool AgentEngine::queue_user_message(const std::string& message) {
@@ -3236,7 +3236,7 @@ bool AgentEngine::queue_user_message(const std::string& message) {
 
 /**
  * @brief Read queue depth under the queue mutex.
- * @internal
+ * @dg_internal
  * @version 2.1.10
  */
 size_t AgentEngine::user_message_queue_depth() const {
@@ -3246,7 +3246,7 @@ size_t AgentEngine::user_message_queue_depth() const {
 
 /**
  * @brief Drop all queued messages atomically.
- * @internal
+ * @dg_internal
  * @version 2.1.10
  */
 void AgentEngine::clear_user_message_queue() {
@@ -3260,7 +3260,7 @@ void AgentEngine::clear_user_message_queue() {
 
 /**
  * @brief Update the runtime cap (in-place on LoopConfig).
- * @internal
+ * @dg_internal
  * @version 2.1.10
  */
 void AgentEngine::set_message_queue_capacity(int cap) {
@@ -3270,7 +3270,7 @@ void AgentEngine::set_message_queue_capacity(int cap) {
 
 /**
  * @brief Pop the head of the queue if non-empty (FIFO).
- * @internal
+ * @dg_internal
  * @version 2.1.10
  */
 std::optional<std::string>
@@ -3286,7 +3286,7 @@ AgentEngine::pop_queued_user_message() {
 
 /**
  * @brief Notify the consumer that a queued message is being injected.
- * @internal
+ * @dg_internal
  * @version 2.1.10
  */
 void AgentEngine::fire_queue_consumed(const std::string& consumed,
@@ -3299,7 +3299,7 @@ void AgentEngine::fire_queue_consumed(const std::string& consumed,
 
 /**
  * @brief Persistent slot setter; survives set_callbacks() shuffles.
- * @internal
+ * @dg_internal
  * @version 2.1.10
  */
 void AgentEngine::set_queue_observer(
@@ -3333,7 +3333,7 @@ void AgentEngine::set_state_observer(
 /**
  * @brief Build ToolExecutorHooks wired to this engine's DirectiveProcessor.
  * @return Configured hooks.
- * @internal
+ * @dg_internal
  * @version 2.0.2
  */
 ToolExecutorHooks AgentEngine::build_directive_hooks() {

@@ -370,7 +370,7 @@ private:
      * @brief Build messages JSON for critique generation.
      * @param content Text to critique.
      * @return JSON array with system + user messages.
-     * @internal
+     * @dg_internal
      * @version 1.9.8
      */
     std::string build_critique_messages(const std::string& content) const;
@@ -378,7 +378,7 @@ private:
     /**
      * @brief Build params JSON for critique generation.
      * @return JSON string with grammar_key, max_tokens, temperature.
-     * @internal
+     * @dg_internal
      * @version 1.9.8
      */
     std::string build_critique_params() const;
@@ -400,7 +400,7 @@ private:
     /**
      * @brief Store a validation result (thread-safe).
      * @param result Result to store.
-     * @internal
+     * @dg_internal
      * @version 1.9.8
      */
     void store_result(const ValidationResult& result);
@@ -461,7 +461,7 @@ private:
      * @brief Build a single-turn messages JSON.
      * @param prompt Full prompt text.
      * @return JSON array string.
-     * @internal
+     * @dg_internal
      * @version 1.9.8
      */
     std::string build_single_turn_json(
@@ -473,7 +473,7 @@ private:
      * @param critique Critique with violations.
      * @param messages_json Original conversation context.
      * @return Augmented messages JSON.
-     * @internal
+     * @dg_internal
      * @version 1.9.8
      */
     std::string build_revision_messages(
@@ -485,7 +485,7 @@ private:
      * @brief Build human-readable feedback text from violations.
      * @param critique Critique result with violations.
      * @return Feedback string.
-     * @internal
+     * @dg_internal
      * @version 1.9.8
      */
     std::string build_feedback_text(
@@ -497,7 +497,7 @@ private:
      * @param feedback Feedback message.
      * @param messages_json Base conversation messages.
      * @return Augmented JSON array.
-     * @internal
+     * @dg_internal
      * @version 1.9.8
      */
     std::string inject_feedback_into_messages(
@@ -520,7 +520,7 @@ private:
      * @brief Write revised content into modified_json output.
      * @param content Revised content.
      * @param modified_json Output buffer (malloc'd).
-     * @internal
+     * @dg_internal
      * @version 1.9.8
      */
     static void write_modified_json(
@@ -640,7 +640,7 @@ private:
 
     /**
      * @brief State captured when validation is paused on rejection.
-     * @internal
+     * @dg_internal
      * @version 2.1.5
      */
     struct PendingValidationState {

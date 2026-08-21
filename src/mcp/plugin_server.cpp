@@ -21,7 +21,7 @@ namespace entropic {
  * @brief Construct around an open library handle.
  * @param handle dlopen result (ownership transferred).
  * @param path Path the handle was opened from.
- * @internal
+ * @dg_internal
  * @version 2.10.1
  */
 PluginServer::PluginServer(void* handle, std::filesystem::path path)
@@ -202,7 +202,7 @@ bool PluginServer::resolve_symbols() {
  * @param symbol_name Symbol to resolve.
  * @param[in,out] ok Cleared to false when the symbol is missing.
  * @return Symbol address, or nullptr.
- * @internal
+ * @dg_internal
  * @version 2.10.1
  */
 void* PluginServer::resolve_one(const char* symbol_name, bool& ok) const {

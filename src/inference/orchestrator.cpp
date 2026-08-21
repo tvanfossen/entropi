@@ -42,7 +42,7 @@ using entropic::log::elapsed_ms;
  * @brief Extract latest user message from conversation.
  * @param messages Conversation history.
  * @return Latest user message content.
- * @internal
+ * @dg_internal
  * @version 1.8.2
  */
 std::string extract_latest_user_message(const std::vector<Message>& messages) {
@@ -68,7 +68,7 @@ std::string extract_latest_user_message(const std::vector<Message>& messages) {
  *
  * @param config Full engine config.
  * @return true on success.
- * @internal
+ * @dg_internal
  * @version 2.1.11
  */
 bool ModelOrchestrator::create_tier_backends(const ParsedConfig& config) {
@@ -308,7 +308,7 @@ bool ModelOrchestrator::resolve_mtp_effective(const std::string& tier_name) cons
 /**
  * @brief Run a generate call through speculative (if enabled+pair
  *        compatible) or fall back to plain decode.
- * @internal
+ * @dg_internal
  * @version 2.9.4
  */
 GenerationResult ModelOrchestrator::run_generate_dispatch(
@@ -421,7 +421,7 @@ static bool mtp_head_guard_fires(LlamaCppBackend* draft,
  * whether the loaded draft GGUF looks like an MTP head (≤2 layers). If so,
  * fail loud with INCOMPATIBLE_CONFIG instead of crashing in fattn.cu.
  *
- * @internal
+ * @dg_internal
  * @version 2.10.0 [reviewed]
  */
 bool ModelOrchestrator::try_speculative_route_streaming(
@@ -480,7 +480,7 @@ bool ModelOrchestrator::try_speculative_route_streaming(
  *
  * gh#108: passes an EMPTY std::function (not a bound no-op lambda) so the MTP
  * path can distinguish non-streaming from streaming by callback bound-ness.
- * @internal
+ * @dg_internal
  * @version 2.9.4
  */
 bool ModelOrchestrator::try_speculative_route(
@@ -721,7 +721,7 @@ static void log_orchestration(const GenerationResult& result,
  * @param params Generation parameters.
  * @param tier_name Explicit tier or empty for routing.
  * @return GenerationResult.
- * @internal
+ * @dg_internal
  * @version 2.11.0
  */
 GenerationResult ModelOrchestrator::generate(
@@ -775,7 +775,7 @@ GenerationResult ModelOrchestrator::generate(
  * calls plain decode. Calls `model->generate(messages, params,
  * cancel)` which polls cancel per token.
  *
- * @internal
+ * @dg_internal
  * @version 2.11.0
  */
 GenerationResult ModelOrchestrator::generate(
@@ -829,7 +829,7 @@ GenerationResult ModelOrchestrator::generate(
  * grammar-constrained requests (params.grammar), not common_chat tool
  * injection.
  *
- * @internal
+ * @dg_internal
  * @version 2.8.0
  */
 std::vector<GenerationResult> ModelOrchestrator::generate_batch(
@@ -1095,7 +1095,7 @@ std::pair<std::string, std::string> ModelOrchestrator::classify_task(
  * @brief Get model for tier, loading/swapping as needed.
  * @param tier_name Tier name.
  * @return Backend pointer, or nullptr if unavailable.
- * @internal
+ * @dg_internal
  * @version 1.9.2
  */
 /**
@@ -1106,7 +1106,7 @@ std::pair<std::string, std::string> ModelOrchestrator::classify_task(
  * multi-resident hit: the new tier was already loaded). Same-tier
  * reuse simply refreshes the timestamp.
  *
- * @internal
+ * @dg_internal
  * @version 2.2.4
  */
 void ModelOrchestrator::record_activation_reuse(
@@ -1140,7 +1140,7 @@ static FootprintInputs footprint_inputs_for(
  * not the lever when nothing fits at any context.
  *
  * @param tier_name Tier being refused.
- * @internal
+ * @dg_internal
  * @req REQ-INFER-019
  * @version 2.11.0
  */
@@ -1177,7 +1177,7 @@ void ModelOrchestrator::log_fit_recommendation(
  * `last_residency_error_ = TIER_MODEL_TOO_LARGE` when the single-tier
  * estimate exceeds a known engine VRAM budget. Returns true to admit.
  *
- * @internal
+ * @dg_internal
  * @version 2.11.0
  */
 bool ModelOrchestrator::residency_admits(const std::string& tier_name) {
@@ -1207,7 +1207,7 @@ bool ModelOrchestrator::residency_admits(const std::string& tier_name) {
  * Drives `load_and_activate` on the backend; on success records the
  * activation timestamp and fires a `Loaded` residency event.
  *
- * @internal
+ * @dg_internal
  * @version 2.2.4
  */
 /**
@@ -1217,7 +1217,7 @@ bool ModelOrchestrator::residency_admits(const std::string& tier_name) {
  * result so the facade surfaces `TIER_MODEL_TOO_LARGE` distinctly from
  * generic `GENERATE_FAILED`. Always clears the stash.
  *
- * @internal
+ * @dg_internal
  * @version 2.2.4
  */
 GenerationResult ModelOrchestrator::build_no_model_error(
@@ -1246,7 +1246,7 @@ GenerationResult ModelOrchestrator::build_no_model_error(
  * @param tier_name Tier name (must be in `config_.models.tiers`).
  * @param backend   Backend shared with the tier_map entry.
  * @return Activated backend, or nullptr.
- * @internal
+ * @dg_internal
  * @version 2.2.4
  */
 InferenceBackend* ModelOrchestrator::activate_and_track(
@@ -1282,7 +1282,7 @@ InferenceBackend* ModelOrchestrator::activate_and_track(
  *
  * @param tier_name Requested tier name.
  * @return Backend pointer, or nullptr.
- * @internal
+ * @dg_internal
  * @version 2.3.7
  */
 InferenceBackend* ModelOrchestrator::get_model(const std::string& tier_name) {
@@ -1319,7 +1319,7 @@ InferenceBackend* ModelOrchestrator::get_model(const std::string& tier_name) {
  * @brief Ensure the active tier's LoRA adapter is loaded.
  * @param tier_name Tier whose adapter to ensure.
  * @param result Active backend.
- * @internal
+ * @dg_internal
  * @version 2.3.7
  */
 void ModelOrchestrator::ensure_tier_lora(const std::string& tier_name,
@@ -1340,7 +1340,7 @@ void ModelOrchestrator::ensure_tier_lora(const std::string& tier_name,
  * observer sees every "tier model just left VRAM" transition.
  *
  * @param incoming The backend about to be activated.
- * @internal
+ * @dg_internal
  * @version 2.3.7
  */
 void ModelOrchestrator::deactivate_current_if_needed(InferenceBackend* incoming) {
@@ -1369,7 +1369,7 @@ void ModelOrchestrator::deactivate_current_if_needed(InferenceBackend* incoming)
 /**
  * @brief Warm-deactivate or cold-unload the current main tier.
  * @param current The backend leaving the active slot.
- * @internal
+ * @dg_internal
  * @version 2.3.7
  */
 void ModelOrchestrator::unload_or_warm_current(InferenceBackend* current) {
@@ -1409,7 +1409,7 @@ RoutingResult ModelOrchestrator::last_routing_result() const {
 
 /**
  * @brief Last used tier name.
- * @internal
+ * @dg_internal
  * @version 1.8.2
  */
 std::string ModelOrchestrator::last_used_tier() const {
@@ -1443,7 +1443,7 @@ std::vector<std::string> ModelOrchestrator::loaded_models() const {
 
 /**
  * @brief All configured tier names.
- * @internal
+ * @dg_internal
  * @version 2.1.11
  */
 std::vector<std::string> ModelOrchestrator::available_models() const {
@@ -1492,7 +1492,7 @@ bool ModelOrchestrator::can_handoff(
 
 /**
  * @brief Get adapter for a tier.
- * @internal
+ * @dg_internal
  * @version 1.8.2
  */
 ChatAdapter* ModelOrchestrator::get_adapter(const std::string& tier_name) const {
@@ -1515,14 +1515,14 @@ ChatAdapter* ModelOrchestrator::get_adapter(const std::string& tier_name) const 
  * @param tier_name Target tier.
  * @param ctx llama_context for activation.
  * @return Adapter swap time in milliseconds.
- * @internal
+ * @dg_internal
  * @version 1.9.2
  */
 /**
  * @brief Deactivate any active LoRA adapter.
  * @param ctx llama_context to clear from.
  * @return true if an adapter was deactivated.
- * @internal
+ * @dg_internal
  * @version 1.9.2
  */
 bool ModelOrchestrator::deactivate_if_active(llama_context* ctx) {
@@ -1538,7 +1538,7 @@ bool ModelOrchestrator::deactivate_if_active(llama_context* ctx) {
  * @param tier_name Target tier.
  * @param ctx llama_context for activation.
  * @return Adapter swap time in milliseconds.
- * @internal
+ * @dg_internal
  * @version 1.9.2
  */
 double ModelOrchestrator::ensure_adapter_for_tier(
@@ -1577,7 +1577,7 @@ double ModelOrchestrator::ensure_adapter_for_tier(
  * Scans tier configs for adapter_path. For each, loads the adapter
  * against its base model. Requires the base model to be at least WARM.
  *
- * @internal
+ * @dg_internal
  * @version 1.9.2
  */
 void ModelOrchestrator::preload_adapters() {
@@ -1625,7 +1625,7 @@ void ModelOrchestrator::preload_adapters() {
  * Scans ENTROPIC_DATA_DIR/grammars/ for .gbnf files and registers
  * each with the grammar registry.
  *
- * @internal
+ * @dg_internal
  * @version 2.0.6
  */
 void ModelOrchestrator::load_bundled_grammars() {
@@ -1654,7 +1654,7 @@ void ModelOrchestrator::load_bundled_grammars() {
  *
  * @param grammar_dir Path to directory containing .gbnf files.
  * @return Number of grammars loaded.
- * @internal
+ * @dg_internal
  * @version 2.0.6
  */
 size_t ModelOrchestrator::load_grammars_from(
@@ -1721,7 +1721,7 @@ std::string ModelOrchestrator::select_vision_tier() const {
  *
  * @return Pointer to the loaded llama_model, or nullptr when no main
  *         tier is loaded or the backend is not LlamaCppBackend.
- * @internal
+ * @dg_internal
  * @version 2.1.11
  */
 static llama_model* resolve_target_model(
@@ -1740,7 +1740,7 @@ static llama_model* resolve_target_model(
  * @param[out] draft_out  Filled with the configured draft's llama_model.
  * @return Empty string on success; otherwise a diagnostic identifying
  *         which side is missing.
- * @internal
+ * @dg_internal
  * @version 2.1.11
  */
 std::string ModelOrchestrator::resolve_speculative_pair(
@@ -1783,7 +1783,7 @@ std::string ModelOrchestrator::resolve_speculative_pair(
  * the C ABI can forward to consumers.
  *
  * @return SpeculativeCompatInfo with compatible flag + diagnostic.
- * @internal
+ * @dg_internal
  * @version 2.1.11
  */
 ModelOrchestrator::SpeculativeCompatInfo
@@ -1967,7 +1967,7 @@ void ModelOrchestrator::apply_tier_sampler_defaults(
  * which itself returns 0 (gate disabled) when there is no GPU.
  *
  * @return Budget in bytes, or 0 meaning "unknown, do not enforce".
- * @internal
+ * @dg_internal
  * @req REQ-INFER-019
  * @version 2.11.1
  */
@@ -2005,7 +2005,7 @@ size_t ModelOrchestrator::resolve_vram_budget_bytes() {
  * @param tier_cfg The tier's configuration.
  * @param weights_bytes Size of the tier's GGUF on disk.
  * @return Inputs for estimate_vram_footprint.
- * @internal
+ * @dg_internal
  * @req REQ-INFER-019
  * @version 2.11.0
  */
@@ -2035,7 +2035,7 @@ static FootprintInputs footprint_inputs_for(
  * GGUF is not resolvable, AND when the placement cannot be priced at all —
  * both mean "unknown" to the gate, which then does not enforce.
  *
- * @internal
+ * @dg_internal
  * @req REQ-INFER-019
  * @version 2.11.0
  */
@@ -2057,7 +2057,7 @@ size_t ModelOrchestrator::estimate_footprint_bytes(
 
 /**
  * @brief Public footprint accessor — memoizes via tier_footprint_bytes_.
- * @internal
+ * @dg_internal
  * @version 2.2.4
  */
 size_t ModelOrchestrator::tier_footprint_bytes(
@@ -2074,7 +2074,7 @@ size_t ModelOrchestrator::tier_footprint_bytes(
 
 /**
  * @brief Register / replace / clear the residency observer.
- * @internal
+ * @dg_internal
  * @version 2.2.4
  */
 void ModelOrchestrator::set_residency_observer(ResidencyObserverFn cb) {
@@ -2084,7 +2084,7 @@ void ModelOrchestrator::set_residency_observer(ResidencyObserverFn cb) {
 
 /**
  * @brief Fire residency observer + INFO-log the event.
- * @internal
+ * @dg_internal
  * @version 2.2.4
  */
 void ModelOrchestrator::fire_residency_observer(
@@ -2107,7 +2107,7 @@ void ModelOrchestrator::fire_residency_observer(
 
 /**
  * @brief JSON serialization of the current residency set.
- * @internal
+ * @dg_internal
  * @version 2.2.4
  */
 /**
@@ -2145,7 +2145,7 @@ static nlohmann::json make_residency_entry(
 
 /**
  * @brief Serialize the current VRAM residency snapshot to JSON.
- * @internal
+ * @dg_internal
  * @version 2.3.7
  */
 std::string ModelOrchestrator::residency_snapshot_json() const {

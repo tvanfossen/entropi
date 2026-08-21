@@ -30,7 +30,7 @@ namespace entropic {
  *
  * Returns a placeholder until the LSP client lands in v1.8.7.
  *
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 class DiagnosticsTool : public ToolBase {
@@ -38,7 +38,7 @@ public:
     /**
      * @brief Construct with definition.
      * @param def Tool definition loaded from JSON.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     explicit DiagnosticsTool(ToolDefinition def)
@@ -59,7 +59,7 @@ public:
      * @brief Return placeholder — LSP not yet connected.
      * @param args_json Unused.
      * @return ServerResponse with stub message.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     ServerResponse execute(const std::string& args_json) override {
@@ -76,7 +76,7 @@ public:
  *
  * Returns a placeholder until the LSP client lands in v1.8.7.
  *
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 class CheckErrorsTool : public ToolBase {
@@ -84,7 +84,7 @@ public:
     /**
      * @brief Construct with definition.
      * @param def Tool definition loaded from JSON.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     explicit CheckErrorsTool(ToolDefinition def)
@@ -105,7 +105,7 @@ public:
      * @brief Return placeholder — LSP not yet connected.
      * @param args_json Unused.
      * @return ServerResponse with stub message.
-     * @internal
+     * @dg_internal
      * @version 1.8.5
      */
     ServerResponse execute(const std::string& args_json) override {
@@ -155,7 +155,7 @@ DiagnosticsServer::DiagnosticsServer(
 
 /**
  * @brief Destructor.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 DiagnosticsServer::~DiagnosticsServer() = default;
@@ -163,7 +163,7 @@ DiagnosticsServer::~DiagnosticsServer() = default;
 /**
  * @brief Get the root directory.
  * @return Root directory path.
- * @internal
+ * @dg_internal
  * @version 1.8.5
  */
 const std::filesystem::path& DiagnosticsServer::root_dir() const {

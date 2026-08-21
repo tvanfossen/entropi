@@ -21,7 +21,7 @@
  * Tracks system prompt + user/assistant messages across turns.
  * The facade delegates all conversation management here.
  *
- * @internal
+ * @dg_internal
  * @version 2.0.1
  */
 struct ConversationState {
@@ -36,7 +36,7 @@ struct ConversationState {
      *
      * @param input User input string.
      * @return Full conversation snapshot [system, ...history, user].
-     * @internal
+     * @dg_internal
      * @version 2.0.1
      */
     std::vector<entropic::Message> append_user(const char* input) {
@@ -57,7 +57,7 @@ struct ConversationState {
      * @brief Append new messages from engine result.
      * @param result Full result from engine->run().
      * @param sent_len Number of messages sent (snapshot size).
-     * @internal
+     * @dg_internal
      * @version 2.0.1
      */
     void append_result(const std::vector<entropic::Message>& result,
@@ -69,7 +69,7 @@ struct ConversationState {
 
     /**
      * @brief Clear all messages (new session).
-     * @internal
+     * @dg_internal
      * @version 2.0.1
      */
     void clear() { messages.clear(); }
@@ -77,7 +77,7 @@ struct ConversationState {
     /**
      * @brief Get message count.
      * @return Number of messages.
-     * @internal
+     * @dg_internal
      * @version 2.0.1
      */
     size_t count() const { return messages.size(); }

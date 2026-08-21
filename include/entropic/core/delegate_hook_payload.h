@@ -13,7 +13,7 @@
  * a bad-UTF8 summary (simulating storage-loaded context, gh#112 interaction)
  * and confirm RED on unfixed code, GREEN on the v2.9.9 sink-guard fix.
  *
- * @internal Not part of the public API.
+ * @dg_internal Not part of the public API.
  * @version 2.9.9
  */
 

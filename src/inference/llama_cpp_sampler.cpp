@@ -13,8 +13,8 @@
  * Coverage of the LOGIC that consumes Samplers lives in
  * LlamaCppBackend tests (which mock the SamplerFactory).
  *
- * @internal
- * @internal
+ * @dg_internal
+ * @dg_internal
  * @version 2.3.10
  */
 
@@ -76,7 +76,7 @@ void add_grammar_sampler(llama_sampler* chain,
  * `llama_sampler_init_logit_bias`. No-op on empty map so the
  * pre-v2.3.16 chain shape stays bit-for-bit identical.
  * @utility
- * @internal
+ * @dg_internal
  * @version 2.3.16
  */
 void add_logit_bias_sampler(llama_sampler* chain,
@@ -102,7 +102,7 @@ void add_logit_bias_sampler(llama_sampler* chain,
  * v2.3.10 from `llama_cpp_backend.cpp` together with chain building.
  *
  * @utility
- * @internal
+ * @dg_internal
  * @version 2.3.10
  */
 uint32_t resolve_dist_seed(int caller_seed) {
@@ -117,7 +117,7 @@ uint32_t resolve_dist_seed(int caller_seed) {
 
 /**
  * @brief Construct an LlamaCppSampler wrapping a pre-built sampler chain.
- * @internal
+ * @dg_internal
  * @version 2.3.10
  */
 LlamaCppSampler::LlamaCppSampler(llama_sampler* chain, llama_context* ctx)
@@ -125,7 +125,7 @@ LlamaCppSampler::LlamaCppSampler(llama_sampler* chain, llama_context* ctx)
 
 /**
  * @brief Free the underlying llama.cpp sampler chain.
- * @internal
+ * @dg_internal
  * @version 2.3.10
  */
 LlamaCppSampler::~LlamaCppSampler() {
@@ -138,7 +138,7 @@ LlamaCppSampler::~LlamaCppSampler() {
 /**
  * @brief Sample one token from the current logits via the wrapped chain.
  * @return Sampled token id, or -1 if the chain or context is missing.
- * @internal
+ * @dg_internal
  * @version 2.3.10
  */
 int32_t LlamaCppSampler::sample() {
@@ -148,7 +148,7 @@ int32_t LlamaCppSampler::sample() {
 
 /**
  * @brief Reset stateful samplers (e.g. repeat-penalty history) on the chain.
- * @internal
+ * @dg_internal
  * @version 2.3.10
  */
 void LlamaCppSampler::reset() {
@@ -161,7 +161,7 @@ void LlamaCppSampler::reset() {
 
 /**
  * @brief Construct a factory bound to a llama_context + vocab.
- * @internal
+ * @dg_internal
  * @version 2.3.10
  */
 LlamaCppSamplerFactory::LlamaCppSamplerFactory(

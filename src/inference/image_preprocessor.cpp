@@ -220,7 +220,7 @@ PreprocessedImage ImagePreprocessor::preprocess_buffer(
  * @param len Byte count.
  * @param source Label for error messages.
  * @return Decoded image with RGB pixel data.
- * @internal
+ * @dg_internal
  * @version 1.9.11
  */
 PreprocessedImage ImagePreprocessor::decode(

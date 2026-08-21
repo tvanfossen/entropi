@@ -182,7 +182,7 @@ static void bind_opt_int(sqlite3_stmt* stmt, int idx,
 /**
  * @brief Construct with database file path.
  * @param db_path Path to SQLite file.
- * @internal
+ * @dg_internal
  * @version 1.8.8
  */
 SqliteStorageBackend::SqliteStorageBackend(
@@ -574,7 +574,7 @@ bool SqliteStorageBackend::search_conversations(
  *
  * @param s Prepared statement.
  * @param rec Delegation record (read-only).
- * @internal
+ * @dg_internal
  * @version 2.3.7
  */
 static void bind_delegation_insert(sqlite3_stmt* s,
@@ -613,7 +613,7 @@ static void bind_delegation_insert(sqlite3_stmt* s,
  * @param[out] child_conversation_id Cleared on rejection.
  * @return true if the parent is valid; false (and out params cleared)
  *         if empty.
- * @internal
+ * @dg_internal
  * @version 2.1.12
  */
 static bool guard_parent_conversation(

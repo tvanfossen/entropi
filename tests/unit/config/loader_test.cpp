@@ -1059,3 +1059,58 @@ SCENARIO("gh#133 mcp.plugins parses into MCPConfig::plugins",
         }
     }
 }
+
+SCENARIO("gh#133 fallout: the bundled default must not clobber explicit layers",
+         "[config][loader][cpu]")
+{
+    // CI-only failure that a developer machine hides. `load_layered` runs
+    // load_bundled_default AFTER load_project_layer whenever models.tiers is
+    // empty, and that fallback re-parses the ENTIRE default_config.yaml over
+    // the already-populated config — silently overwriting settings a
+    // higher-precedence layer established. data/default_config.yaml sets
+    // `mcp.enable_bash: true`, so a project asking for false gets true back.
+    //
+    // It passes on any machine whose ~/.entropic/config.yaml declares tiers,
+    // because then the fallback never fires. Every fresh install — and every
+    // CI runner — takes the broken path. REQ-CFG-001 says the most specific
+    // layer wins; this is that rule failing.
+    GIVEN("no global config, and a project layer that disables bash") {
+        const char* saved_home = std::getenv("HOME");
+        std::string home_backup = saved_home ? saved_home : "";
+
+        auto fake_home = std::filesystem::temp_directory_path()
+            / "entropic-no-global-config";
+        std::filesystem::remove_all(fake_home);
+        std::filesystem::create_directories(fake_home);
+        ::setenv("HOME", fake_home.c_str(), 1);
+
+        auto project_dir = std::filesystem::temp_directory_path()
+            / "entropic-project-beats-bundled";
+        std::filesystem::remove_all(project_dir);
+        std::filesystem::create_directories(project_dir);
+        std::ofstream out(project_dir / "config.local.yaml");
+        out << "mcp:\n  enable_bash: false\n";
+        out.close();
+
+        auto registry = load_test_registry();
+        entropic::ParsedConfig config;
+        auto err = entropic::config::load_layered(
+            project_dir, std::filesystem::path{}, registry, config);
+
+        if (home_backup.empty()) {
+            ::unsetenv("HOME");
+        } else {
+            ::setenv("HOME", home_backup.c_str(), 1);
+        }
+
+        THEN("the load succeeds") {
+            REQUIRE(err.empty());
+        }
+        THEN("the bundled fallback still supplies tiers — REQ-CFG-007") {
+            CHECK_FALSE(config.models.tiers.empty());
+        }
+        THEN("but it does NOT overwrite what the project layer set") {
+            CHECK_FALSE(config.mcp.enable_bash);
+        }
+    }
+}

@@ -81,7 +81,7 @@ struct Subcommand {
 
 /**
  * @brief Adapter for `version` which takes no args.
- * @internal
+ * @dg_internal
  * @return Subcommand exit code.
  * @version 2.0.5
  */

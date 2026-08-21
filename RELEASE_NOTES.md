@@ -2,6 +2,86 @@ _Last 10 releases. Older history: [OLD_NOTES.md](OLD_NOTES.md). Kept short
 because `gh release create --notes-file` hits GitHub's 125,000-char release
 body limit once this file accumulates full project history — see v2.9.3._
 
+# entropic v2.11.1
+
+Patch release — **a config bug that only ever hit fresh installs and CI, and the
+build gate that was hiding it.**
+
+Both defects were invisible on a developer machine by construction. That is the
+theme.
+
+## The bundled default outranked layers it should never have touched
+
+`load_layered` runs a bundled-default fallback when no model tiers are
+configured anywhere. It ran that fallback **after** the project layer, and it
+re-parsed the entire `data/default_config.yaml` straight over the
+already-populated config — so every setting an explicit, higher-precedence layer
+had established was silently overwritten by the layer that is supposed to be the
+*least* specific one.
+
+`default_config.yaml` sets `mcp.enable_bash: true`. A project config asking for
+`false` got `true` back. That is REQ-CFG-001's most-specific-layer-wins rule
+being broken from below.
+
+**Who this hit:** anyone with no `~/.entropic/config.yaml` declaring tiers —
+every fresh install, and every CI runner. On a machine that *does* have one, the
+fallback never fires and the bug cannot be observed.
+
+The fallback now parses into a scratch config and transplants only the model
+block. The condition that triggers it is a missing model set, so the model set
+is the only thing it may supply. `REQ-CFG-007` (usable configuration with no
+user config present) still holds and is pinned by its own assertion, so this
+cannot regress into the opposite bug.
+
+## doxygen-guard is pinned, and CI is green again
+
+The hook was on `rev: main`, a mutable ref. CI installs it fresh every run; a
+developer machine keeps whatever it cached. The two ran **different builds of
+the same tool** and disagreed about identical code — 3 violations on one, 578 on
+the other, same commit. The two builds even print different exemption
+vocabularies in their own error text, so the message could not be trusted to
+describe the build that produced it.
+
+Now pinned to `v1.4.2`. Upgrades become a deliberate, reviewed act.
+
+With the guard passing, CI reached the unit tests for the first time in over
+three weeks — which is how the config bug above was found. A gate that fails
+early hides everything behind it.
+
+## `@internal` → `@dg_internal`
+
+`@internal` is a reserved doxygen command; using it as a guard exemption
+overloaded a tag doxygen already owns. v1.4.2 defines its own
+(`EXEMPTION_TAGS = {"utility", "dg_internal", "callback"}`), so all 929
+occurrences across 108 files move to the tag the tool owns outright.
+
+Nothing is newly exempt — every one of these was already exempt under the old
+spelling, and the exemption ratio is unchanged.
+
+## Three documentation defects found underneath
+
+| | |
+|---|---|
+| `backend.cpp` | `evaluate_logprobs` had **two** `@return` tags; only the first was ever used, so the detailed one was dead text. Kept the detailed one. |
+| `filesystem.cpp` | two functions' docs **merged into one block** — an "apply string replacement" brief and its four params sat atop `count_occurrences`, documenting nothing. |
+| `external_bridge.h` | stale class `@version`. |
+
+## Distribution
+
+- CPU tarball: `entropic-2.11.1-linux-x86_64-cpu.tar.gz` (sha256 in companion file)
+- CUDA tarball: `entropic-2.11.1-linux-x86_64-cuda.tar.gz` (sha256 in companion file)
+- Python wrapper: `pip install entropic-engine==2.11.1` then `entropic install-engine`
+
+## Known limitations
+
+- Patch release: unit tests only per the version gate. The v2.11.0 model-suite
+  result (74/74, 0 skipped, 0 failed) stands; no engine inference path changed
+  here.
+- `docs/roadmap.md` still reports a stale "Current State" and is not maintained
+  alongside GitHub issues.
+
+---
+
 # entropic v2.11.0
 
 Minor release — **the requirements catalog is back and enforced, and four
