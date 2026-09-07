@@ -527,11 +527,13 @@ void ToolExecutor::record_tool_history(const ToolCall& call,
  * @return "<tool name>:<sorted arguments JSON>" — the identity a
  *         repeated call is recognised by.
  * @req REQ-MCP-015
- * @version 1.8.5
+ * @version 2.12.0
  */
 std::string ToolExecutor::tool_call_key(const ToolCall& call) {
-    // Sort arguments for consistent key
-    nlohmann::json args;
+    // Sort arguments for consistent key. gh#143: seed an OBJECT, not a
+    // default-constructed null — an argument-free call would otherwise
+    // key as "<name>:null" instead of "<name>:{}".
+    nlohmann::json args = nlohmann::json::object();
     for (const auto& [k, v] : call.arguments) {
         args[k] = v;
     }
@@ -1273,19 +1275,35 @@ Message ToolExecutor::create_duplicate_message(
  * over the string-only arguments map. Without this, boolean/integer values
  * get serialized as strings and crash tools that expect typed values.
  *
+ * gh#143 (v2.12.0): the accumulator is seeded as an explicit OBJECT.
+ * `nlohmann::json args;` default-constructs to NULL, and the loop below
+ * only coerces it to an object when the map is non-empty — so an
+ * argument-free call serialised to the four characters `null`.
+ * `json::parse("null")` then SUCCEEDS (it is valid JSON), schema
+ * validation waves it through whenever the tool declares no required
+ * fields, and the first `.value()` inside the server throws
+ * type_error.306 straight out of dispatch, killing the whole run.
+ * `git.diff` with no arguments is a legitimate call shape, so this was
+ * reachable from any model on any turn.
+ *
+ * The entrance is bounded (one function) where the exits are not (28
+ * `.value()` sites across five servers), which is the guard architecture
+ * decision #56 prescribes for a recurring defect class.
+ *
  * @param call Tool call.
  * @return The parse-preserved arguments_json when the call carries one;
  *         otherwise the string-only arguments map serialised as a JSON
- *         object. This is the string schema validation, permission
- *         patterns and duplicate keys are all computed from.
+ *         object — `{}` when the map is empty, never `null`. This is the
+ *         string schema validation, permission patterns and duplicate
+ *         keys are all computed from.
  * @req REQ-MCP-013
- * @version 2.0.4
+ * @version 2.12.0
  */
 std::string ToolExecutor::serialize_args(const ToolCall& call) {
     if (!call.arguments_json.empty()) {
         return call.arguments_json;
     }
-    nlohmann::json args;
+    nlohmann::json args = nlohmann::json::object();
     for (const auto& [k, v] : call.arguments) {
         args[k] = v;
     }

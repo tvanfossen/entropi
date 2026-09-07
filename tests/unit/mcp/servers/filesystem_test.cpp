@@ -862,11 +862,31 @@ SCENARIO("gh#116: read_file with a directory path returns is_directory error",
 }
 
 TEST_CASE("test_path_security_rejects_traversal",
-          "[filesystem]") {
+          "[filesystem][gh143][2.12.0]") {
     /**
      * @brief Attempt path traversal and verify rejection.
+     *
+     * The security property under test is that the traversal is REJECTED
+     * and nothing outside the root is read. That property is unchanged.
+     *
+     * What changed in v2.12.0 (gh#143) is the delivery mechanism. The
+     * FilesystemServer still refuses the path and still never opens the
+     * file — the refusal is now reported to the model as a tool error
+     * instead of unwinding as an exception that aborted the whole run.
+     * That is the point of gh#143: an unhandled throw from a tool killed
+     * the conversation, and a denial the model cannot see is a denial it
+     * cannot correct.
+     *
+     * The assertions below are deliberately STRONGER than the
+     * REQUIRE_THROWS_AS they replace: they pin the refusal, the absence
+     * of any leaked content, and the absence of a ContextAnchor. That
+     * last one is not hypothetical — the first cut of the gh#143 barrier
+     * sat in ToolRegistry::dispatch, which let `inject_anchor_if_needed`
+     * run on the rejected path and anchor `../../etc/passwd` into context
+     * as though it had been read. This test caught it.
+     *
      * @internal
-     * @version 1.8.5
+     * @version 2.12.0
      */
     TempDir tmp;
     auto server = make_server(tmp.path());
@@ -874,9 +894,26 @@ TEST_CASE("test_path_security_rejects_traversal",
     json args;
     args["path"] = "../../etc/passwd";
 
-    REQUIRE_THROWS_AS(
-        server.execute("read_file", args.dump()),
-        std::runtime_error);
+    std::string envelope_str;
+    REQUIRE_NOTHROW(
+        envelope_str = server.execute("read_file", args.dump()));
+
+    auto envelope = json::parse(envelope_str);
+    auto result = raw_result(envelope_str);
+
+    // The traversal is refused, and the refusal says so.
+    CHECK(result.find("Path escapes project root") != std::string::npos);
+
+    // Nothing outside the root leaked into the response. Match on a
+    // passwd-record shape rather than "root:", which occurs innocently
+    // inside the refusal text "Path escapes project root: ...".
+    CHECK(result.find("x:0:0") == std::string::npos);
+    CHECK(result.find("/bin/") == std::string::npos);
+
+    // A rejected path must not be anchored into context.
+    REQUIRE(envelope.contains("directives"));
+    REQUIRE(envelope["directives"].is_array());
+    CHECK(envelope["directives"].empty());
 }
 
 TEST_CASE("test_read_file_anchor_key", "[filesystem]") {

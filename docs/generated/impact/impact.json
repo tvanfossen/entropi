@@ -1,34 +1,77 @@
 [
   {
-    "req_id": "REQ-CFG-001",
-    "req_name": "Layered configuration resolution with most-specific-layer-wins precedence",
+    "req_id": "REQ-MCP-001",
+    "req_name": "MCPServerBase holds the shared logic; concrete servers override only deltas",
     "functions": [
       {
-        "name": "load_layered",
-        "file": "src/config/loader.cpp",
-        "version": "2.11.1"
+        "name": "execute",
+        "file": "src/mcp/server_base.cpp",
+        "version": "2.12.0"
       }
     ]
   },
   {
-    "req_id": "REQ-CFG-002",
-    "req_name": "Whole-block replace semantics for models and routing across layers",
+    "req_id": "REQ-MCP-002",
+    "req_name": "Tool results always cross boundaries as a ServerResponse JSON envelope",
     "functions": [
       {
-        "name": "load_layered",
-        "file": "src/config/loader.cpp",
-        "version": "2.11.1"
+        "name": "execute",
+        "file": "src/mcp/server_base.cpp",
+        "version": "2.12.0"
+      },
+      {
+        "name": "dispatch",
+        "file": "src/mcp/tool_registry.cpp",
+        "version": "2.0.0"
       }
     ]
   },
   {
-    "req_id": "REQ-CFG-007",
-    "req_name": "Usable configuration with no user config present",
+    "req_id": "REQ-MCP-003",
+    "req_name": "ToolRegistry dispatch is defensive about unknown and null tools",
     "functions": [
       {
-        "name": "load_layered",
-        "file": "src/config/loader.cpp",
-        "version": "2.11.1"
+        "name": "dispatch",
+        "file": "src/mcp/tool_registry.cpp",
+        "version": "2.0.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-MCP-013",
+    "req_name": "Tool arguments are validated against the declared JSON schema before dispatch",
+    "functions": [
+      {
+        "name": "normalize_args",
+        "file": "src/mcp/server_base.cpp",
+        "version": "2.12.0"
+      },
+      {
+        "name": "serialize_args",
+        "file": "src/mcp/tool_executor.cpp",
+        "version": "2.12.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-MCP-015",
+    "req_name": "Duplicates, errors, and denials return corrective guidance, not bare failure",
+    "functions": [
+      {
+        "name": "tool_call_key",
+        "file": "src/mcp/tool_executor.cpp",
+        "version": "2.12.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-MCP-024",
+    "req_name": "Engine-level entropic.* tools validate their arguments and emit typed directives",
+    "functions": [
+      {
+        "name": "execute",
+        "file": "src/mcp/servers/entropic_server.cpp",
+        "version": "2.12.0"
       }
     ]
   }

@@ -139,3 +139,38 @@ TEST_CASE("context_inspect without provider returns error",
         server.execute("context_inspect", R"({})"));
     REQUIRE(r.find("Error") != std::string::npos);
 }
+
+// ── gh#143: argument-free / non-object arguments ────────────────
+
+TEST_CASE("gh#143: context_inspect survives non-object arguments",
+          "[context_inspect][gh143][regression][2.12.0]") {
+    /**
+     * @brief The gh#33 coercion guard reached InspectTool but never its
+     *        sibling ContextInspectTool, so an argument-free call threw
+     *        type_error.306 here even after gh#33 was closed.
+     *
+     * "null" is the load-bearing case: a NON-THROWING parse of those four
+     * characters yields a NULL value, not a discarded one, so the
+     * is_discarded() half of the guard does not fire — only !is_object()
+     * catches it. That distinction is why this survived.
+     *
+     * @internal
+     * @version 2.12.0
+     */
+    EntropicServer server({"lead", "eng"}, TEST_DATA_DIR);
+    auto prov = make_ctx_provider();
+    server.set_state_provider(prov);
+
+    // Each of these previously threw out of dispatch and killed the run.
+    REQUIRE_NOTHROW(server.execute("context_inspect", "null"));
+    REQUIRE_NOTHROW(server.execute("context_inspect", ""));
+    REQUIRE_NOTHROW(server.execute("context_inspect", "not-json"));
+    REQUIRE_NOTHROW(server.execute("context_inspect", "[1,2,3]"));
+    REQUIRE_NOTHROW(server.execute("context_inspect", "42"));
+
+    // And "null" behaves exactly like "{}" — max_messages falls back to
+    // its default rather than erroring.
+    auto from_null = get_result(server.execute("context_inspect", "null"));
+    auto from_empty_obj = get_result(server.execute("context_inspect", "{}"));
+    CHECK(from_null == from_empty_obj);
+}

@@ -103,6 +103,10 @@ std::vector<const ToolDefinition*> ToolRegistry::get_definitions() const {
  * An unregistered name is answered with an error ServerResponse — the
  * missing tool is never dereferenced.
  *
+ * A throwing tool is NOT handled here — the barrier sits one level up in
+ * MCPServerBase::execute (gh#143), because a throw must also skip the
+ * automatic ContextAnchor injection that follows this call.
+ *
  * @param name Tool name (without server prefix).
  * @param args_json JSON arguments string.
  * @return The tool's own ServerResponse when the name resolves;

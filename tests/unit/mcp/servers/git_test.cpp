@@ -278,3 +278,51 @@ TEST_CASE("Git reset rolls back a staged change",
         REQUIRE(true);
     }
 }
+
+// ── gh#143: the reported reproduction ───────────────────
+
+TEST_CASE("gh#143: git.diff with no arguments does not throw",
+          "[git][gh143][regression][2.12.0]") {
+    /**
+     * @brief The exact call shape from the consumer's report.
+     *
+     * `git.diff` declares no required fields, so schema validation passes
+     * an argument-free call straight through to execute(), where
+     * `args.value("staged", false)` met a JSON null and threw
+     * type_error.306 out of dispatch — taking the whole run with it.
+     *
+     * Every other server test in this corpus passes "{}"; none passed
+     * "null", which is why a defect reachable from any model on any turn
+     * survived to a consumer. The literals below are the gap.
+     *
+     * @internal
+     * @version 2.12.0
+     */
+    TempGitRepo repo;
+    auto server = make_git_server(repo);
+
+    // Nothing below may escape as an exception.
+    REQUIRE_NOTHROW(server.execute("diff", "null"));
+    REQUIRE_NOTHROW(server.execute("diff", ""));
+    REQUIRE_NOTHROW(server.execute("diff", "[1,2]"));
+    REQUIRE_NOTHROW(server.execute("diff", "not-json"));
+
+    const auto baseline = parse_result(server.execute("diff", "{}"));
+
+    // "no arguments", spelled two ways, both mean {} — `staged` falls back
+    // to its default exactly as it does for "{}". MCP treats a call's
+    // `arguments` as optional and clients serialise absent as null, so this
+    // is a well-formed statement, not a malformed one.
+    CHECK(parse_result(server.execute("diff", "null")) == baseline);
+    CHECK(parse_result(server.execute("diff", "")) == baseline);
+
+    // An array, a scalar, or unparseable input is a CALLER ERROR and is
+    // deliberately NOT rewritten to {}. Substituting a silent default there
+    // would mean the sender is never told it sent something wrong. Each must
+    // still be survivable — a tool error, never an escaping exception.
+    for (const auto* bad : {"[1,2]", "42", "not-json"}) {
+        const auto out = parse_result(server.execute("diff", bad));
+        CHECK(out != baseline);
+        CHECK(out.find("Error") != std::string::npos);
+    }
+}
