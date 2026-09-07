@@ -595,9 +595,29 @@
 
     thread B THEN the run terminates early rather than blocking on the API mutex.
 
+    GIVEN a run in flight on a handle WHEN a second run is entered on the same
+
+    handle from any thread THEN it returns ENTROPIC_ERROR_ALREADY_RUNNING and does
+
+    not touch the conversation; GIVEN that rejection THEN entropic_interrupt
+
+    remains callable without blocking, because the claim is a compare-exchange and
+
+    not a lock.
+
     '
   verified_by: 'TEST_CASE("entropic_run rejects NULL handle") / ("entropic_run on unconfigured
     handle returns INVALID_STATE") — tests/unit/api/entropic_capi_test.cpp
+
+    gh#144 (v2.12.0), the turn-claim mechanism the six entry points share:
+    SCENARIO("gh#144: a second turn cannot start while one is in flight"),
+    SCENARIO("gh#144: exactly one of many racing claimants wins"),
+    SCENARIO("gh#144: run_turn nested under an outer claim does not release it"),
+    SCENARIO("gh#144: an unclaimed run_turn still reports itself running")
+    — tests/unit/core/turn_exclusion_test.cpp. These are CPU-only and cover the
+    claim itself; the facade-level assertion that ENTROPIC_ERROR_ALREADY_RUNNING
+    reaches a caller needs a CONFIGURED handle (a model load) and therefore lands
+    in the gh#144 model suite rather than here.
 
     TEST_CASE("entropic_run_streaming rejects NULL handle") / ("... on unconfigured handle
     returns INVALID_STATE") — tests/unit/api/entropic_capi_test.cpp
@@ -613,7 +633,7 @@
     SCENARIO("gh#93: entropic_interrupt stops a long run early (cancel-bridge)") — tests/model/test_gh93_behavioral.cpp
 
     '
-  version: 2.10.4
+  version: 2.12.0
 - id: REQ-API-010
   name: Observer and callback slots survive configure and fire uniformly
   module: Public C API and Facade

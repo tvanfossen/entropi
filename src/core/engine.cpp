@@ -2858,14 +2858,22 @@ void AgentEngine::set_session_logger(SessionLogger* log) {
  * @param input User input string.
  * @return Result messages from engine.
  * @req REQ-LOOP-001
- * @version 2.8.0
+ * @version 2.12.0
  */
 std::vector<Message> AgentEngine::run_turn(const std::string& input) {
     // gh#40 (v2.1.10): the drain loop turns mid-generation queued user
     // messages into subsequent turns at this single top-level COMPLETE
     // boundary. running_flag_ lets the facade reject
     // entropic_queue_user_message with INVALID_STATE when idle.
-    running_flag_.store(true);
+    //
+    // gh#144 (v2.12.0): claim only if the caller has not already. The
+    // facade claims BEFORE calling in, and must keep the claim until it
+    // has finished serialising results out of conversation_ — if this
+    // function released the flag on its way out, a second thread could
+    // start appending to that vector while the first was still reading it.
+    // A direct engine caller (tests, embedders) still gets is_running()
+    // set for the duration, preserving the gh#40 contract.
+    const bool owns_turn = try_begin_turn();
     if (conversation_.empty() && !system_prompt_.empty()) {
         Message sys;
         sys.role = "system";
@@ -2873,7 +2881,7 @@ std::vector<Message> AgentEngine::run_turn(const std::string& input) {
         conversation_.push_back(std::move(sys));
     }
     auto result = run_drain_loop(input, /*tier_override=*/"");
-    running_flag_.store(false);
+    if (owns_turn) { end_turn(); }
     return result;
 }
 
@@ -2892,14 +2900,16 @@ std::vector<Message> AgentEngine::run_turn(const std::string& input) {
  * @param input User input string.
  * @return Result messages.
  * @req REQ-IDEN-001
- * @version 2.8.0
+ * @version 2.12.0
  */
 std::vector<Message> AgentEngine::run_turn_as(const std::string& tier,
                                               const std::string& input) {
-    running_flag_.store(true);
+    // gh#144 (v2.12.0): see run_turn(const std::string&) — claim only if
+    // the caller has not already.
+    const bool owns_turn = try_begin_turn();
     seed_system_prompt_for_tier(tier);
     auto result = run_drain_loop(input, tier);
-    running_flag_.store(false);
+    if (owns_turn) { end_turn(); }
     return result;
 }
 
@@ -3020,14 +3030,15 @@ bool AgentEngine::prepare_next_turn(std::vector<Message>& pending) {
  * @param new_messages Messages to add this turn.
  * @return Full result messages from the engine loop.
  * @req REQ-LOOP-001
- * @version 2.3.7
+ * @version 2.12.0
  */
 std::vector<Message> AgentEngine::run_turn(std::vector<Message> new_messages) {
     // gh#40 (v2.1.10): mirror the single-string overload's drain
     // loop. Queued messages enqueued via entropic_queue_user_message
     // become subsequent plain-text user turns at this top-level
     // boundary (no content_parts — the queue ABI is text-only).
-    running_flag_.store(true);
+    // gh#144 (v2.12.0): see run_turn(const std::string&).
+    const bool owns_turn = try_begin_turn();
     seed_system_prompt(new_messages);
     std::vector<Message> pending = std::move(new_messages);
     std::vector<Message> result;
@@ -3042,7 +3053,7 @@ std::vector<Message> AgentEngine::run_turn(std::vector<Message> new_messages) {
         }
         if (!prepare_next_turn(pending)) { break; }
     }
-    running_flag_.store(false);
+    if (owns_turn) { end_turn(); }
     return result;
 }
 

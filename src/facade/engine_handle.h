@@ -183,4 +183,89 @@ private:
     entropic::log::HandleLogScope log_scope_;
 };
 
+/**
+ * @brief gh#144 (v2.12.0): RAII turn claim + log scope, for the RUN paths.
+ *
+ * Sibling of HandleApiLock, and deliberately NOT built on it. HandleApiLock
+ * takes `api_mutex`; gh#109 removed that mutex from all six run entry points
+ * precisely so a long turn could not block `entropic_interrupt()` called from
+ * another thread. Reusing it here would silently re-break gh#109, which is
+ * the single mistake this refactor is most likely to make — hence a separate
+ * type rather than a subclass or a flag.
+ *
+ * The claim is one compare-exchange on the engine's `running_flag_`. A second
+ * thread interrupting a 40-second turn still touches only atomics.
+ *
+ * Usage at every run entry point:
+ * @code
+ *   HandleTurnGuard turn(handle);
+ *   if (!turn.claimed()) { return ENTROPIC_ERROR_ALREADY_RUNNING; }
+ * @endcode
+ *
+ * Holding the claim across the WHOLE entry point — not just the engine call —
+ * is the point: the facade serialises results out of the same conversation
+ * the engine appends to, so releasing early would let a second thread mutate
+ * that vector mid-read. That is the race gh#144 reported.
+ *
+ * @req REQ-API-009
+ * @version 2.12.0
+ */
+class HandleTurnGuard {
+public:
+    /**
+     * @brief Enter the handle's log scope. Does NOT claim the turn.
+     *
+     * Construction is deliberately side-effect-free beyond logging so the
+     * guard can be declared ahead of argument validation; claim() is then
+     * evaluated last in the precondition chain. A call that is going to be
+     * rejected for a null argument must not momentarily claim the engine and
+     * bounce a legitimate concurrent caller.
+     *
+     * Null-handle safe: log id 0 is the reserved "no handle scope" sentinel.
+     *
+     * @param h Engine handle, possibly null.
+     * @version 2.12.0
+     */
+    explicit HandleTurnGuard(entropic_handle_t h)
+        : engine_(h != nullptr ? h->engine.get() : nullptr),
+          log_scope_(h != nullptr ? h->log_id : 0) {}
+
+    /**
+     * @brief Release the turn if this guard claimed it.
+     * @version 2.12.0
+     */
+    ~HandleTurnGuard() {
+        if (claimed_) { engine_->end_turn(); }
+    }
+
+    HandleTurnGuard(const HandleTurnGuard&) = delete;
+    HandleTurnGuard& operator=(const HandleTurnGuard&) = delete;
+
+    /**
+     * @brief Claim the turn. Idempotent for one guard.
+     * @return true when this guard now owns the turn; false when another
+     *         turn is already in flight on this handle.
+     * @req REQ-API-009
+     * @version 2.12.0
+     */
+    bool claim() {
+        if (!claimed_ && engine_ != nullptr) {
+            claimed_ = engine_->try_begin_turn();
+        }
+        return claimed_;
+    }
+
+    /**
+     * @brief Whether this guard owns the turn.
+     * @utility
+     * @version 2.12.0
+     */
+    bool claimed() const { return claimed_; }
+
+private:
+    entropic::AgentEngine* engine_;
+    entropic::log::HandleLogScope log_scope_;
+    bool claimed_ = false;
+};
+
 }  // namespace entropic

@@ -598,6 +598,41 @@ public:
     bool is_running() const { return running_flag_.load(); }
 
     /**
+     * @brief Try to claim the engine for one turn (gh#144, v2.12.0).
+     *
+     * A single compare-exchange on `running_flag_` — deliberately NOT a
+     * mutex. gh#109 removed `api_mutex` from every run entry point so a
+     * long turn could not block `entropic_interrupt()` called from another
+     * thread, and that property must survive: a second thread interrupting
+     * a 40-second turn must touch only atomics. Reintroducing a lock on
+     * this path would silently re-break gh#109.
+     *
+     * Until v2.12.0 nothing claimed at all. `ENTROPIC_ERROR_ALREADY_RUNNING`
+     * was declared, documented on two run entry points, and returned from
+     * nowhere; two concurrent runs raced into the shared conversation
+     * vector and decoded on one llama_context (gh#144).
+     *
+     * @return true when this caller now owns the turn and MUST call
+     *         end_turn(); false when a turn is already in flight, in which
+     *         case the caller owns nothing and must not release.
+     * @req REQ-API-009
+     * @version 2.12.0
+     */
+    bool try_begin_turn() {
+        bool expected = false;
+        return running_flag_.compare_exchange_strong(expected, true);
+    }
+
+    /**
+     * @brief Release a turn claimed by try_begin_turn (gh#144, v2.12.0).
+     *
+     * Only the caller whose try_begin_turn() returned true may call this.
+     * @req REQ-API-009
+     * @version 2.12.0
+     */
+    void end_turn() { running_flag_.store(false); }
+
+    /**
      * @brief Register an observer that fires when a queued user
      *        message is consumed and seeded as the next turn.
      *
