@@ -1,277 +1,46 @@
 [
   {
-    "req_id": "REQ-ABI-001",
-    "req_name": "Pure C at every .so boundary \u2014 opaque handles and explicit ownership",
+    "req_id": "REQ-BRIDGE-001",
+    "req_name": "External bridge exposes the engine over a peer-authenticated unix socket",
     "functions": [
       {
-        "name": "entropic_context_clear",
-        "file": "src/facade/entropic.cpp",
-        "version": "2.0.1"
-      }
-    ]
-  },
-  {
-    "req_id": "REQ-ABI-002",
-    "req_name": "C++ exceptions never cross any .so boundary",
-    "functions": [
-      {
-        "name": "entropic_run",
-        "file": "src/facade/entropic.cpp",
+        "name": "handle_status",
+        "file": "src/facade/external_bridge.cpp",
         "version": "2.12.0"
       },
       {
-        "name": "entropic_run_batch",
-        "file": "src/facade/entropic.cpp",
+        "name": "dispatch_ask",
+        "file": "src/facade/external_bridge.cpp",
         "version": "2.12.0"
       },
       {
-        "name": "entropic_run_streaming",
-        "file": "src/facade/entropic.cpp",
+        "name": "dispatch_tool",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.12.0-rc1"
+      },
+      {
+        "name": "begin_turn_wait",
+        "file": "src/facade/external_bridge.cpp",
         "version": "2.12.0"
       },
       {
-        "name": "entropic_run_messages",
-        "file": "src/facade/entropic.cpp",
+        "name": "end_turn_wait",
+        "file": "src/facade/external_bridge.cpp",
         "version": "2.12.0"
       },
       {
-        "name": "entropic_run_messages_streaming",
-        "file": "src/facade/entropic.cpp",
-        "version": "2.12.0"
-      }
-    ]
-  },
-  {
-    "req_id": "REQ-API-002",
-    "req_name": "Handle lifecycle \u2014 create, configure, destroy, NULL-safe teardown",
-    "functions": [
-      {
-        "name": "entropic_run",
-        "file": "src/facade/entropic.cpp",
-        "version": "2.12.0"
-      }
-    ]
-  },
-  {
-    "req_id": "REQ-API-005",
-    "req_name": "Uniform precondition guard on every exported entry point",
-    "functions": [
-      {
-        "name": "entropic_run",
-        "file": "src/facade/entropic.cpp",
-        "version": "2.12.0"
+        "name": "stop",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.1.2"
       },
       {
-        "name": "entropic_run_as",
-        "file": "src/facade/entropic.cpp",
-        "version": "2.12.0"
+        "name": "accept_loop",
+        "file": "src/facade/external_bridge.cpp",
+        "version": "2.1.7"
       },
       {
-        "name": "entropic_run_batch",
-        "file": "src/facade/entropic.cpp",
-        "version": "2.12.0"
-      },
-      {
-        "name": "entropic_run_streaming",
-        "file": "src/facade/entropic.cpp",
-        "version": "2.12.0"
-      },
-      {
-        "name": "entropic_run_messages",
-        "file": "src/facade/entropic.cpp",
-        "version": "2.12.0"
-      },
-      {
-        "name": "entropic_run_messages_streaming",
-        "file": "src/facade/entropic.cpp",
-        "version": "2.12.0"
-      },
-      {
-        "name": "entropic_set_queue_observer",
-        "file": "src/facade/entropic.cpp",
-        "version": "2.1.10"
-      },
-      {
-        "name": "entropic_context_clear",
-        "file": "src/facade/entropic.cpp",
-        "version": "2.0.1"
-      },
-      {
-        "name": "entropic_context_get",
-        "file": "src/facade/entropic.cpp",
-        "version": "2.12.0"
-      }
-    ]
-  },
-  {
-    "req_id": "REQ-API-008",
-    "req_name": "Single cross-boundary allocator pair and explicit ownership transfer",
-    "functions": [
-      {
-        "name": "entropic_run",
-        "file": "src/facade/entropic.cpp",
-        "version": "2.12.0"
-      },
-      {
-        "name": "entropic_run_as",
-        "file": "src/facade/entropic.cpp",
-        "version": "2.12.0"
-      },
-      {
-        "name": "entropic_run_batch",
-        "file": "src/facade/entropic.cpp",
-        "version": "2.12.0"
-      },
-      {
-        "name": "entropic_run_messages",
-        "file": "src/facade/entropic.cpp",
-        "version": "2.12.0"
-      },
-      {
-        "name": "entropic_context_get",
-        "file": "src/facade/entropic.cpp",
-        "version": "2.12.0"
-      }
-    ]
-  },
-  {
-    "req_id": "REQ-API-009",
-    "req_name": "Run entry-point family, result contract, and cross-thread interruptibility",
-    "functions": [
-      {
-        "name": "try_begin_turn",
-        "file": "include/entropic/core/engine.h",
-        "version": "2.12.0"
-      },
-      {
-        "name": "end_turn",
-        "file": "include/entropic/core/engine.h",
-        "version": "2.12.0"
-      },
-      {
-        "name": "claim",
-        "file": "src/facade/engine_handle.h",
-        "version": "2.12.0"
-      },
-      {
-        "name": "entropic_run",
-        "file": "src/facade/entropic.cpp",
-        "version": "2.12.0"
-      },
-      {
-        "name": "entropic_run_as",
-        "file": "src/facade/entropic.cpp",
-        "version": "2.12.0"
-      },
-      {
-        "name": "entropic_run_batch",
-        "file": "src/facade/entropic.cpp",
-        "version": "2.12.0"
-      },
-      {
-        "name": "entropic_run_streaming",
-        "file": "src/facade/entropic.cpp",
-        "version": "2.12.0"
-      },
-      {
-        "name": "entropic_run_messages",
-        "file": "src/facade/entropic.cpp",
-        "version": "2.12.0"
-      },
-      {
-        "name": "entropic_run_messages_streaming",
-        "file": "src/facade/entropic.cpp",
-        "version": "2.12.0"
-      }
-    ]
-  },
-  {
-    "req_id": "REQ-API-010",
-    "req_name": "Observer and callback slots survive configure and fire uniformly",
-    "functions": [
-      {
-        "name": "entropic_run",
-        "file": "src/facade/entropic.cpp",
-        "version": "2.12.0"
-      },
-      {
-        "name": "entropic_run_as",
-        "file": "src/facade/entropic.cpp",
-        "version": "2.12.0"
-      },
-      {
-        "name": "entropic_run_streaming",
-        "file": "src/facade/entropic.cpp",
-        "version": "2.12.0"
-      },
-      {
-        "name": "entropic_set_queue_observer",
-        "file": "src/facade/entropic.cpp",
-        "version": "2.1.10"
-      }
-    ]
-  },
-  {
-    "req_id": "REQ-IDEN-001",
-    "req_name": "Tier resolution contract and per-tier loop overrides",
-    "functions": [
-      {
-        "name": "run_turn_as",
-        "file": "src/core/engine.cpp",
-        "version": "2.12.0"
-      }
-    ]
-  },
-  {
-    "req_id": "REQ-INFER-018",
-    "req_name": "Same-prefix batch generation is gated, per-request-constrained and seq-safe",
-    "functions": [
-      {
-        "name": "entropic_run_batch",
-        "file": "src/facade/entropic.cpp",
-        "version": "2.12.0"
-      }
-    ]
-  },
-  {
-    "req_id": "REQ-INFER-025",
-    "req_name": "Multimodal input is bounded, tier-gated and degrades gracefully",
-    "functions": [
-      {
-        "name": "entropic_run_messages",
-        "file": "src/facade/entropic.cpp",
-        "version": "2.12.0"
-      },
-      {
-        "name": "entropic_run_messages_streaming",
-        "file": "src/facade/entropic.cpp",
-        "version": "2.12.0"
-      }
-    ]
-  },
-  {
-    "req_id": "REQ-LOOP-001",
-    "req_name": "Agent state machine with observable, dual-channel transitions",
-    "functions": [
-      {
-        "name": "run_turn",
-        "file": "src/core/engine.cpp",
-        "version": "2.12.0"
-      },
-      {
-        "name": "run_turn",
-        "file": "src/core/engine.cpp",
-        "version": "2.12.0"
-      }
-    ]
-  },
-  {
-    "req_id": "REQ-SAFE-001",
-    "req_name": "Untrusted bytes are sanitized at ingress, never at egress",
-    "functions": [
-      {
-        "name": "entropic_context_get",
-        "file": "src/facade/entropic.cpp",
+        "name": "run_async_ask",
+        "file": "src/facade/external_bridge.cpp",
         "version": "2.12.0"
       }
     ]

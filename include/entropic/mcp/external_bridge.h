@@ -47,9 +47,11 @@
 
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <filesystem>
 #include <memory>
 #include <mutex>
+#include <set>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -75,10 +77,11 @@ namespace entropic {
  * monitors can use inotify rather than parsing log output.
  *
  * gh#145 (v2.12.0): exposes config() so the tool-name handlers can read the
- * consumer's configured namespace.
+ * consumer's configured namespace. gh#144 (v2.12.0): owns the FIFO turn queue
+ * that serialises every caller reaching the engine.
  *
  * @dg_internal
- * @version 2.12.0
+ * @version 2.12.0-rc1
  */
 class ENTROPIC_EXPORT ExternalBridge {
 public:
@@ -143,6 +146,78 @@ public:
      * @version 2.12.0
      */
     const ExternalMCPConfig& config() const { return config_; }
+
+    // ── Turn queue (gh#144, v2.12.0) ─────────────────────────
+
+    /**
+     * @brief Take a ticket and wait for this caller's turn on the engine.
+     *
+     * The engine admits one turn at a time and refuses the loser with
+     * ENTROPIC_ERROR_ALREADY_RUNNING (gh#144 stage 1). A refusal is the right
+     * contract for a direct C API consumer, but the wrong one for a shared
+     * host: several MCP clients on one engine want to QUEUE, which is the
+     * whole point of one resident model. This serialises them here so the
+     * engine's refusal is never reached from the bridge.
+     *
+     * FIFO by ticket rather than a bare mutex: a mutex gives no fairness
+     * guarantee (a caller can starve), no observable depth, and no way to
+     * bound the wait — and MCP clients have their own timeouts, so blocking
+     * one indefinitely is worse than telling it the truth.
+     *
+     * @param timeout_ms Give up after this long and let the caller report a
+     *                   busy engine rather than hang.
+     * @param waited_ms_out Optional; receives the time actually spent waiting.
+     * @return true when it is this caller's turn — the caller MUST then call
+     *         end_turn_wait(). false on timeout, owning nothing.
+     * @req REQ-BRIDGE-001
+     * @version 2.12.0
+     */
+    bool begin_turn_wait(long timeout_ms, long* waited_ms_out);
+
+    /**
+     * @brief Hand the turn to the next ticket in line.
+     * @req REQ-BRIDGE-001
+     * @version 2.12.0
+     */
+    void end_turn_wait();
+
+    /**
+     * @brief Mark an async task failed because its turn never came (gh#144).
+     * @param task_id Task that gave up waiting.
+     * @param waited_ms How long it waited before giving up.
+     * @utility
+     * @version 2.12.0
+     */
+    void fail_task_engine_busy(const std::string& task_id, long waited_ms);
+
+    /**
+     * @brief Record an async task's terminal state and write its sentinel.
+     * @param task_id Task reaching a terminal state.
+     * @param status Terminal status string.
+     * @param phase Terminal phase string.
+     * @param text Result or error text.
+     * @utility
+     * @version 2.12.0
+     */
+    void commit_async_final_state(const std::string& task_id,
+                                  const std::string& status,
+                                  const std::string& phase,
+                                  const std::string& text);
+
+    /**
+     * @brief How many callers are waiting behind the one in flight.
+     * @return Queue depth, excluding the caller currently running.
+     * @utility
+     * @version 2.12.0
+     */
+    size_t turn_queue_depth() const { return waiters_.load(); }
+
+    /**
+     * @brief Whether a turn is currently running on the engine.
+     * @utility
+     * @version 2.12.0
+     */
+    bool turn_in_flight() const { return turn_busy_.load(); }
 
     /**
      * @brief Handle entropic.ask_status — check async task state.
@@ -408,6 +483,27 @@ private:
 
     entropic_handle_t handle_;                 ///< Engine handle (not owned)
     ExternalMCPConfig config_;                 ///< Config snapshot
+
+    // ── Turn queue (gh#144, v2.12.0) ─────────────────────────
+    // Serialises every path that reaches the engine — sync ask, streaming
+    // ask, AND the detached async worker. Missing the async path would let
+    // an async ask bypass the queue and collide with a sync one, earning an
+    // ALREADY_RUNNING where the caller expected to be queued.
+    //
+    // Nothing else on the bridge may take turn_mutex_. In particular
+    // handle_clear -> cancel_inflight_async_tasks raises the engine
+    // interrupt, and must NOT wait behind the turn it is trying to cancel —
+    // that would be gh#109's failure one layer up. It reaches the engine
+    // through entropic_context_clear (api_mutex), which runs never take.
+    mutable std::mutex turn_mutex_;            ///< Guards the ticket counters
+    std::condition_variable turn_cv_;          ///< Signalled when a turn ends
+    uint64_t next_ticket_ = 0;                 ///< Next ticket to hand out
+    uint64_t now_serving_ = 0;                 ///< Ticket whose turn it is
+    std::atomic<size_t> waiters_{0};           ///< Callers waiting in line
+    std::atomic<bool> turn_busy_{false};       ///< A turn is running
+    /// Tickets whose owner timed out. Skipped when the line reaches them,
+    /// so one abandoned waiter cannot stall every caller behind it.
+    std::set<uint64_t> abandoned_tickets_;
     std::filesystem::path socket_path_;        ///< Unix socket path
     std::string bound_canonical_;              ///< Process-registry key
     int listen_fd_ = -1;                       ///< Listening socket fd

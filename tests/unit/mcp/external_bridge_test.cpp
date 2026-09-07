@@ -1023,3 +1023,113 @@ SCENARIO("ExternalBridge::ask_streaming() reflects the config field",
         }
     }
 }
+
+// ── gh#144: turn queue ───────────────────────────────────
+
+SCENARIO("gh#144: the turn queue serialises callers in FIFO order",
+         "[external_bridge][gh144][concurrency][2.12.0]") {
+    GIVEN("a bridge with no turn in flight") {
+        ExternalMCPConfig cfg;
+        ExternalBridge bridge(nullptr, cfg, "/tmp/test-turnq");
+
+        THEN("it reports itself idle and empty") {
+            CHECK_FALSE(bridge.turn_in_flight());
+            CHECK(bridge.turn_queue_depth() == 0);
+        }
+
+        WHEN("one caller holds the turn") {
+            long waited = 0;
+            REQUIRE(bridge.begin_turn_wait(5000, &waited));
+
+            THEN("the engine reads busy with nobody queued behind") {
+                CHECK(bridge.turn_in_flight());
+                CHECK(bridge.turn_queue_depth() == 0);
+                CHECK(waited < 1000);
+            }
+            bridge.end_turn_wait();
+            AND_THEN("releasing clears busy") {
+                CHECK_FALSE(bridge.turn_in_flight());
+            }
+        }
+
+        WHEN("three callers contend") {
+            // Deterministic FIFO check: each waiter records its order of
+            // admission. A bare mutex would give no such guarantee, which
+            // is why this is a ticket queue rather than a lock.
+            std::vector<int> admitted;
+            std::mutex admitted_mu;
+            std::atomic<int> started{0};
+
+            long waited = 0;
+            REQUIRE(bridge.begin_turn_wait(5000, &waited));
+
+            std::vector<std::thread> ts;
+            for (int i = 1; i <= 3; ++i) {
+                ts.emplace_back([&, i] {
+                    started.fetch_add(1);
+                    long w = 0;
+                    if (bridge.begin_turn_wait(10000, &w)) {
+                        {
+                            std::lock_guard<std::mutex> lk(admitted_mu);
+                            admitted.push_back(i);
+                        }
+                        bridge.end_turn_wait();
+                    }
+                });
+                // Stagger so ticket order is deterministic; the queue
+                // guarantees FIFO by ticket, not by thread start.
+                while (bridge.turn_queue_depth() < static_cast<size_t>(i)) {
+                    std::this_thread::yield();
+                }
+            }
+
+            THEN("all three are queued behind the holder") {
+                CHECK(bridge.turn_queue_depth() == 3);
+                CHECK(bridge.turn_in_flight());
+            }
+
+            bridge.end_turn_wait();
+            for (auto& t : ts) { t.join(); }
+
+            AND_THEN("they ran in ticket order and the queue drained") {
+                REQUIRE(admitted.size() == 3);
+                CHECK(admitted == std::vector<int>{1, 2, 3});
+                CHECK(bridge.turn_queue_depth() == 0);
+                CHECK_FALSE(bridge.turn_in_flight());
+            }
+        }
+    }
+}
+
+SCENARIO("gh#144: a caller that gives up does not stall the line",
+         "[external_bridge][gh144][concurrency][2.12.0]") {
+    GIVEN("a held turn and a waiter that times out") {
+        ExternalMCPConfig cfg;
+        ExternalBridge bridge(nullptr, cfg, "/tmp/test-turnq-abandon");
+
+        long waited = 0;
+        REQUIRE(bridge.begin_turn_wait(5000, &waited));
+
+        WHEN("a second caller waits past its deadline") {
+            long gave_up_after = 0;
+            bool got_it = bridge.begin_turn_wait(50, &gave_up_after);
+
+            THEN("it is refused rather than blocking forever") {
+                CHECK_FALSE(got_it);
+                CHECK(gave_up_after >= 40);
+            }
+
+            AND_THEN("a later caller still gets its turn once released") {
+                // The first cut of this queue advanced now_serving_ on
+                // timeout, which stepped over the IN-FLIGHT turn and handed
+                // the engine to two callers at once. The abandoned ticket
+                // must be skipped when the line reaches it, not before.
+                bridge.end_turn_wait();
+                long w = 0;
+                CHECK(bridge.begin_turn_wait(5000, &w));
+                bridge.end_turn_wait();
+                CHECK(bridge.turn_queue_depth() == 0);
+            }
+        }
+    }
+}

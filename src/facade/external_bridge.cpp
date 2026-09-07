@@ -22,6 +22,7 @@
 #include <atomic>
 #include <cerrno>
 #include <chrono>
+#include <condition_variable>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -381,18 +382,33 @@ static json handle_ask(entropic_handle_t handle, const json& args,
 }
 
 /**
- * @brief Handle entropic.status.
+ * @brief Handle the status tool.
+ *
+ * gh#144 (v2.12.0) adds the occupancy lines. The issue's second half was
+ * that a caller queued behind another's turn is indistinguishable from one
+ * talking to a hung engine — on a 4B-class local model a review is 15-90
+ * seconds, so a routine wait was presented as an indefinite one. `busy` and
+ * `queue_depth` are what make the difference visible.
+ *
+ * Appended as text lines rather than restructured into JSON on purpose: the
+ * result is an unstructured blob with an embedded `metrics:` payload that
+ * consumers already parse, and changing its shape would break them.
+ *
  * @param handle Engine handle.
+ * @param bridge Bridge instance, for the turn-queue counters.
  * @return MCP tool result JSON.
  * @req REQ-BRIDGE-001
- * @version 2.0.6-rc16.2
+ * @version 2.12.0
  */
-static json handle_status(entropic_handle_t handle) {
+static json handle_status(entropic_handle_t handle,
+                          const ExternalBridge* bridge) {
     size_t count = 0;
     entropic_context_count(handle, &count);
     std::ostringstream os;
     os << "entropic " << entropic_version()
-       << "\nmessages: " << count;
+       << "\nmessages: " << count
+       << "\nbusy: " << (bridge->turn_in_flight() ? "true" : "false")
+       << "\nqueue_depth: " << bridge->turn_queue_depth();
     // Metrics + per-tier breakdown (P2-15 follow-up, 2.0.6-rc16.2)
     char* mjson = nullptr;
     if (entropic_metrics_json(handle, &mjson) == ENTROPIC_OK
@@ -622,6 +638,75 @@ static std::string generate_task_id() {
     return "task-" + ss.str();
 }
 
+namespace {
+
+/// @brief How long a bridge caller waits before being told the engine is busy.
+constexpr long kTurnWaitTimeoutMs = 300000;  // 5 minutes
+
+/**
+ * @brief RAII wrapper over begin_turn_wait / end_turn_wait (gh#144).
+ * @dg_internal
+ * @version 2.12.0
+ */
+class TurnTicket {
+public:
+    /**
+     * @brief Take a ticket and wait for this caller's turn.
+     * @param b Bridge owning the queue.
+     * @dg_internal
+     * @version 2.12.0
+     */
+    explicit TurnTicket(ExternalBridge* b)
+        : bridge_(b),
+          held_(b->begin_turn_wait(kTurnWaitTimeoutMs, &waited_ms_)) {}
+
+    /**
+     * @brief Hand the turn on, if this ticket held it.
+     * @dg_internal
+     * @version 2.12.0
+     */
+    ~TurnTicket() { if (held_) { bridge_->end_turn_wait(); } }
+
+    TurnTicket(const TurnTicket&) = delete;
+    TurnTicket& operator=(const TurnTicket&) = delete;
+
+    /**
+     * @brief Whether the turn was acquired before the deadline.
+     * @return true when this ticket owns the engine.
+     * @dg_internal
+     * @version 2.12.0
+     */
+    bool held() const { return held_; }
+
+    /**
+     * @brief Time spent waiting in line.
+     * @return Milliseconds waited.
+     * @dg_internal
+     * @version 2.12.0
+     */
+    long waited_ms() const { return waited_ms_; }
+
+private:
+    ExternalBridge* bridge_;
+    long waited_ms_ = 0;
+    bool held_;
+};
+
+/**
+ * @brief The tool result returned when the queue deadline expired.
+ * @dg_internal
+ * @version 2.12.0
+ */
+json turn_timeout_result(const ExternalBridge* bridge, long waited_ms) {
+    std::ostringstream os;
+    os << "error: engine busy — waited " << waited_ms << " ms with "
+       << bridge->turn_queue_depth() << " request(s) still ahead. "
+       << "Another caller's turn is still running; retry shortly.";
+    return tool_text(os.str());
+}
+
+} // namespace
+
 // ── Dispatch ─────────────────────────────────────────────
 
 /**
@@ -633,7 +718,7 @@ static std::string generate_task_id() {
  * @param call_id Request id.
  * @return MCP tool result JSON.
  * @req REQ-BRIDGE-001
- * @version 2.9.12
+ * @version 2.12.0
  */
 static json dispatch_ask(entropic_handle_t handle,
                          ExternalBridge* bridge,
@@ -641,13 +726,24 @@ static json dispatch_ask(entropic_handle_t handle,
                          int client_fd,
                          const std::string& call_id) {
     if (args.value("async", false)) {
+        // The async worker takes its own ticket inside run_async_ask — it
+        // must not hold one here, or registering the task would block behind
+        // an in-flight turn and defeat the point of async.
         auto task_id = generate_task_id();
         bridge->run_async_ask(
             args.value("prompt", ""), task_id, client_fd);
         return tool_text("async task started: " + task_id);
     }
-    if (!bridge->ask_streaming()) { return handle_ask_plain(handle, args); }
-    return handle_ask(handle, args, client_fd, call_id);
+    // gh#144 (v2.12.0): queue rather than race. The engine admits one turn
+    // and refuses the loser with ALREADY_RUNNING; from a shared host the
+    // right answer is to WAIT, so the refusal is never reached from here.
+    TurnTicket ticket(bridge);
+    if (!ticket.held()) {
+        return turn_timeout_result(bridge, ticket.waited_ms());
+    }
+    return bridge->ask_streaming()
+        ? handle_ask(handle, args, client_fd, call_id)
+        : handle_ask_plain(handle, args);
 }
 
 /**
@@ -664,7 +760,7 @@ static json dispatch_ask(entropic_handle_t handle,
  * @param call_id JSON-RPC request id for progress correlation.
  * @return MCP tool result JSON.
  * @req REQ-BRIDGE-001
- * @version 2.12.0
+ * @version 2.12.0-rc1
  */
 static json dispatch_tool(entropic_handle_t handle,
                           ExternalBridge* bridge,
@@ -683,12 +779,72 @@ static json dispatch_tool(entropic_handle_t handle,
     }
     json result;
     if      (suffix == tool_suffix::kAskStatus)    { result = bridge->handle_ask_status(args); }
-    else if (suffix == tool_suffix::kStatus)       { result = handle_status(handle); }
+    else if (suffix == tool_suffix::kStatus)       { result = handle_status(handle, bridge); }
     else if (suffix == tool_suffix::kContextClear) { result = handle_clear(handle, bridge); }
     else if (suffix == tool_suffix::kContextCount) { result = handle_count(handle); }
     else { result = tool_text("error: unknown tool '" + name + "'"); }
     return result;
 }
+
+// ── Turn queue (gh#144, v2.12.0) ─────────────────────────
+
+/**
+ * @brief Take a ticket and wait for this caller's turn on the engine.
+ * @param timeout_ms Give up after this long rather than hang the client.
+ * @param waited_ms_out Optional; receives time actually spent waiting.
+ * @return true when it is this caller's turn (caller must end_turn_wait()).
+ * @req REQ-BRIDGE-001
+ * @version 2.12.0
+ */
+bool ExternalBridge::begin_turn_wait(long timeout_ms, long* waited_ms_out) {
+    const auto t0 = std::chrono::steady_clock::now();
+    std::unique_lock<std::mutex> lock(turn_mutex_);
+    const uint64_t ticket = next_ticket_++;
+    const bool first = (ticket == now_serving_);
+    if (!first) { waiters_.fetch_add(1); }
+
+    const bool ours = turn_cv_.wait_for(
+        lock, std::chrono::milliseconds(timeout_ms),
+        [&] { return now_serving_ == ticket; });
+
+    if (!first) { waiters_.fetch_sub(1); }
+    if (waited_ms_out != nullptr) {
+        *waited_ms_out = static_cast<long>(
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - t0).count());
+    }
+    if (!ours) {
+        // Timed out. Record the ticket as abandoned so that when the line
+        // reaches it, it is skipped rather than waited on forever. Do NOT
+        // advance now_serving_ here: it currently names ANOTHER caller's
+        // in-flight turn, and stepping over it would hand the engine to two
+        // callers at once — the exact race this queue exists to prevent.
+        abandoned_tickets_.insert(ticket);
+        return false;
+    }
+    turn_busy_.store(true);
+    return true;
+}
+
+/**
+ * @brief Hand the turn to the next ticket in line.
+ * @req REQ-BRIDGE-001
+ * @version 2.12.0
+ */
+void ExternalBridge::end_turn_wait() {
+    {
+        std::lock_guard<std::mutex> lock(turn_mutex_);
+        turn_busy_.store(false);
+        ++now_serving_;
+        // Step over anyone who gave up while waiting, or the line stalls on
+        // a ticket whose owner is long gone.
+        while (abandoned_tickets_.erase(now_serving_) > 0) {
+            ++now_serving_;
+        }
+    }
+    turn_cv_.notify_all();
+}
+
 
 // ── ExternalBridge ───────────────────────────────────────
 
@@ -1244,6 +1400,62 @@ void ExternalBridge::detach_phase_observer() {
 }
 
 /**
+ * @brief Record an async task's terminal state and write its sentinel.
+ *
+ * Extracted from run_async_ask (gh#144, v2.12.0) to keep it inside the SLOC
+ * and ABC gates once the turn-queue wait was added.
+ *
+ * Issue #12 (v2.1.4): the sentinel is written UNDER tasks_mutex_, before the
+ * MCP notification fires, so an external monitor reacting to the sentinel can
+ * immediately call the ask_status tool and see the same terminal state.
+ *
+ * @param task_id Task reaching a terminal state.
+ * @param status Terminal status string.
+ * @param phase Terminal phase string.
+ * @param text Result or error text.
+ * @dg_internal
+ * @version 2.12.0
+ */
+void ExternalBridge::commit_async_final_state(
+    const std::string& task_id, const std::string& status,
+    const std::string& phase, const std::string& text) {
+    std::lock_guard<std::mutex> lock(tasks_mutex_);
+    auto it = tasks_.find(task_id);
+    if (it != tasks_.end()) {
+        it->second.status = status;
+        it->second.phase = phase;
+        it->second.result = text;
+    }
+    write_sentinel(task_id, status);
+}
+
+/**
+ * @brief Mark an async task failed because its turn never came (gh#144).
+ *
+ * The task stays "queued" until the ticket is actually held, so ask_status
+ * reports the truth rather than claiming to run while blocked. On timeout it
+ * becomes a terminal error with the wait recorded, and the sentinel is
+ * written under tasks_mutex_ like every other terminal transition.
+ *
+ * @param task_id Task that gave up waiting.
+ * @param waited_ms How long it waited before giving up.
+ * @dg_internal
+ * @version 2.12.0
+ */
+void ExternalBridge::fail_task_engine_busy(const std::string& task_id,
+                                           long waited_ms) {
+    update_task_phase(task_id, "error", "engine busy");
+    std::lock_guard<std::mutex> lock(tasks_mutex_);
+    auto it = tasks_.find(task_id);
+    if (it != tasks_.end()) {
+        it->second.status = "error";
+        it->second.result = "engine busy — waited "
+            + std::to_string(waited_ms) + " ms for a turn";
+        write_sentinel(task_id, "error");
+    }
+}
+
+/**
  * @brief Run an async entropic.ask in a detached background thread.
  *
  * Creates a task registry entry, runs the engine, stores the result,
@@ -1254,7 +1466,7 @@ void ExternalBridge::detach_phase_observer() {
  * @param task_id Assigned task ID.
  * @param client_fd Socket fd for completion notification.
  * @req REQ-BRIDGE-001
- * @version 2.1.4
+ * @version 2.12.0
  */
 void ExternalBridge::run_async_ask(
     const std::string& prompt,
@@ -1274,6 +1486,19 @@ void ExternalBridge::run_async_ask(
     int log_id = handle_ ? handle_->log_id : 0;
     std::thread([this, prompt, task_id, client_fd, log_id]() {
         entropic::log::HandleLogScope scope(log_id);
+
+        // gh#144 (v2.12.0): the async worker reaches the engine like any
+        // other caller and must take the same ticket. Without this an async
+        // ask bypasses the queue and collides with a sync one, earning an
+        // ALREADY_RUNNING where the caller expected to be queued. The task
+        // stays "queued" until the ticket is actually held, so ask_status
+        // reports the truth rather than claiming to run while blocked.
+        long waited_ms = 0;
+        if (!begin_turn_wait(kTurnWaitTimeoutMs, &waited_ms)) {
+            fail_task_engine_busy(task_id, waited_ms);
+            return;
+        }
+
         update_task_phase(task_id, "running", "running");
         attach_phase_observer(task_id);
 
@@ -1281,24 +1506,12 @@ void ExternalBridge::run_async_ask(
         auto err = entropic_run(handle_, prompt.c_str(), &result_json);
 
         detach_phase_observer();
+        end_turn_wait();
 
         auto final_state = derive_async_final_state(
             handle_, err, result_json);
-
-        {
-            std::lock_guard<std::mutex> lock(tasks_mutex_);
-            auto it = tasks_.find(task_id);
-            if (it != tasks_.end()) {
-                it->second.status = final_state.status;
-                it->second.phase = final_state.phase;
-                it->second.result = final_state.text;
-            }
-            // Issue #12 (v2.1.4): write sentinel UNDER tasks_mutex_,
-            // before the MCP notification fires. Any external monitor
-            // reacting to the sentinel can immediately call
-            // entropic.ask_status and see the same terminal state.
-            write_sentinel(task_id, final_state.status);
-        }
+        commit_async_final_state(task_id, final_state.status,
+                                 final_state.phase, final_state.text);
         auto status = final_state.status;
 
         // Issue #4 (v2.1.2, parts A+B): emit the spec-defined
