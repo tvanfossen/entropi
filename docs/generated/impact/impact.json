@@ -1,34 +1,69 @@
 [
   {
-    "req_id": "REQ-INFER-002",
-    "req_name": "Teardown releases every model, context and adapter handle",
+    "req_id": "REQ-API-009",
+    "req_name": "Run entry-point family, result contract, and cross-thread interruptibility",
     "functions": [
       {
-        "name": "do_unload",
-        "file": "src/inference/llama_cpp_backend.cpp",
+        "name": "try_begin_turn",
+        "file": "include/entropic/core/engine.h",
+        "version": "2.12.0"
+      },
+      {
+        "name": "end_turn",
+        "file": "include/entropic/core/engine.h",
         "version": "2.12.0"
       }
     ]
   },
   {
-    "req_id": "REQ-INFER-005",
-    "req_name": "Every decode path honours cooperative cancellation within one token",
+    "req_id": "REQ-IDEN-001",
+    "req_name": "Tier resolution contract and per-tier loop overrides",
     "functions": [
       {
-        "name": "run_sampling_loop",
-        "file": "src/inference/llama_cpp_backend.cpp",
-        "version": "2.8.3"
+        "name": "run_turn_as",
+        "file": "src/core/engine.cpp",
+        "version": "2.12.0"
+      },
+      {
+        "name": "seed_system_prompt_for_tier",
+        "file": "src/core/engine.cpp",
+        "version": "2.12.0"
       }
     ]
   },
   {
-    "req_id": "REQ-INFER-015",
-    "req_name": "MTP speculative decode fails loud and never silently falls back",
+    "req_id": "REQ-LOOP-001",
+    "req_name": "Agent state machine with observable, dual-channel transitions",
     "functions": [
       {
-        "name": "mtp_guard",
-        "file": "src/inference/llama_cpp_backend.cpp",
-        "version": "2.11.0"
+        "name": "set_active_session",
+        "file": "include/entropic/core/engine.h",
+        "version": "2.12.0"
+      },
+      {
+        "name": "messages_for",
+        "file": "include/entropic/core/engine.h",
+        "version": "2.12.0"
+      },
+      {
+        "name": "clear_conversation_for",
+        "file": "include/entropic/core/engine.h",
+        "version": "2.12.0"
+      },
+      {
+        "name": "drop_session",
+        "file": "include/entropic/core/engine.h",
+        "version": "2.12.0"
+      },
+      {
+        "name": "run_turn",
+        "file": "src/core/engine.cpp",
+        "version": "2.12.0-rc1"
+      },
+      {
+        "name": "run_turn",
+        "file": "src/core/engine.cpp",
+        "version": "2.12.0-rc1"
       }
     ]
   }

@@ -298,6 +298,7 @@ add_executable(entropic-core-tests
     core/response_generator_test.cpp
     core/message_queue_test.cpp  # gh#40 (v2.1.10)
     core/turn_exclusion_test.cpp  # gh#144 (v2.12.0)
+    core/session_conversation_test.cpp  # gh#144 (v2.12.0)
     # v2.3.10: backstop coverage for streaming <think> tag filter
     core/stream_think_filter_test.cpp
 )
