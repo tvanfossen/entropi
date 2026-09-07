@@ -1,26 +1,49 @@
 [
   {
-    "req_id": "REQ-BRIDGE-001",
-    "req_name": "External bridge exposes the engine over a peer-authenticated unix socket",
+    "req_id": "REQ-ABI-001",
+    "req_name": "Pure C at every .so boundary \u2014 opaque handles and explicit ownership",
     "functions": [
       {
-        "name": "dispatch_tool",
-        "file": "src/facade/external_bridge.cpp",
+        "name": "entropic_context_count",
+        "file": "src/facade/entropic.cpp",
+        "version": "2.12.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-API-005",
+    "req_name": "Uniform precondition guard on every exported entry point",
+    "functions": [
+      {
+        "name": "entropic_context_get",
+        "file": "src/facade/entropic.cpp",
         "version": "2.12.0"
       },
       {
-        "name": "dispatch",
-        "file": "src/facade/external_bridge.cpp",
+        "name": "entropic_context_count",
+        "file": "src/facade/entropic.cpp",
         "version": "2.12.0"
-      },
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-API-008",
+    "req_name": "Single cross-boundary allocator pair and explicit ownership transfer",
+    "functions": [
       {
-        "name": "qualify_tool_name",
-        "file": "src/facade/tool_namespace.h",
+        "name": "entropic_context_get",
+        "file": "src/facade/entropic.cpp",
         "version": "2.12.0"
-      },
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-SAFE-001",
+    "req_name": "Untrusted bytes are sanitized at ingress, never at egress",
+    "functions": [
       {
-        "name": "strip_tool_prefix",
-        "file": "src/facade/tool_namespace.h",
+        "name": "entropic_context_get",
+        "file": "src/facade/entropic.cpp",
         "version": "2.12.0"
       }
     ]

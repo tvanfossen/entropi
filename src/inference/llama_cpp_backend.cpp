@@ -2344,10 +2344,23 @@ bool LlamaCppBackend::run_prefill_cached(
  * auto-positions the delta at `cut` (same mechanism the cache-restore path
  * relies on). Occupancy is derived from llama_memory_seq_pos_max, never a
  * software counter — so an out-of-band wipe (multimodal / complete /
- * speculative / a different conversation interleaved on a shared backend)
- * either fails the warm_keep_cut occupancy gate or diverges in the prefix
- * scan, and we fall back. Per-turn cost shrinks from the whole post-system
- * history to just the appended delta.
+ * speculative) fails the warm_keep_cut occupancy gate and we fall back.
+ * Per-turn cost shrinks from the whole post-system history to just the
+ * appended delta.
+ *
+ * gh#144 (v2.12.0) CORRECTION. This comment also used to claim the same held
+ * for "a different conversation interleaved on a shared backend". It does
+ * not, and NEITHER stated branch fires. Two conversations on one handle share
+ * a system prompt, so common_prefix_len is > 0 (the prefix scan yields 0 only
+ * on divergence at token 0, i.e. a DIFFERENT system prompt), and the resident
+ * conversation's own occupancy satisfies kv_pos_max + 1 >= common. So cut > 0,
+ * the seq_rm below DESTROYS the other conversation's tail, and because this
+ * function then returns true, prefill_dispatch never runs and the prompt cache
+ * is skipped too — worse than the pre-gh#96 path.
+ *
+ * Latent while one shared conversation means one monotonically growing
+ * history. Keying conversations per caller ACTIVATES it, which is why
+ * residency must become per-sequence before keying ships.
  *
  * @param tokens Full incoming token sequence.
  * @return true if reuse handled the prefill; false to fall back (no KV change).

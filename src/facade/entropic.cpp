@@ -2844,12 +2844,24 @@ entropic_error_t entropic_context_clear(entropic_handle_t handle) {
  * @req REQ-SAFE-001
  * @req REQ-API-008
  * @req REQ-API-005
- * @version 2.0.1
+ * @version 2.12.0
  */
 entropic_error_t entropic_context_get(
     entropic_handle_t handle, char** messages_json) {
-    if (!handle) { return ENTROPIC_ERROR_INVALID_HANDLE; }
-    if (!messages_json) { return ENTROPIC_ERROR_INVALID_ARGUMENT; }
+    // gh#144 (v2.12.0): the !handle->engine leg is new — an unconfigured
+    // handle has no engine, and this function dereferenced it. The siblings
+    // entropic_context_clear and entropic_context_usage both guarded it;
+    // this one and entropic_context_count did not. INVALID_HANDLE matches
+    // those siblings' contract for an unconfigured handle.
+    //
+    // Ordering matters and is not the siblings': a NULL out-param on a
+    // created-but-unconfigured handle must still report INVALID_ARGUMENT,
+    // which v2.3.10 pinned. Folded into one exit for the returns <= 3 gate.
+    if (!handle || !messages_json || !handle->engine) {
+        return (handle != nullptr && messages_json == nullptr)
+            ? ENTROPIC_ERROR_INVALID_ARGUMENT
+            : ENTROPIC_ERROR_INVALID_HANDLE;
+    }
     entropic::HandleApiLock lock(handle);  // gh#59 v2.3.1: mutex + log scope
     *messages_json = alloc_cstr(
         facade_json::serialize_messages(handle->engine->get_messages()));
@@ -2863,12 +2875,17 @@ entropic_error_t entropic_context_get(
  * @return ENTROPIC_OK on success.
  * @req REQ-API-005
  * @req REQ-ABI-001
- * @version 2.0.1
+ * @version 2.12.0
  */
 entropic_error_t entropic_context_count(
     entropic_handle_t handle, size_t* count) {
-    if (!handle) { return ENTROPIC_ERROR_INVALID_HANDLE; }
-    if (!count) { return ENTROPIC_ERROR_INVALID_ARGUMENT; }
+    // gh#144 (v2.12.0): see entropic_context_get — same missing engine
+    // guard, same ordering constraint, same single-exit fold.
+    if (!handle || !count || !handle->engine) {
+        return (handle != nullptr && count == nullptr)
+            ? ENTROPIC_ERROR_INVALID_ARGUMENT
+            : ENTROPIC_ERROR_INVALID_HANDLE;
+    }
     *count = handle->engine->message_count();
     return ENTROPIC_OK;
 }

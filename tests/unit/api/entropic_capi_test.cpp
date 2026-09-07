@@ -491,6 +491,28 @@ TEST_CASE("entropic_context_count rejects NULL out-param",
             == ENTROPIC_ERROR_INVALID_ARGUMENT);
 }
 
+TEST_CASE("gh#144: entropic_context_get on unconfigured handle does not "
+          "dereference a null engine",
+          "[gh144][entropic_capi][context][2.12.0]") {
+    // RED before v2.12.0: the !handle and !out-param guards were present but
+    // nothing checked handle->engine, so a VALID out-param on a created-but-
+    // unconfigured handle reached handle->engine->get_messages() on NULL.
+    // Its siblings context_clear and context_usage both guarded this.
+    CreatedOnlyHandle h;
+    char* out = nullptr;
+    REQUIRE(entropic_context_get(h, &out) == ENTROPIC_ERROR_INVALID_HANDLE);
+    CHECK(out == nullptr);
+}
+
+TEST_CASE("gh#144: entropic_context_count on unconfigured handle does not "
+          "dereference a null engine",
+          "[gh144][entropic_capi][context][2.12.0]") {
+    CreatedOnlyHandle h;
+    size_t n = 12345;  // sentinel: must be left untouched on the error path
+    REQUIRE(entropic_context_count(h, &n) == ENTROPIC_ERROR_INVALID_HANDLE);
+    CHECK(n == 12345);
+}
+
 TEST_CASE("entropic_context_usage rejects NULL handle",
           "[v2.3.10][entropic_capi][context]") {
     size_t u = 0, c = 0;

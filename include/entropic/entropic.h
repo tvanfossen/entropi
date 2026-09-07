@@ -296,7 +296,14 @@ ENTROPIC_EXPORT void entropic_free(void* ptr);
  *         - ENTROPIC_ERROR_ALREADY_RUNNING — another run in progress.
  *         - ENTROPIC_ERROR_INTERRUPTED — cancelled via entropic_interrupt().
  *
- * @threadsafety Serialized per-handle.
+ * @threadsafety NOT serialized. gh#109 removed api_mutex from every run
+ *   entry point so a long turn cannot block entropic_interrupt() from another
+ *   thread; the pre-2.12.0 claim that this call was "serialized per-handle" was
+ *   stale from that moment and is what led a consumer to build on a guarantee
+ *   that did not exist (gh#144). As of 2.12.0 a run entered while another is in
+ *   flight on the same handle returns ENTROPIC_ERROR_ALREADY_RUNNING rather
+ *   than racing. Callers wanting to QUEUE rather than be refused must serialize
+ *   above this layer, as the external MCP bridge does.
  * @req REQ-API-009
  * @req REQ-API-010
  * @req REQ-API-008
@@ -332,7 +339,14 @@ ENTROPIC_EXPORT entropic_error_t entropic_run(
  *         - ENTROPIC_ERROR_IDENTITY_NOT_FOUND — unknown tier name.
  *         - ENTROPIC_ERROR_GENERATE_FAILED — inference error.
  *
- * @threadsafety Serialized per-handle.
+ * @threadsafety NOT serialized. gh#109 removed api_mutex from every run
+ *   entry point so a long turn cannot block entropic_interrupt() from another
+ *   thread; the pre-2.12.0 claim that this call was "serialized per-handle" was
+ *   stale from that moment and is what led a consumer to build on a guarantee
+ *   that did not exist (gh#144). As of 2.12.0 a run entered while another is in
+ *   flight on the same handle returns ENTROPIC_ERROR_ALREADY_RUNNING rather
+ *   than racing. Callers wanting to QUEUE rather than be refused must serialize
+ *   above this layer, as the external MCP bridge does.
  * @req REQ-API-009
  * @req REQ-API-010
  * @req REQ-API-008
@@ -372,7 +386,14 @@ ENTROPIC_EXPORT entropic_error_t entropic_run_as(
  *         - ENTROPIC_ERROR_INVALID_STATE — engine not configured.
  *         - ENTROPIC_ERROR_GENERATE_FAILED — inference error.
  *
- * @threadsafety Serialized per-handle.
+ * @threadsafety NOT serialized. gh#109 removed api_mutex from every run
+ *   entry point so a long turn cannot block entropic_interrupt() from another
+ *   thread; the pre-2.12.0 claim that this call was "serialized per-handle" was
+ *   stale from that moment and is what led a consumer to build on a guarantee
+ *   that did not exist (gh#144). As of 2.12.0 a run entered while another is in
+ *   flight on the same handle returns ENTROPIC_ERROR_ALREADY_RUNNING rather
+ *   than racing. Callers wanting to QUEUE rather than be refused must serialize
+ *   above this layer, as the external MCP bridge does.
  * @req REQ-API-009
  * @req REQ-INFER-018
  * @req REQ-API-008
@@ -410,7 +431,14 @@ ENTROPIC_EXPORT entropic_error_t entropic_run_batch(
  *         - ENTROPIC_ERROR_CANCELLED — cancelled via cancel_flag.
  *         - ENTROPIC_ERROR_INTERRUPTED — cancelled via entropic_interrupt().
  *
- * @threadsafety Serialized per-handle.
+ * @threadsafety NOT serialized. gh#109 removed api_mutex from every run
+ *   entry point so a long turn cannot block entropic_interrupt() from another
+ *   thread; the pre-2.12.0 claim that this call was "serialized per-handle" was
+ *   stale from that moment and is what led a consumer to build on a guarantee
+ *   that did not exist (gh#144). As of 2.12.0 a run entered while another is in
+ *   flight on the same handle returns ENTROPIC_ERROR_ALREADY_RUNNING rather
+ *   than racing. Callers wanting to QUEUE rather than be refused must serialize
+ *   above this layer, as the external MCP bridge does.
  * @req REQ-API-009
  * @req REQ-API-010
  * @req REQ-API-005
@@ -456,7 +484,14 @@ ENTROPIC_EXPORT entropic_error_t entropic_run_streaming(
  *           vision-capable tier configured (gh#41).
  *         - ENTROPIC_ERROR_GENERATE_FAILED — inference error.
  *
- * @threadsafety Serialized per-handle.
+ * @threadsafety NOT serialized. gh#109 removed api_mutex from every run
+ *   entry point so a long turn cannot block entropic_interrupt() from another
+ *   thread; the pre-2.12.0 claim that this call was "serialized per-handle" was
+ *   stale from that moment and is what led a consumer to build on a guarantee
+ *   that did not exist (gh#144). As of 2.12.0 a run entered while another is in
+ *   flight on the same handle returns ENTROPIC_ERROR_ALREADY_RUNNING rather
+ *   than racing. Callers wanting to QUEUE rather than be refused must serialize
+ *   above this layer, as the external MCP bridge does.
  * @req REQ-API-009
  * @req REQ-INFER-025
  * @req REQ-API-008
@@ -483,7 +518,14 @@ ENTROPIC_EXPORT entropic_error_t entropic_run_messages(
  * @return ENTROPIC_OK on success. See entropic_run_messages() for
  *         error codes.
  *
- * @threadsafety Serialized per-handle.
+ * @threadsafety NOT serialized. gh#109 removed api_mutex from every run
+ *   entry point so a long turn cannot block entropic_interrupt() from another
+ *   thread; the pre-2.12.0 claim that this call was "serialized per-handle" was
+ *   stale from that moment and is what led a consumer to build on a guarantee
+ *   that did not exist (gh#144). As of 2.12.0 a run entered while another is in
+ *   flight on the same handle returns ENTROPIC_ERROR_ALREADY_RUNNING rather
+ *   than racing. Callers wanting to QUEUE rather than be refused must serialize
+ *   above this layer, as the external MCP bridge does.
  * @req REQ-API-009
  * @req REQ-INFER-025
  * @req REQ-API-005

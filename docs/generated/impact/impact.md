@@ -2,6 +2,9 @@
 
 | REQ | Name | Functions Changed |
 |-----|------|-------------------|
-| REQ-BRIDGE-001 | External bridge exposes the engine over a peer-authenticated unix socket | dispatch_tool, dispatch, qualify_tool_name, strip_tool_prefix |
+| REQ-ABI-001 | Pure C at every .so boundary — opaque handles and explicit ownership | entropic_context_count |
+| REQ-API-005 | Uniform precondition guard on every exported entry point | entropic_context_get, entropic_context_count |
+| REQ-API-008 | Single cross-boundary allocator pair and explicit ownership transfer | entropic_context_get |
+| REQ-SAFE-001 | Untrusted bytes are sanitized at ingress, never at egress | entropic_context_get |
 
-**Total: 1 requirement(s) affected, 4 function(s) changed**
+**Total: 4 requirement(s) affected, 5 function(s) changed**
