@@ -43,6 +43,25 @@
 
 namespace entropic {
 
+/**
+ * @brief Fill one cell of a multi-seq llama_batch (defined below).
+ *
+ * Forward-declared because gh#144 (v2.12.0) made the per-token decode path
+ * build explicit batches, and that path sits above the definition.
+ *
+ * @param b Batch to fill.
+ * @param k Cell index.
+ * @param tok Token id.
+ * @param pos Position within the sequence.
+ * @param seq Sequence id.
+ * @param want_logits Whether this cell should emit logits.
+ * @utility
+ * @version 2.12.0
+ */
+static void fill_batch_cell(llama_batch& b, int k, llama_token tok,
+                            llama_pos pos, llama_seq_id seq,
+                            bool want_logits);
+
 namespace {
 
 auto logger = entropic::log::get("inference.llama_cpp");
@@ -1622,26 +1641,19 @@ std::unique_ptr<Sampler> LlamaCppBackend::create_sampler(
  * @param tokens Input token sequence.
  * @return true on success.
  * @dg_internal
- * @version 2.7.5
+ * @version 2.12.0
  */
 bool LlamaCppBackend::run_prefill(const std::vector<llama_token>& tokens) {
     llama_memory_clear(llama_get_memory(ctx_), true);
 
-    const int n_batch = config().n_batch;
-    const int n_tokens = static_cast<int>(tokens.size());
-
-    for (int i = 0; i < n_tokens; i += n_batch) {
-        int chunk = std::min(n_batch, n_tokens - i);
-        std::vector<llama_token> slice(
-            tokens.begin() + i, tokens.begin() + i + chunk);
-        llama_batch batch = llama_batch_get_one(
-            slice.data(), static_cast<int32_t>(chunk));
-        if (llama_decode(ctx_, batch) != 0) {
-            logger->error("Prefill decode failed at offset {}", i);
-            return false;
-        }
+    // gh#144 (v2.12.0): chunking and position arithmetic now live in
+    // decode_tokens_into_slot. The memory was just cleared for this slot, so
+    // its sequence is empty and positions start at 0 — exactly what the
+    // previous auto-positioned llama_batch_get_one produced.
+    if (!decode_tokens_into_slot(tokens, 0, active_slot_)) {
+        logger->error("Prefill decode failed (slot={})", active_slot_);
+        return false;
     }
-    last_prefill_tokens_ += n_tokens;  // gh#96: count tokens decoded in prefill
     return true;
 }
 
@@ -1659,7 +1671,7 @@ bool LlamaCppBackend::run_prefill(const std::vector<llama_token>& tokens) {
  * @param stop Stop sequences.
  * @return "continue", "stop", "eos", or "error".
  * @dg_internal
- * @version 2.3.10
+ * @version 2.12.0
  */
 std::string LlamaCppBackend::step_token(
     Sampler& sampler,
@@ -1683,9 +1695,20 @@ std::string LlamaCppBackend::step_token(
         return "stop";
     }
 
+    // gh#144 (v2.12.0): the freshly sampled token must extend THIS session's
+    // sequence. Under a pool, auto-positioning into seq 0 would append one
+    // session's generated token onto another's KV.
     llama_token tok = new_token;
-    llama_batch single = llama_batch_get_one(&tok, 1);
-    return (llama_decode(ctx_, single) == 0) ? "continue" : "error";
+    auto* mem = llama_get_memory(ctx_);
+    const auto seq = static_cast<llama_seq_id>(active_slot_);
+    llama_batch single = llama_batch_init(1, 0, 1);
+    single.n_tokens = 1;
+    fill_batch_cell(single, 0, tok,
+                    llama_memory_seq_pos_max(mem, seq) + 1, seq,
+                    /*want_logits=*/true);
+    const bool ok = (llama_decode(ctx_, single) == 0);
+    llama_batch_free(single);
+    return ok ? "continue" : "error";
 }
 
 /**
@@ -2107,6 +2130,74 @@ std::string LlamaCppBackend::extract_system_prompt(
 }
 
 /**
+ * @brief Decode a token run into an explicit sequence at explicit positions.
+ *
+ * gh#144 (v2.12.0). `llama_batch_get_one` builds a batch with seq_id 0 and
+ * AUTO-POSITIONS from the cache cursor, which is correct only while every
+ * decode targets sequence 0. A session pool needs the same run decoded into
+ * an arbitrary slot, so the batch has to be built by hand.
+ *
+ * The position arithmetic is the whole risk of this function. Positions must
+ * continue THIS slot's sequence: `seq_pos_max(mem, slot) + 1 + i`. Getting it
+ * wrong does not crash and does not fail a unit test — it writes KV cells at
+ * the wrong positions and degrades output silently, which is why the
+ * single-session path is asserted byte-identical by a model test rather than
+ * trusted.
+ *
+ * `seq_pos_max` returns -1 for an empty sequence, so a cold slot starts at 0
+ * exactly as the auto-positioning path did.
+ *
+ * @param tokens Full token sequence.
+ * @param start_offset First index to decode.
+ * @param slot Sequence slot to decode into.
+ * @return true when every chunk decoded.
+ * @dg_internal
+ * @version 2.12.0
+ */
+bool LlamaCppBackend::decode_tokens_into_slot(
+    const std::vector<llama_token>& tokens, int start_offset, int slot)
+{
+    const int total = static_cast<int>(tokens.size());
+    if (start_offset >= total) { return true; }
+
+    auto* mem = llama_get_memory(ctx_);
+    const auto seq = static_cast<llama_seq_id>(slot);
+    // -1 on an empty sequence, so base is 0 for a cold slot.
+    llama_pos base = llama_memory_seq_pos_max(mem, seq) + 1;
+
+    const int n_batch = llama_n_batch(ctx_);
+    const int n_remaining = total - start_offset;
+    last_prefill_tokens_ += n_remaining;
+
+    bool ok = true;
+    for (int off = 0; off < n_remaining && ok; off += n_batch) {
+        const int chunk = std::min(n_batch, n_remaining - off);
+        llama_batch batch = llama_batch_init(chunk, 0, 1);
+        batch.n_tokens = chunk;
+        for (int k = 0; k < chunk; ++k) {
+            fill_batch_cell(batch, k,
+                            tokens[static_cast<std::size_t>(
+                                start_offset + off + k)],
+                            base + off + k, seq, /*want_logits=*/false);
+        }
+        // Each chunk's last token carries logits. llama_batch_get_one passes
+        // logits = nullptr, which makes llama.cpp emit logits for the last
+        // token of EACH decode call — so requesting them per chunk, not just
+        // on the final one, keeps this byte-identical to the path it
+        // replaces. Cheaper to compute a few unused logits than to differ
+        // from a path whose divergence would be silent.
+        batch.logits[chunk - 1] = 1;
+        if (llama_decode(ctx_, batch) != 0) {
+            logger->error("Decode chunk failed (slot={}, start={}, off={}, "
+                          "chunk={})", slot, start_offset, off, chunk);
+            ok = false;
+        }
+        llama_batch_free(batch);
+    }
+    return ok;
+}
+
+/**
  * @brief Decode remaining tokens starting at `start_offset`.
  *
  * Assumes `seq_pos_max(0) == start_offset - 1` so that
@@ -2116,30 +2207,15 @@ std::string LlamaCppBackend::extract_system_prompt(
  * @param start_offset Index of the first token to decode.
  * @return true on success, false on decode failure.
  * @dg_internal
- * @version 2.7.5
+ * @version 2.12.0
  */
 bool LlamaCppBackend::decode_tokens_from(
     const std::vector<llama_token>& tokens, int start_offset)
 {
-    int total = static_cast<int>(tokens.size());
-    if (start_offset >= total) { return true; }
-
-    int n_batch = llama_n_batch(ctx_);
-    int n_remaining = total - start_offset;
-    last_prefill_tokens_ += n_remaining;  // gh#96: count tokens decoded here
-    for (int off = 0; off < n_remaining; off += n_batch) {
-        int chunk = std::min(n_batch, n_remaining - off);
-        llama_batch batch = llama_batch_get_one(
-            const_cast<llama_token*>(tokens.data())
-                + start_offset + off,
-            chunk);
-        if (llama_decode(ctx_, batch) != 0) {
-            logger->error("Decode chunk failed (start={}, off={}, "
-                          "chunk={})", start_offset, off, chunk);
-            return false;
-        }
-    }
-    return true;
+    // gh#144 (v2.12.0): decode into whichever slot this generation is bound
+    // to. active_slot_ is 0 unless a session pool is configured, so the
+    // single-session path is unchanged.
+    return decode_tokens_into_slot(tokens, start_offset, active_slot_);
 }
 
 /**

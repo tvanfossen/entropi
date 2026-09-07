@@ -1051,6 +1051,17 @@ protected:
     void invalidate_all_resident_kv();
 
     /**
+     * @brief Decode a token run into an explicit sequence slot (gh#144).
+     * @param tokens Full token sequence.
+     * @param start_offset First index to decode.
+     * @param slot Sequence slot to decode into.
+     * @return true when every chunk decoded.
+     * @version 2.12.0
+     */
+    bool decode_tokens_into_slot(const std::vector<llama_token>& tokens,
+                                int start_offset, int slot);
+
+    /**
      * @brief Decode tokens starting at a given offset.
      * @param tokens Full token sequence.
      * @param start_offset First token to decode.
