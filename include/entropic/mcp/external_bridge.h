@@ -9,21 +9,33 @@
  * on the already-configured engine handle — no second engine instance.
  *
  * @par Exposed tools:
- * - entropic.ask — submit a prompt, get the full response
- * - entropic.status — engine version + message count
- * - entropic.context_clear — reset conversation
- * - entropic.context_count — message count
+ * Named `<prefix>.<suffix>`, where prefix is `mcp.external.tool_prefix`
+ * (default "entropic", so the stock names are unchanged). gh#145: a consumer
+ * app hosting this engine advertises its OWN namespace — the engine is a
+ * substrate, not the product.
+ * - `<prefix>.ask` — submit a prompt, get the full response
+ * - `<prefix>.ask_status` — poll an async ask
+ * - `<prefix>.status` — engine version + message count
+ * - `<prefix>.context_clear` — reset conversation
+ * - `<prefix>.context_count` — message count
  *
  * @par Socket path:
  * Uses ExternalMCPConfig.socket_path if set, otherwise derived from
  * the project directory via compute_socket_path().
  *
  * @par Thread safety:
- * The bridge runs a background accept loop. Each connected client is
- * served sequentially (one request at a time). The engine handle's
- * api_mutex serializes access to the engine.
+ * The bridge runs a background accept loop and serves EACH CLIENT ON ITS OWN
+ * THREAD (v2.1.2, issue #4 — a TUI and a Claude Code session may be connected
+ * at once). Requests on a single connection are sequential.
  *
- * @version 2.0.8
+ * The engine handle's api_mutex does NOT serialize access to the engine: gh#109
+ * removed it from every run entry point so a long turn cannot block
+ * entropic_interrupt(). Until v2.12.0 that made two concurrent asks a data race
+ * on the shared conversation and on the llama context (gh#144). The bridge now
+ * serializes turns itself, so a second caller QUEUES rather than racing or
+ * being refused, and reports its position through the status tool.
+ *
+ * @version 2.12.0
  */
 
 #pragma once
@@ -62,8 +74,11 @@ namespace entropic {
  * `<log_dir>/async/<task_id>.{done,failed,cancelled}` so external
  * monitors can use inotify rather than parsing log output.
  *
+ * gh#145 (v2.12.0): exposes config() so the tool-name handlers can read the
+ * consumer's configured namespace.
+ *
  * @dg_internal
- * @version 2.11.0
+ * @version 2.12.0
  */
 class ENTROPIC_EXPORT ExternalBridge {
 public:
@@ -72,7 +87,7 @@ public:
      * @param handle Engine handle (must outlive the bridge).
      * @param config External MCP configuration.
      * @param project_dir Project directory (for socket path derivation).
-     * @version 2.0.8
+     * @version 2.12.0
      */
     ExternalBridge(
         entropic_handle_t handle,
@@ -115,6 +130,19 @@ public:
      * @version 2.9.12
      */
     bool ask_streaming() const { return config_.ask_streaming; }
+
+    /**
+     * @brief The external MCP config this bridge was constructed with.
+     *
+     * gh#145 (v2.12.0): file-scope handlers holding an `ExternalBridge*` need
+     * the configured `tool_prefix` and description overrides to build and
+     * resolve tool names. Same static-dispatch rationale as ask_streaming().
+     *
+     * @return Const reference to the config snapshot.
+     * @utility
+     * @version 2.12.0
+     */
+    const ExternalMCPConfig& config() const { return config_; }
 
     /**
      * @brief Handle entropic.ask_status — check async task state.

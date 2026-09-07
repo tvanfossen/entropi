@@ -90,3 +90,15 @@ mcp:
   external:
     enabled: false
     rate_limit: 10
+    # gh#145: a consumer app hosting this engine presents its OWN identity.
+    # tool_prefix namespaces the advertised tools (sumac.ask, sumac.status);
+    # server_name is what a person sees in their MCP server list. Both default
+    # to "entropic", so leaving them unset is exactly the pre-2.12.0 behaviour.
+    # tool_prefix: entropic
+    # server_name: entropic
+    # Optional per-tool description overrides, keyed by bare suffix. The
+    # description is what a MODEL reasons over when choosing a tool, so a host
+    # with one specific job should say what that job is rather than describe
+    # the transport.
+    # tool_descriptions:
+    #   ask: "Review this repository against the documentation ruleset."

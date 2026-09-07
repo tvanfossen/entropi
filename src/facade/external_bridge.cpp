@@ -15,6 +15,7 @@
 
 #include "engine_handle.h"
 #include "final_text.h"  // gh#130 (v2.10.2)
+#include "tool_namespace.h"  // gh#145 (v2.12.0)
 
 #include <nlohmann/json.hpp>
 
@@ -100,19 +101,87 @@ static json tool_text(const std::string& text) {
 // ── Tool definitions ─────────────────────────────────────
 
 /**
- * @brief MCP tool definitions exposed by the bridge.
- * @return JSON array of tool schemas.
- * @utility
- * @version 2.0.11
+ * @brief The bare tool suffixes this bridge exposes, in advertised order.
+ *
+ * gh#145 (v2.12.0). SINGLE SOURCE OF TRUTH. Both `tool_definitions()` and the
+ * name-resolution in `dispatch_tool()` derive from this table, so a name can no
+ * longer be advertised under one spelling and dispatched under another — before
+ * this the five names were written out twice, ~470 lines apart.
+ *
+ * @version 2.12.0
  */
-static json tool_definitions() {
-    return json::array({
-        {{"name", "entropic.ask"},
-         {"description",
-          "Submit a prompt to the running entropic engine. "
-          "Set async=true to return immediately with a task_id; "
-          "the engine pushes a notification when done."},
-         {"inputSchema", {
+namespace tool_suffix {
+constexpr const char* kAsk           = "ask";
+constexpr const char* kAskStatus     = "ask_status";
+constexpr const char* kStatus        = "status";
+constexpr const char* kContextClear  = "context_clear";
+constexpr const char* kContextCount  = "context_count";
+} // namespace tool_suffix
+
+/**
+ * @brief Resolve a tool's description, honouring any consumer override.
+ *
+ * gh#145 (v2.12.0): the description is what a MODEL reasons over when choosing
+ * a tool, and the stock text describes the transport rather than the capability
+ * — so a host with one specific job can replace it. An absent or unknown key
+ * leaves the built-in text untouched.
+ *
+ * @param cfg External MCP config carrying any overrides.
+ * @param suffix Bare tool suffix.
+ * @param fallback Built-in description.
+ * @return The override when one is configured, else `fallback`.
+ * @utility
+ * @version 2.12.0
+ */
+static std::string describe(const ExternalMCPConfig& cfg,
+                            const char* suffix,
+                            const char* fallback) {
+    auto it = cfg.tool_descriptions.find(suffix);
+    if (it != cfg.tool_descriptions.end() && !it->second.empty()) {
+        return it->second;
+    }
+    return fallback;
+}
+
+/**
+ * @brief Definition for a tool that takes no arguments.
+ *
+ * gh#145 (v2.12.0): three of the five tools share an empty inputSchema, so
+ * they share a builder. Also keeps tool_definitions() inside the SLOC gate.
+ *
+ * @param cfg External MCP config supplying prefix and description overrides.
+ * @param suffix Bare tool suffix.
+ * @param fallback Built-in description.
+ * @return One MCP tool definition object.
+ * @utility
+ * @version 2.12.0
+ */
+static json no_args_tool(const ExternalMCPConfig& cfg,
+                         const char* suffix,
+                         const char* fallback) {
+    return {{"name", facade::qualify_tool_name(cfg.tool_prefix, suffix)},
+            {"description", describe(cfg, suffix, fallback)},
+            {"inputSchema", {{"type", "object"},
+                             {"properties", json::object()}}}};
+}
+
+/**
+ * @brief Definition for the ask tool (prompt + optional async).
+ * @param cfg External MCP config supplying prefix and description overrides.
+ * @return One MCP tool definition object.
+ * @utility
+ * @version 2.12.0
+ */
+static json ask_tool(const ExternalMCPConfig& cfg) {
+    return {
+        {"name", facade::qualify_tool_name(cfg.tool_prefix,
+                                           tool_suffix::kAsk)},
+        {"description",
+         describe(cfg, tool_suffix::kAsk,
+                  "Submit a prompt to the running entropic engine. "
+                  "Set async=true to return immediately with a task_id; "
+                  "the engine pushes a notification when done.")},
+        {"inputSchema", {
             {"type", "object"},
             {"properties", {
                 {"prompt", {{"type", "string"},
@@ -122,30 +191,55 @@ static json tool_definitions() {
                            {"default", false}}}
             }},
             {"required", json::array({"prompt"})}
-         }}},
-        {{"name", "entropic.ask_status"},
-         {"description",
-          "Check status of an async entropic.ask task."},
-         {"inputSchema", {
+        }}};
+}
+
+/**
+ * @brief Definition for the ask_status tool (task_id lookup).
+ * @param cfg External MCP config supplying prefix and description overrides.
+ * @return One MCP tool definition object.
+ * @utility
+ * @version 2.12.0
+ */
+static json ask_status_tool(const ExternalMCPConfig& cfg) {
+    return {
+        {"name", facade::qualify_tool_name(cfg.tool_prefix,
+                                           tool_suffix::kAskStatus)},
+        {"description",
+         describe(cfg, tool_suffix::kAskStatus,
+                  "Check status of an async ask task.")},
+        {"inputSchema", {
             {"type", "object"},
             {"properties", {{"task_id", {
                 {"type", "string"},
                 {"description", "Task ID from async ask"}
             }}}},
             {"required", json::array({"task_id"})}
-         }}},
-        {{"name", "entropic.status"},
-         {"description", "Engine version and message count."},
-         {"inputSchema", {{"type", "object"},
-                          {"properties", json::object()}}}},
-        {{"name", "entropic.context_clear"},
-         {"description", "Clear conversation history."},
-         {"inputSchema", {{"type", "object"},
-                          {"properties", json::object()}}}},
-        {{"name", "entropic.context_count"},
-         {"description", "Return the message count."},
-         {"inputSchema", {{"type", "object"},
-                          {"properties", json::object()}}}},
+        }}};
+}
+
+/**
+ * @brief MCP tool definitions exposed by the bridge.
+ *
+ * gh#145 (v2.12.0): names and descriptions are consumer-configurable. The
+ * defaults ("entropic" prefix, no description overrides) reproduce the
+ * pre-2.12.0 payload exactly.
+ *
+ * @param cfg External MCP config supplying prefix and description overrides.
+ * @return JSON array of tool schemas.
+ * @utility
+ * @version 2.12.0
+ */
+static json tool_definitions(const ExternalMCPConfig& cfg) {
+    return json::array({
+        ask_tool(cfg),
+        ask_status_tool(cfg),
+        no_args_tool(cfg, tool_suffix::kStatus,
+                     "Engine version and message count."),
+        no_args_tool(cfg, tool_suffix::kContextClear,
+                     "Clear conversation history."),
+        no_args_tool(cfg, tool_suffix::kContextCount,
+                     "Return the message count."),
     });
 }
 
@@ -566,11 +660,11 @@ static json dispatch_ask(entropic_handle_t handle,
  * @param handle Engine handle.
  * @param bridge Bridge instance (for async task registry).
  * @param params JSON-RPC params (name + arguments).
- * @param client_fd Socket fd for streaming (entropic.ask only).
+ * @param client_fd Socket fd for streaming (the ask tool only).
  * @param call_id JSON-RPC request id for progress correlation.
  * @return MCP tool result JSON.
  * @req REQ-BRIDGE-001
- * @version 2.0.6-rc16
+ * @version 2.12.0
  */
 static json dispatch_tool(entropic_handle_t handle,
                           ExternalBridge* bridge,
@@ -579,14 +673,19 @@ static json dispatch_tool(entropic_handle_t handle,
                           const std::string& call_id) {
     std::string name = params.value("name", std::string{});
     json args = params.value("arguments", json::object());
-    if (name == "entropic.ask") {
+    // gh#145: strip the configured namespace, then match bare suffixes
+    // against the same table tool_definitions() advertised from.
+    const std::string suffix =
+        facade::strip_tool_prefix(
+            bridge->config().tool_prefix, name);
+    if (suffix == tool_suffix::kAsk) {
         return dispatch_ask(handle, bridge, args, client_fd, call_id);
     }
     json result;
-    if      (name == "entropic.ask_status")    { result = bridge->handle_ask_status(args); }
-    else if (name == "entropic.status")        { result = handle_status(handle); }
-    else if (name == "entropic.context_clear") { result = handle_clear(handle, bridge); }
-    else if (name == "entropic.context_count") { result = handle_count(handle); }
+    if      (suffix == tool_suffix::kAskStatus)    { result = bridge->handle_ask_status(args); }
+    else if (suffix == tool_suffix::kStatus)       { result = handle_status(handle); }
+    else if (suffix == tool_suffix::kContextClear) { result = handle_clear(handle, bridge); }
+    else if (suffix == tool_suffix::kContextCount) { result = handle_count(handle); }
     else { result = tool_text("error: unknown tool '" + name + "'"); }
     return result;
 }
@@ -1016,14 +1115,25 @@ void ExternalBridge::serve_client(int client_fd) {
 
 /**
  * @brief Build the MCP initialize response payload.
+ *
+ * gh#145 (v2.12.0): `serverInfo.name` comes from `mcp.external.server_name`
+ * (default "entropic"). This is the string a PERSON reads in their MCP server
+ * list, which is why it is configured separately from `tool_prefix` — the
+ * latter is what a MODEL reasons over. `version` remains the engine's own
+ * version: the host owns its identity, but must not misreport the engine
+ * behind it.
+ *
+ * @param cfg External MCP config supplying the server name.
  * @return JSON result object.
  * @utility
- * @version 2.0.9
+ * @version 2.12.0
  */
-static json initialize_result() {
+static json initialize_result(const ExternalMCPConfig& cfg) {
+    const std::string name =
+        cfg.server_name.empty() ? "entropic" : cfg.server_name;
     return {
         {"protocolVersion", "2025-06-18"},
-        {"serverInfo", {{"name", "entropic"},
+        {"serverInfo", {{"name", name},
                         {"version", entropic_version()}}},
         {"capabilities", {{"tools", json::object()}}}
     };
@@ -1040,7 +1150,7 @@ static json initialize_result() {
  * @param client_fd Socket fd for streaming progress (entropic.ask).
  * @return JSON-RPC response string, or empty for notifications.
  * @req REQ-BRIDGE-001
- * @version 2.0.11
+ * @version 2.12.0
  */
 std::string ExternalBridge::dispatch(
     const std::string& request, int client_fd) {
@@ -1057,8 +1167,8 @@ std::string ExternalBridge::dispatch(
     json params = req.value("params", json::object());
     json result;
 
-    if      (method == "initialize")  { result = initialize_result(); }
-    else if (method == "tools/list")  { result = {{"tools", tool_definitions()}}; }
+    if      (method == "initialize")  { result = initialize_result(config_); }
+    else if (method == "tools/list")  { result = {{"tools", tool_definitions(config_)}}; }
     else if (method == "tools/call")  {
         auto id_str = id.is_string() ? id.get<std::string>()
                                      : id.dump();

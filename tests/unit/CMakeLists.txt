@@ -458,6 +458,9 @@ add_executable(entropic-api-tests
     # gh#130 (v2.10.2): bridge final-text selection — includes the private
     # src/facade/final_text.h (same pattern as serialize_messages_utf8_test).
     api/final_text_test.cpp
+    # gh#145 (v2.12.0): bridge tool-namespace rule — includes the private
+    # src/facade/tool_namespace.h (same pattern as final_text_test).
+    api/tool_namespace_test.cpp
     # v2.1.7 (gh#34): mcp-bridge CLI relay round-trip tests.
     mcp/mcp_bridge_relay_test.cpp
 )
