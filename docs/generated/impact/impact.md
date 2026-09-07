@@ -2,7 +2,6 @@
 
 | REQ | Name | Functions Changed |
 |-----|------|-------------------|
-| REQ-CFG-006 | Fail-loud validation — reject bad or inert configuration at load time | validate |
-| REQ-INFER-019 | Model pool dedup and VRAM residency policy govern which tier is resident | footprint_inputs_for, derive_pool_geometry, session_pool_conflict_reason, estimate_vram_footprint, recommend_context_length |
+| REQ-INFER-019 | Model pool dedup and VRAM residency policy govern which tier is resident | slot_for, acquire, resident, set_resident, invalidate, invalidate_all |
 
-**Total: 2 requirement(s) affected, 6 function(s) changed**
+**Total: 1 requirement(s) affected, 6 function(s) changed**

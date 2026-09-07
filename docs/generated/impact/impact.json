@@ -1,42 +1,36 @@
 [
   {
-    "req_id": "REQ-CFG-006",
-    "req_name": "Fail-loud validation \u2014 reject bad or inert configuration at load time",
-    "functions": [
-      {
-        "name": "validate",
-        "file": "src/config/validate.cpp",
-        "version": "2.12.0"
-      }
-    ]
-  },
-  {
     "req_id": "REQ-INFER-019",
     "req_name": "Model pool dedup and VRAM residency policy govern which tier is resident",
     "functions": [
       {
-        "name": "footprint_inputs_for",
-        "file": "src/inference/orchestrator.cpp",
+        "name": "slot_for",
+        "file": "src/inference/session_residency.h",
         "version": "2.12.0"
       },
       {
-        "name": "derive_pool_geometry",
-        "file": "src/inference/session_pool_util.h",
+        "name": "acquire",
+        "file": "src/inference/session_residency.h",
         "version": "2.12.0"
       },
       {
-        "name": "session_pool_conflict_reason",
-        "file": "src/inference/session_pool_util.h",
+        "name": "resident",
+        "file": "src/inference/session_residency.h",
         "version": "2.12.0"
       },
       {
-        "name": "estimate_vram_footprint",
-        "file": "src/inference/vram_footprint.h",
+        "name": "set_resident",
+        "file": "src/inference/session_residency.h",
         "version": "2.12.0"
       },
       {
-        "name": "recommend_context_length",
-        "file": "src/inference/vram_footprint.h",
+        "name": "invalidate",
+        "file": "src/inference/session_residency.h",
+        "version": "2.12.0"
+      },
+      {
+        "name": "invalidate_all",
+        "file": "src/inference/session_residency.h",
         "version": "2.12.0"
       }
     ]
