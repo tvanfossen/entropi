@@ -657,7 +657,7 @@ bool LlamaCppBackend::build_mtp_head(const std::string& head_path) {
  * via the next activate, which reloads from scratch).
  *
  * @dg_internal
- * @version 2.9.1
+ * @version 2.12.0
  */
 void LlamaCppBackend::do_deactivate() {
     // gh#108 (v2.9.1): serialise vs an in-flight generate_mtp — it holds
@@ -681,7 +681,7 @@ void LlamaCppBackend::do_deactivate() {
         llama_free(ctx_);
         ctx_ = nullptr;
     }
-    invalidate_resident_kv();  // gh#96: KV is gone with the context
+    invalidate_all_resident_kv();  // gh#96: KV is gone with the context
 
     // Free the GPU model FIRST (releasing VRAM — the point of
     // deactivate), then reload CPU-only for the WARM state. tokenizer_
@@ -790,7 +790,7 @@ void LlamaCppBackend::inject_sampler_factory_for_test(
  * second engine handle in the same process fail its GPU model load.
  *
  * @req REQ-INFER-002
- * @version 2.10.4
+ * @version 2.12.0
  */
 void LlamaCppBackend::do_unload() {
     // gh#108 (v2.9.1): serialise vs in-flight generate_mtp (see do_deactivate).
@@ -835,7 +835,7 @@ void LlamaCppBackend::do_unload() {
         llama_free(ctx_);
         ctx_ = nullptr;
     }
-    invalidate_resident_kv();  // gh#96: KV is gone with the context
+    invalidate_all_resident_kv();  // gh#96: KV is gone with the context
     if (model_) {
         llama_model_free(model_);
         model_ = nullptr;
@@ -2008,7 +2008,7 @@ void LlamaCppBackend::release_temp_seqs(std::vector<BatchSeq>& seqs) {
  * prefilled once); `last_gen_decode_calls_` holds the batched step count.
  *
  * @dg_internal
- * @version 2.8.0
+ * @version 2.12.0
  */
 std::vector<GenerationResult> LlamaCppBackend::run_batched_decode(
     const std::vector<std::vector<llama_token>>& toks,
@@ -2027,7 +2027,7 @@ std::vector<GenerationResult> LlamaCppBackend::run_batched_decode(
     for (const auto& p : params) { max_steps = std::max(max_steps, p.max_tokens); }
 
     llama_memory_clear(llama_get_memory(ctx_), true);
-    invalidate_resident_kv();
+    invalidate_all_resident_kv();
     last_prefill_tokens_ = 0;
     last_gen_decode_calls_ = 0;
 
@@ -2039,7 +2039,7 @@ std::vector<GenerationResult> LlamaCppBackend::run_batched_decode(
                   : std::vector<GenerationResult>(
                         n, batch_error_result("batch prefill"));
     release_temp_seqs(seqs);
-    invalidate_resident_kv();
+    invalidate_all_resident_kv();
     logger->info("gh#98 batch: requests={} prefix.tokens_shared={} "
                  "prefix.tokens_saved={} total_prefill_tokens={} gen_decodes={}",
                  n, shared, shared * (n - 1), last_prefill_tokens_,
@@ -2293,7 +2293,7 @@ bool LlamaCppBackend::prefill_and_cache_prefix(
  * @param params Generation parameters.
  * @return true on success.
  * @dg_internal
- * @version 2.7.6
+ * @version 2.12.0
  */
 bool LlamaCppBackend::run_prefill_cached(
     const std::vector<llama_token>& tokens,
@@ -2330,7 +2330,7 @@ bool LlamaCppBackend::run_prefill_cached(
         if (!ok) {
             ok = prefill_dispatch(tokens, system_prompt, messages, params);
             if (ok) {
-                resident_tokens_ = tokens;
+                residency_.set_resident(active_slot_, tokens);
             } else {
                 invalidate_resident_kv();
             }
@@ -2372,25 +2372,32 @@ bool LlamaCppBackend::run_prefill_cached(
  * @param tokens Full incoming token sequence.
  * @return true if reuse handled the prefill; false to fall back (no KV change).
  * @dg_internal
- * @version 2.7.5
+ * @version 2.12.0
  */
 bool LlamaCppBackend::try_warm_reuse(const std::vector<llama_token>& tokens) {
     if (!prompt_cache_config_.warm_keep || ctx_ == nullptr) {
         return false;
     }
+    // gh#144 (v2.12.0): ask THIS session's slot what it holds. Against the
+    // previous single shared vector, a second session sharing the system
+    // prompt scored a non-zero common prefix and reused destructively.
+    const int slot = active_slot_;
     auto* mem = llama_get_memory(ctx_);
-    long pos_max = static_cast<long>(llama_memory_seq_pos_max(mem, 0));
-    std::size_t cut = warm_keep_cut(resident_tokens_, tokens, pos_max);
+    long pos_max = static_cast<long>(
+        llama_memory_seq_pos_max(mem, static_cast<llama_seq_id>(slot)));
+    std::size_t cut = warm_keep_cut(residency_.resident(slot), tokens,
+                                    pos_max);
     if (cut == 0) {
         return false;  // nothing reusable — cold prefill
     }
     // Drop the divergent tail (and any prior generated tokens past `cut`),
     // then decode only the appended delta. A single exit (returns <= 3 gate):
     // success records the new resident set; failure invalidates and reports it.
-    llama_memory_seq_rm(mem, 0, static_cast<llama_pos>(cut), -1);
+    llama_memory_seq_rm(mem, static_cast<llama_seq_id>(slot),
+                        static_cast<llama_pos>(cut), -1);
     bool ok = decode_tokens_from(tokens, static_cast<int>(cut));
     if (ok) {
-        resident_tokens_ = tokens;
+        residency_.set_resident(slot, tokens);
         if (prompt_cache_config_.log_hits) {
             logger->info("Warm-keep: reused {} resident tokens, decoded {} "
                          "delta (of {} total)", cut, tokens.size() - cut,
@@ -2410,10 +2417,28 @@ bool LlamaCppBackend::try_warm_reuse(const std::vector<llama_token>& tokens) {
  * declaration run to the preceding declaration).
  * @utility
  * @dg_internal
- * @version 2.7.5
+ * @version 2.12.0
  */
 void LlamaCppBackend::invalidate_resident_kv() {
-    resident_tokens_.clear();
+    // gh#144 (v2.12.0): only this session's slot. A caller that wiped the
+    // WHOLE context must call invalidate_all_resident_kv() instead — believing
+    // another slot is still resident after that is how a stale prefix gets
+    // reused.
+    residency_.invalidate(active_slot_);
+}
+
+/**
+ * @brief Drop EVERY slot's warm-keep record (gh#144, v2.12.0).
+ *
+ * For the paths that still clear the whole context unconditionally
+ * (llama_memory_clear(mem, true)). After one of those no slot holds what the
+ * bookkeeping thinks it does.
+ * @utility
+ * @dg_internal
+ * @version 2.12.0
+ */
+void LlamaCppBackend::invalidate_all_resident_kv() {
+    residency_.invalidate_all();
 }
 
 /**
@@ -2672,7 +2697,7 @@ GenerationResult LlamaCppBackend::run_sampling_loop(
  * @return GenerationResult; ENTROPIC_ERROR_IMAGE_LOAD_FAILED when a bitmap
  *         could not be built, or the prefill's own error code.
  * @req REQ-INFER-025
- * @version 2.7.5
+ * @version 2.12.0
  */
 GenerationResult LlamaCppBackend::generate_multimodal(
     const std::vector<Message>& messages,
@@ -2681,7 +2706,7 @@ GenerationResult LlamaCppBackend::generate_multimodal(
     std::atomic<bool>* cancel)
 {
     auto t0 = entropic::log::now();
-    invalidate_resident_kv();  // gh#96: mtmd_prefill mutates seq 0 out-of-band
+    invalidate_all_resident_kv();  // gh#96: mtmd_prefill mutates seq 0 out-of-band
     std::vector<::mtmd_bitmap*> bitmaps;
     auto marked = substitute_image_markers(
         messages, mtmd_ctx_, bitmaps);
@@ -3916,7 +3941,7 @@ static GenerationResult spec_run_from_tokens(
 /**
  * @brief Speculative generation against a draft model (gh#36).
  * @dg_internal
- * @version 2.10.4
+ * @version 2.12.0
  */
 GenerationResult LlamaCppBackend::generate_speculative_with_draft(
     const std::vector<Message>& messages,
@@ -3928,7 +3953,7 @@ GenerationResult LlamaCppBackend::generate_speculative_with_draft(
     const std::string& draft_path)
 {
     auto t0 = entropic::log::now();
-    invalidate_resident_kv();  // gh#96: speculative path manages seq 0 itself
+    invalidate_all_resident_kv();  // gh#96: speculative path manages seq 0 itself
     auto pre_err = spec_check_preconditions(
         is_active(), draft.is_active(), ctx_, draft.ctx_);
     GenerationResult result;
@@ -4299,7 +4324,7 @@ GenerationResult LlamaCppBackend::mtp_guard(
  *         this route owns the outcome and never degrades to plain decode.
  * @req REQ-INFER-015
  * @req REQ-INFER-005
- * @version 2.10.4
+ * @version 2.12.0
  */
 GenerationResult LlamaCppBackend::generate_mtp(
     const std::vector<Message>& messages,
@@ -4315,7 +4340,7 @@ GenerationResult LlamaCppBackend::generate_mtp(
     if (result.error_code != ENTROPIC_OK) {
         return result;
     }
-    invalidate_resident_kv();  // MTP kernel owns seq 0 itself
+    invalidate_all_resident_kv();  // MTP kernel owns seq 0 itself
     auto tokens = tokenize(render_prompt(messages, params), true);
     if (tokens.size() < 2) {
         return spec_error(ENTROPIC_ERROR_GENERATE_FAILED,
@@ -4336,14 +4361,14 @@ GenerationResult LlamaCppBackend::generate_mtp(
  * @param params Generation parameters.
  * @return GenerationResult.
  * @dg_internal
- * @version 2.7.5
+ * @version 2.12.0
  */
 GenerationResult LlamaCppBackend::do_complete(
     const std::string& prompt,
     const GenerationParams& params)
 {
     auto t0 = entropic::log::now();
-    invalidate_resident_kv();  // gh#96: decode_loop/run_prefill mutate seq 0
+    invalidate_all_resident_kv();  // gh#96: decode_loop/run_prefill mutate seq 0
     auto tokens = tokenize(prompt, false);
 
     logger->info("Complete: {} input tokens, max_tokens={}",
