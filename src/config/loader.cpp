@@ -29,7 +29,7 @@ namespace entropic::config {
  * knots ABC gate as new MVP-10 model-load knobs land.
  * @utility
  * @dg_internal
- * @version 2.3.19
+ * @version 2.12.0
  */
 static void parse_model_runtime_knobs(
     ryml::ConstNodeRef node, ModelConfig& config)
@@ -46,6 +46,7 @@ static void parse_model_runtime_knobs(
     extract(node, "rope_freq_base", config.rope_freq_base); // gh#23 v2.3.21
     extract(node, "rope_freq_scale", config.rope_freq_scale); // gh#23 v2.3.22
     extract(node, "n_parallel", config.n_parallel); // gh#23 v2.3.23
+    extract(node, "max_sessions", config.max_sessions); // gh#144 v2.12.0
     extract(node, "flash_attn", config.flash_attn);
 }
 

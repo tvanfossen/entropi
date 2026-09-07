@@ -1,46 +1,42 @@
 [
   {
-    "req_id": "REQ-BRIDGE-001",
-    "req_name": "External bridge exposes the engine over a peer-authenticated unix socket",
+    "req_id": "REQ-CFG-006",
+    "req_name": "Fail-loud validation \u2014 reject bad or inert configuration at load time",
     "functions": [
       {
-        "name": "handle_status",
-        "file": "src/facade/external_bridge.cpp",
+        "name": "validate",
+        "file": "src/config/validate.cpp",
+        "version": "2.12.0"
+      }
+    ]
+  },
+  {
+    "req_id": "REQ-INFER-019",
+    "req_name": "Model pool dedup and VRAM residency policy govern which tier is resident",
+    "functions": [
+      {
+        "name": "footprint_inputs_for",
+        "file": "src/inference/orchestrator.cpp",
         "version": "2.12.0"
       },
       {
-        "name": "dispatch_ask",
-        "file": "src/facade/external_bridge.cpp",
+        "name": "derive_pool_geometry",
+        "file": "src/inference/session_pool_util.h",
         "version": "2.12.0"
       },
       {
-        "name": "dispatch_tool",
-        "file": "src/facade/external_bridge.cpp",
-        "version": "2.12.0-rc1"
-      },
-      {
-        "name": "begin_turn_wait",
-        "file": "src/facade/external_bridge.cpp",
+        "name": "session_pool_conflict_reason",
+        "file": "src/inference/session_pool_util.h",
         "version": "2.12.0"
       },
       {
-        "name": "end_turn_wait",
-        "file": "src/facade/external_bridge.cpp",
+        "name": "estimate_vram_footprint",
+        "file": "src/inference/vram_footprint.h",
         "version": "2.12.0"
       },
       {
-        "name": "stop",
-        "file": "src/facade/external_bridge.cpp",
-        "version": "2.1.2"
-      },
-      {
-        "name": "accept_loop",
-        "file": "src/facade/external_bridge.cpp",
-        "version": "2.1.7"
-      },
-      {
-        "name": "run_async_ask",
-        "file": "src/facade/external_bridge.cpp",
+        "name": "recommend_context_length",
+        "file": "src/inference/vram_footprint.h",
         "version": "2.12.0"
       }
     ]

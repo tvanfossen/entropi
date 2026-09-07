@@ -236,6 +236,23 @@ struct ModelConfig {
     /// `LLAMA_MAX_SEQ`; consult llama.cpp for the current ceiling.
     /// @version 2.3.23
     int n_parallel = 1;
+
+    /// @brief Resident per-caller conversation sessions this tier keeps
+    /// KV for (gh#144).
+    ///
+    /// `1` (default) is bit-identical to pre-v2.12.0. Greater than 1
+    /// DERIVES the context geometry rather than being set alongside it —
+    /// `n_seq_max`, `kv_unified` and `n_ctx` are computed from this and
+    /// `context_length`, and the derivation is logged. Three independently
+    /// settable knobs an operator can get inconsistent is precisely the
+    /// silent-misconfiguration shape this codebase's fail-fast rule exists
+    /// to prevent, and `kv_unified` is not a config key at all.
+    ///
+    /// `context_length` stays PER SESSION: a pool of 3 at 32768 allocates
+    /// 98304 cells, not 3 sessions sharing 32768.
+    /// @version 2.12.0
+    int max_sessions = 1;
+
     bool flash_attn = true;                  ///< Enable flash attention
 
     /* ── Tool filtering ────────────────────────────────── */

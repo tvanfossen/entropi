@@ -86,6 +86,8 @@ add_executable(entropic-inference-tests
     inference/generation_params_test.cpp
     inference/prompt_cache_test.cpp
     inference/warm_keep_util_test.cpp
+    # gh#144 (v2.12.0): pure session-pool geometry derivation.
+    inference/session_pool_util_test.cpp
     # gh#103 (v2.8.2): CPU pin for the family-aware tool-call close-marker map
     # (sequential tool_call_mode). Vendor-coupled to the common_chat PEG
     # section_end defaults; needs the llama.cpp common/ include for <chat.h>.

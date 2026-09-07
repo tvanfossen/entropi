@@ -257,3 +257,88 @@ SCENARIO("gh#142 the config that aborted the process is refused instead",
         }
     }
 }
+
+// ── gh#144: session pool multiplies the KV term ──────────
+
+SCENARIO("gh#144: a session pool multiplies the KV estimate",
+         "[vram_footprint][gh144][2.12.0]") {
+    GIVEN("a tier that fits comfortably at one session") {
+        FootprintInputs one = agentic_e4b_q8();
+        one.context_length = 32768;
+        one.max_sessions = 1;
+        const auto base = entropic::estimate_vram_footprint(one);
+        REQUIRE(base.known);
+
+        WHEN("the same tier asks for three resident sessions") {
+            FootprintInputs three = one;
+            three.max_sessions = 3;
+            const auto pooled = entropic::estimate_vram_footprint(three);
+
+            THEN("the KV term triples rather than being counted once") {
+                // Without this the gate under-counts by exactly N and can
+                // admit a config that then aborts the host inside
+                // llama.cpp — the failure gh#142 built the gate to prevent.
+                REQUIRE(pooled.known);
+                const uint64_t kv_one =
+                    static_cast<uint64_t>(32768.0
+                        * entropic::kv_bytes_per_token(one));
+                CHECK(pooled.bytes == base.bytes + 2 * kv_one);
+            }
+        }
+    }
+}
+
+SCENARIO("gh#144: the fit recommendation is per session, not total",
+         "[vram_footprint][gh144][2.12.0]") {
+    GIVEN("a budget sized so ONE session exactly fits the request") {
+        FootprintInputs one = agentic_e4b_q8();
+        one.context_length = 32768;
+        one.max_sessions = 1;
+        // recommend_context_length never inflates a request that already
+        // fits, so a generous budget returns the requested length for any
+        // session count and proves nothing. Pin the budget to the
+        // one-session estimate so the divide is actually load-bearing.
+        const auto base = entropic::estimate_vram_footprint(one);
+        REQUIRE(base.known);
+        const uint64_t budget = base.bytes;
+
+        const int fits_one =
+            entropic::recommend_context_length(one, budget);
+        REQUIRE(fits_one > 0);
+
+        WHEN("three sessions are requested against the same budget") {
+            FootprintInputs three = one;
+            three.max_sessions = 3;
+            const int fits_three =
+                entropic::recommend_context_length(three, budget);
+
+            THEN("the recommended PER-SESSION window shrinks") {
+                // Returning the single-session number here would hand the
+                // operator a config three times too large, from the very
+                // function whose job is to offer one that works.
+                CHECK(fits_three < fits_one);
+            }
+            AND_THEN("it is near a third, allowing for 512-rounding") {
+                CHECK(fits_three <= (fits_one / 3) + 512);
+            }
+        }
+    }
+}
+
+SCENARIO("gh#144: max_sessions of 0 or 1 is priced identically",
+         "[vram_footprint][gh144][regression][2.12.0]") {
+    GIVEN("a tier with the field left at its default") {
+        FootprintInputs def = agentic_e4b_q8();
+        def.context_length = 8192;
+
+        THEN("an explicit 1 and a degenerate 0 both match the default") {
+            FootprintInputs one = def;  one.max_sessions = 1;
+            FootprintInputs zero = def; zero.max_sessions = 0;
+            const auto a = entropic::estimate_vram_footprint(def);
+            const auto b = entropic::estimate_vram_footprint(one);
+            const auto c = entropic::estimate_vram_footprint(zero);
+            CHECK(a.bytes == b.bytes);
+            CHECK(a.bytes == c.bytes);
+        }
+    }
+}

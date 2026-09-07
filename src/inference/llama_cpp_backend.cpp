@@ -18,6 +18,7 @@
 #include "grammar_source.h"
 #include "llama_cpp_sampler.h"
 #include "llama_cpp_tokenizer.h"
+#include "session_pool_util.h"
 #include "warm_keep_util.h"  // gh#96: common_prefix_len / warm_keep_cut
 #include "tool_call_markers.h"  // gh#103: family-aware tool-call close marker
 #include "batch_util.h"  // gh#98: batch_shared_prefix_len / batch_is_viable
@@ -335,11 +336,17 @@ namespace {
  * n_parallel>1 so the same-prefix batch fan-out's seq_cp is supported.
  *
  * @utility
- * @version 2.9.2
+ * @version 2.12.0
  */
 llama_context_params build_cparams(const entropic::ModelConfig& cfg) {
     llama_context_params c = llama_context_default_params();
-    c.n_ctx = static_cast<uint32_t>(cfg.context_length);
+    // gh#144 (v2.12.0): with max_sessions > 1 the geometry is DERIVED, not
+    // set knob-by-knob — see session_pool_util.h for why non-unified and why
+    // n_ctx multiplies (context_length is PER SESSION). max_sessions == 1
+    // reproduces the previous values exactly, so an existing deployment is
+    // bit-identical.
+    const auto pool = derive_pool_geometry(cfg);
+    c.n_ctx = static_cast<uint32_t>(pool.n_ctx);
     c.n_batch = static_cast<uint32_t>(cfg.n_batch);
     // gh#23 MVP item 5 (v2.3.17): n_ubatch. 0 keeps llama.cpp's default
     // (== n_batch in practice), preserving pre-v2.3.17 chunking.
@@ -363,13 +370,13 @@ llama_context_params build_cparams(const entropic::ModelConfig& cfg) {
     c.rope_freq_scale = cfg.rope_freq_scale;
     // gh#23 MVP item 11 (v2.3.23): n_parallel maps to cparams.n_seq_max.
     // 1 (default) matches llama.cpp's default — bit-identical.
-    c.n_seq_max = static_cast<uint32_t>(cfg.n_parallel);
+    c.n_seq_max = static_cast<uint32_t>(pool.n_seq_max);
     // gh#98 (v2.8.0): a unified KV buffer is REQUIRED for llama_memory_seq_cp
     // (the same-prefix batch fan-out) — seq_cp asserts on per-sequence buffers.
     // llama.cpp also recommends kv_unified exactly when sequences share a large
     // prefix (our case). Only enabled when batching is configured (n_parallel>1)
     // so single-sequence handles keep llama.cpp's default.
-    c.kv_unified = (cfg.n_parallel > 1);
+    c.kv_unified = pool.kv_unified;
     // gh#108 (v2.9.2): llama_context_default_params() returns swa_full=true (a
     // full-context SWA cache), but the CLI default is false. For Gemma-4 (mostly
     // sliding-window: window=512, 5:1 SWA:global) the un-windowed cache wastes

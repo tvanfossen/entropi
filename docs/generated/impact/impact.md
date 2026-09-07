@@ -2,6 +2,7 @@
 
 | REQ | Name | Functions Changed |
 |-----|------|-------------------|
-| REQ-BRIDGE-001 | External bridge exposes the engine over a peer-authenticated unix socket | handle_status, dispatch_ask, dispatch_tool, begin_turn_wait, end_turn_wait, stop, accept_loop, run_async_ask |
+| REQ-CFG-006 | Fail-loud validation — reject bad or inert configuration at load time | validate |
+| REQ-INFER-019 | Model pool dedup and VRAM residency policy govern which tier is resident | footprint_inputs_for, derive_pool_geometry, session_pool_conflict_reason, estimate_vram_footprint, recommend_context_length |
 
-**Total: 1 requirement(s) affected, 8 function(s) changed**
+**Total: 2 requirement(s) affected, 6 function(s) changed**
