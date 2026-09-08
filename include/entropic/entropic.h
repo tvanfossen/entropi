@@ -990,6 +990,178 @@ ENTROPIC_EXPORT entropic_error_t entropic_context_get(
     char** messages_json);
 
 /**
+ * @brief Run a turn on a named session (gh#144).
+ *
+ * The keyed sibling of entropic_run(). A NULL or empty session_key means the
+ * default session, so this is exactly entropic_run() in that case.
+ *
+ * The key is OPAQUE — the engine never interprets it. A consumer hosting one
+ * engine for several callers picks whatever identifies a caller for it (a
+ * canonical repository path, a hash). Two callers passing the SAME key share
+ * a conversation deliberately; that choice belongs to the consumer.
+ *
+ * Added as a new named function rather than by changing entropic_run's
+ * signature, per REQ-ABI-001. It is additive, so ENTROPIC_API_VERSION does
+ * not move.
+ *
+ * @param handle Engine handle returned by entropic_create.
+ * @param session_key Session to run under; NULL or "" = default session.
+ * @param input Null-terminated user input.
+ * @param result_json Out: newly allocated JSON result (free with
+ *                    entropic_free).
+ * @return ENTROPIC_OK on success.
+ *         - ENTROPIC_ERROR_ALREADY_RUNNING — a turn is in flight on this
+ *           handle. One turn at a time: there is one model and one context.
+ *         - Other codes per entropic_run().
+ * @threadsafety NOT serialized. A second concurrent run on the same handle
+ *   is refused rather than queued; a host wanting callers to WAIT must
+ *   serialize above this layer, as the external MCP bridge does.
+ * @req REQ-API-009
+ * @req REQ-LOOP-001
+ * @version 2.12.0
+ *
+ * @par Memory ownership
+ * Caller must free *result_json with entropic_free().
+ */
+ENTROPIC_EXPORT entropic_error_t entropic_run_session(
+    entropic_handle_t handle,
+    const char* session_key,
+    const char* input,
+    char** result_json);
+
+/**
+ * @brief Run a turn on a named session under a named tier (gh#144).
+ * @param handle Engine handle.
+ * @param session_key Session to run under; NULL or "" = default session.
+ * @param tier_or_identity Tier to lock this call to.
+ * @param input Null-terminated user input.
+ * @param result_json Out: newly allocated JSON result (free with
+ *                    entropic_free).
+ * @return ENTROPIC_OK; ENTROPIC_ERROR_IDENTITY_NOT_FOUND for an unknown
+ *         tier; ENTROPIC_ERROR_ALREADY_RUNNING when a turn is in flight.
+ * @threadsafety NOT serialized. See entropic_run_session().
+ * @req REQ-API-009
+ * @req REQ-IDEN-001
+ * @version 2.12.0
+ *
+ * @par Memory ownership
+ * Caller must free *result_json with entropic_free().
+ */
+ENTROPIC_EXPORT entropic_error_t entropic_run_session_as(
+    entropic_handle_t handle,
+    const char* session_key,
+    const char* tier_or_identity,
+    const char* input,
+    char** result_json);
+
+/**
+ * @brief Streaming turn on a named session (gh#144).
+ * @param handle Engine handle.
+ * @param session_key Session to run under; NULL or "" = default session.
+ * @param input Null-terminated user input.
+ * @param on_token Per-token callback.
+ * @param user_data Forwarded to on_token.
+ * @param cancel_flag Optional cancel flag (NULL for none).
+ * @return ENTROPIC_OK; ENTROPIC_ERROR_CANCELLED when cancelled;
+ *         ENTROPIC_ERROR_ALREADY_RUNNING when a turn is in flight.
+ * @threadsafety NOT serialized. See entropic_run_session().
+ * @req REQ-API-009
+ * @version 2.12.0
+ */
+ENTROPIC_EXPORT entropic_error_t entropic_run_session_streaming(
+    entropic_handle_t handle,
+    const char* session_key,
+    const char* input,
+    void (*on_token)(const char* token, size_t len, void* user_data),
+    void* user_data,
+    int* cancel_flag);
+
+/**
+ * @brief Read one session's conversation as a JSON array (gh#144).
+ * @param handle Engine handle.
+ * @param session_key Session to read; NULL or "" = default session.
+ * @param messages_json Out: newly allocated JSON array (free with
+ *                      entropic_free).
+ * @return ENTROPIC_OK on success.
+ * @threadsafety Serialized per-handle.
+ * @req REQ-LOOP-001
+ * @version 2.12.0
+ *
+ * @par Memory ownership
+ * Caller must free *messages_json with entropic_free().
+ */
+ENTROPIC_EXPORT entropic_error_t entropic_session_context_get(
+    entropic_handle_t handle,
+    const char* session_key,
+    char** messages_json);
+
+/**
+ * @brief Message count for one session (gh#144).
+ * @param handle Engine handle.
+ * @param session_key Session to count; NULL or "" = default session.
+ * @param count Out: message count.
+ * @return ENTROPIC_OK on success.
+ * @threadsafety Serialized per-handle.
+ * @req REQ-LOOP-001
+ * @version 2.12.0
+ */
+ENTROPIC_EXPORT entropic_error_t entropic_session_context_count(
+    entropic_handle_t handle,
+    const char* session_key,
+    size_t* count);
+
+/**
+ * @brief Clear one session's history, leaving other sessions intact (gh#144).
+ *
+ * The unscoped entropic_context_clear() wipes EVERY session, which with more
+ * than one caller active is never the right thing.
+ *
+ * @param handle Engine handle.
+ * @param session_key Session to clear; NULL or "" = default session.
+ * @return ENTROPIC_OK on success.
+ * @threadsafety Serialized per-handle.
+ * @req REQ-LOOP-001
+ * @version 2.12.0
+ */
+ENTROPIC_EXPORT entropic_error_t entropic_session_context_clear(
+    entropic_handle_t handle,
+    const char* session_key);
+
+/**
+ * @brief Forget a session entirely (gh#144).
+ *
+ * The default session ("") is cleared rather than erased, so the unscoped
+ * accessors remain total.
+ *
+ * @param handle Engine handle.
+ * @param session_key Session to drop.
+ * @return ENTROPIC_OK on success.
+ * @threadsafety Serialized per-handle.
+ * @req REQ-LOOP-001
+ * @version 2.12.0
+ */
+ENTROPIC_EXPORT entropic_error_t entropic_session_drop(
+    entropic_handle_t handle,
+    const char* session_key);
+
+/**
+ * @brief List the sessions this handle currently holds (gh#144).
+ * @param handle Engine handle.
+ * @param sessions_json Out: newly allocated JSON array of
+ *                      {key, messages} (free with entropic_free).
+ * @return ENTROPIC_OK on success.
+ * @threadsafety Serialized per-handle.
+ * @req REQ-LOOP-001
+ * @version 2.12.0
+ *
+ * @par Memory ownership
+ * Caller must free *sessions_json with entropic_free().
+ */
+ENTROPIC_EXPORT entropic_error_t entropic_session_list(
+    entropic_handle_t handle,
+    char** sessions_json);
+
+/**
  * @brief Get the number of messages in the conversation.
  *
  * @param handle Engine handle.

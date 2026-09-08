@@ -1133,3 +1133,64 @@ SCENARIO("gh#144: a caller that gives up does not stall the line",
         }
     }
 }
+
+// ── gh#144: the session tool argument ────────────────────
+
+SCENARIO("gh#144: the ask tool advertises session as OPTIONAL",
+         "[external_bridge][gh144][gh116][2.12.0]") {
+    GIVEN("a bridge with default config") {
+        ExternalMCPConfig cfg;
+        ExternalBridge bridge(nullptr, cfg, "/tmp/test-session-schema");
+
+        WHEN("tools/list is served") {
+            auto reply = bridge.dispatch(
+                R"({"jsonrpc":"2.0","id":1,"method":"tools/list"})", -1);
+            auto j = json::parse(reply);
+            const auto& tools = j["result"]["tools"];
+
+            THEN("ask declares session but does not require it") {
+                // gh#116's standing rule: every optional tool parameter needs
+                // a case where it is ABSENT, not just present-with-default.
+                // An omitted `session` must mean the shared default session,
+                // which is what every pre-2.12.0 client already gets.
+                bool found = false;
+                for (const auto& t : tools) {
+                    if (t["name"] == "entropic.ask") {
+                        found = true;
+                        const auto& props =
+                            t["inputSchema"]["properties"];
+                        CHECK(props.contains("session"));
+                        const auto& req = t["inputSchema"]["required"];
+                        bool session_required = false;
+                        for (const auto& r : req) {
+                            if (r == "session") { session_required = true; }
+                        }
+                        CHECK_FALSE(session_required);
+                        // prompt IS still required.
+                        bool prompt_required = false;
+                        for (const auto& r : req) {
+                            if (r == "prompt") { prompt_required = true; }
+                        }
+                        CHECK(prompt_required);
+                    }
+                }
+                REQUIRE(found);
+            }
+
+            AND_THEN("context_clear and context_count are session-scoped") {
+                int scoped = 0;
+                for (const auto& t : tools) {
+                    const std::string n = t["name"];
+                    if (n == "entropic.context_clear"
+                        || n == "entropic.context_count") {
+                        if (t["inputSchema"]["properties"]
+                                .contains("session")) {
+                            ++scoped;
+                        }
+                    }
+                }
+                CHECK(scoped == 2);
+            }
+        }
+    }
+}

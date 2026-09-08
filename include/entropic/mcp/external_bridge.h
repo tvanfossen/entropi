@@ -81,7 +81,7 @@ namespace entropic {
  * that serialises every caller reaching the engine.
  *
  * @dg_internal
- * @version 2.12.0-rc1
+ * @version 2.12.0-rc2
  */
 class ENTROPIC_EXPORT ExternalBridge {
 public:
@@ -146,6 +146,23 @@ public:
      * @version 2.12.0
      */
     const ExternalMCPConfig& config() const { return config_; }
+
+    /**
+     * @brief Dispatch one JSON-RPC request and return the response.
+     *
+     * Public since gh#144 (v2.12.0) for the same reason handle_ask_status is:
+     * this is the bridge's protocol entry point, and the tool schemas it
+     * serves are otherwise observable only over a real unix socket. The class
+     * is @dg_internal and crosses no public ABI, so exposing it costs
+     * nothing a consumer can depend on.
+     *
+     * @param request Raw JSON-RPC request line.
+     * @param client_fd Socket fd for streaming progress (-1 when none).
+     * @return JSON-RPC response string, or empty for a notification.
+     * @req REQ-BRIDGE-001
+     * @version 2.12.0
+     */
+    std::string dispatch(const std::string& request, int client_fd);
 
     // ── Turn queue (gh#144, v2.12.0) ─────────────────────────
 
@@ -260,7 +277,8 @@ public:
 
     void run_async_ask(const std::string& prompt,
                        const std::string& task_id,
-                       int client_fd);
+                       int client_fd,
+                       const std::string& session_key = "");
 
     /**
      * @brief Write the sentinel file for an async task completion.
@@ -459,15 +477,6 @@ private:
      */
     void serve_client(int client_fd);
 
-    /**
-     * @brief Dispatch a JSON-RPC request and return the response.
-     * @param request Raw JSON-RPC request string.
-     * @param client_fd Socket fd for streaming progress notifications.
-     * @return JSON-RPC response string, or empty for notifications.
-     * @dg_internal
-     * @version 2.0.10
-     */
-    std::string dispatch(const std::string& request, int client_fd);
 
     /**
      * @brief Reap finished client threads from client_threads_.

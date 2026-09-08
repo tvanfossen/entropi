@@ -2907,6 +2907,265 @@ entropic_error_t entropic_context_get(
 }
 
 /**
+ * @brief Run a turn on a named session (gh#144, v2.12.0).
+ *
+ * The keyed sibling of entropic_run(). A NULL or empty `session_key` means
+ * the default session, so this is exactly entropic_run() in that case.
+ *
+ * The key is OPAQUE — the engine never interprets it. Two callers that pass
+ * the same string deliberately share a conversation; that choice belongs to
+ * the consumer, which is the only party that knows what identifies a caller.
+ *
+ * Added as a NEW NAMED FUNCTION rather than by changing entropic_run's
+ * signature, per REQ-ABI-001 and the entropic_run -> _streaming -> _messages
+ * -> _as -> _batch lineage, none of which ever modified an existing one. It
+ * is additive, so ENTROPIC_API_VERSION does NOT move.
+ *
+ * @param handle Engine handle.
+ * @param session_key Session to run under; NULL or "" = default session.
+ * @param input User input.
+ * @param result_json Out: JSON result (free with entropic_free).
+ * @return ENTROPIC_OK, or ENTROPIC_ERROR_ALREADY_RUNNING when a turn is
+ *         already in flight on this handle.
+ * @req REQ-API-009
+ * @req REQ-LOOP-001
+ * @version 2.12.0
+ */
+entropic_error_t entropic_run_session(
+    entropic_handle_t handle,
+    const char* session_key,
+    const char* input,
+    char** result_json) {
+    entropic::HandleTurnGuard turn(handle);
+    auto rc = check_orchestrator(handle);
+    if (rc != ENTROPIC_OK || !input || !result_json || !handle->engine
+        || !turn.claim()) {
+        return rc != ENTROPIC_OK ? rc
+            : (!input || !result_json) ? ENTROPIC_ERROR_INVALID_ARGUMENT
+            : !handle->engine ? ENTROPIC_ERROR_INVALID_STATE
+            : ENTROPIC_ERROR_ALREADY_RUNNING;
+    }
+    handle->engine->set_active_session(session_key ? session_key : "");
+    try {
+        auto result = handle->engine->run_turn(input);
+        *result_json = alloc_cstr(
+            facade_json::serialize_messages(result));
+        if (handle->stream_observer != nullptr) {
+            handle->stream_observer("", 0, handle->stream_observer_data);
+        }
+        return ENTROPIC_OK;
+    } catch (const std::exception& e) {
+        handle->last_error = e.what();
+        s_log->error("run_session: {}", handle->last_error);
+        *result_json = nullptr;
+        return ENTROPIC_ERROR_GENERATE_FAILED;
+    }
+}
+
+/**
+ * @brief Run a turn on a named session under a named tier (gh#144).
+ * @param handle Engine handle.
+ * @param session_key Session to run under; NULL or "" = default session.
+ * @param tier_or_identity Tier to lock this call to.
+ * @param input User input.
+ * @param result_json Out: JSON result (free with entropic_free).
+ * @return ENTROPIC_OK, ENTROPIC_ERROR_IDENTITY_NOT_FOUND for an unknown
+ *         tier, or ENTROPIC_ERROR_ALREADY_RUNNING.
+ * @req REQ-API-009
+ * @req REQ-IDEN-001
+ * @version 2.12.0
+ */
+entropic_error_t entropic_run_session_as(
+    entropic_handle_t handle,
+    const char* session_key,
+    const char* tier_or_identity,
+    const char* input,
+    char** result_json) {
+    entropic::HandleTurnGuard turn(handle);
+    auto rc = check_orchestrator(handle);
+    if (rc != ENTROPIC_OK || !tier_or_identity || !input || !result_json
+        || !handle->engine || !turn.claim()) {
+        return rc != ENTROPIC_OK ? rc
+            : (!tier_or_identity || !input || !result_json)
+                ? ENTROPIC_ERROR_INVALID_ARGUMENT
+            : !handle->engine ? ENTROPIC_ERROR_INVALID_STATE
+            : ENTROPIC_ERROR_ALREADY_RUNNING;
+    }
+    if (!handle->engine->has_tier(tier_or_identity)) {
+        handle->last_error =
+            std::string("unknown tier: ") + tier_or_identity;
+        return ENTROPIC_ERROR_IDENTITY_NOT_FOUND;
+    }
+    handle->engine->set_active_session(session_key ? session_key : "");
+    return run_as_inner(handle, tier_or_identity, input, result_json);
+}
+
+/**
+ * @brief Streaming turn on a named session (gh#144, v2.12.0).
+ * @param handle Engine handle.
+ * @param session_key Session to run under; NULL or "" = default session.
+ * @param input User input.
+ * @param on_token Per-token callback.
+ * @param user_data Forwarded to on_token.
+ * @param cancel_flag Optional cancel flag.
+ * @return ENTROPIC_OK or ENTROPIC_ERROR_ALREADY_RUNNING.
+ * @req REQ-API-009
+ * @version 2.12.0
+ */
+entropic_error_t entropic_run_session_streaming(
+    entropic_handle_t handle,
+    const char* session_key,
+    const char* input,
+    void (*on_token)(const char* token, size_t len, void* user_data),
+    void* user_data,
+    int* cancel_flag) {
+    entropic::HandleTurnGuard turn(handle);
+    auto rc = check_orchestrator(handle);
+    if (rc != ENTROPIC_OK || !input || !on_token || !handle->engine
+        || !turn.claim()) {
+        return rc != ENTROPIC_OK ? rc
+            : (!input || !on_token || !handle->engine)
+                ? ENTROPIC_ERROR_INVALID_ARGUMENT
+            : ENTROPIC_ERROR_ALREADY_RUNNING;
+    }
+    handle->engine->set_active_session(session_key ? session_key : "");
+    try {
+        int code = handle->engine->run_streaming(
+            input, on_token, user_data, cancel_flag);
+        if (handle->stream_observer != nullptr) {
+            handle->stream_observer("", 0, handle->stream_observer_data);
+        }
+        return code == 1 ? ENTROPIC_ERROR_CANCELLED : ENTROPIC_OK;
+    } catch (const std::exception& e) {
+        handle->last_error = e.what();
+        s_log->error("run_session_streaming: {}", handle->last_error);
+        return ENTROPIC_ERROR_GENERATE_FAILED;
+    }
+}
+
+/**
+ * @brief Read one session's conversation as JSON (gh#144, v2.12.0).
+ * @param handle Engine handle.
+ * @param session_key Session to read; NULL or "" = default session.
+ * @param messages_json Out: JSON array (free with entropic_free).
+ * @return ENTROPIC_OK on success.
+ * @req REQ-LOOP-001
+ * @version 2.12.0
+ */
+entropic_error_t entropic_session_context_get(
+    entropic_handle_t handle,
+    const char* session_key,
+    char** messages_json) {
+    if (!handle || !messages_json || !handle->engine) {
+        return (handle != nullptr && messages_json == nullptr)
+            ? ENTROPIC_ERROR_INVALID_ARGUMENT
+            : ENTROPIC_ERROR_INVALID_HANDLE;
+    }
+    entropic::HandleApiLock lock(handle);
+    *messages_json = alloc_cstr(facade_json::serialize_messages(
+        handle->engine->messages_for(session_key ? session_key : "")));
+    return ENTROPIC_OK;
+}
+
+/**
+ * @brief Message count for one session (gh#144, v2.12.0).
+ * @param handle Engine handle.
+ * @param session_key Session to count; NULL or "" = default session.
+ * @param count Out: message count.
+ * @return ENTROPIC_OK on success.
+ * @req REQ-LOOP-001
+ * @version 2.12.0
+ */
+entropic_error_t entropic_session_context_count(
+    entropic_handle_t handle,
+    const char* session_key,
+    size_t* count) {
+    if (!handle || !count || !handle->engine) {
+        return (handle != nullptr && count == nullptr)
+            ? ENTROPIC_ERROR_INVALID_ARGUMENT
+            : ENTROPIC_ERROR_INVALID_HANDLE;
+    }
+    entropic::HandleApiLock lock(handle);
+    *count = handle->engine->message_count_for(
+        session_key ? session_key : "");
+    return ENTROPIC_OK;
+}
+
+/**
+ * @brief Clear one session's history, leaving others intact (gh#144).
+ *
+ * The unscoped entropic_context_clear wiped every caller's context, which is
+ * why the issue observed it "is not isolation" — with two callers active
+ * there was no ordering in which it was correct.
+ *
+ * @param handle Engine handle.
+ * @param session_key Session to clear; NULL or "" = default session.
+ * @return ENTROPIC_OK on success.
+ * @req REQ-LOOP-001
+ * @version 2.12.0
+ */
+entropic_error_t entropic_session_context_clear(
+    entropic_handle_t handle,
+    const char* session_key) {
+    if (!handle || !handle->engine) {
+        return ENTROPIC_ERROR_INVALID_HANDLE;
+    }
+    entropic::HandleApiLock lock(handle);
+    handle->engine->clear_conversation_for(session_key ? session_key : "");
+    return ENTROPIC_OK;
+}
+
+/**
+ * @brief Forget a session entirely (gh#144, v2.12.0).
+ * @param handle Engine handle.
+ * @param session_key Session to drop; "" is cleared rather than erased.
+ * @return ENTROPIC_OK on success.
+ * @req REQ-LOOP-001
+ * @version 2.12.0
+ */
+entropic_error_t entropic_session_drop(
+    entropic_handle_t handle,
+    const char* session_key) {
+    if (!handle || !handle->engine) {
+        return ENTROPIC_ERROR_INVALID_HANDLE;
+    }
+    entropic::HandleApiLock lock(handle);
+    handle->engine->drop_session(session_key ? session_key : "");
+    return ENTROPIC_OK;
+}
+
+/**
+ * @brief List the sessions this handle holds (gh#144, v2.12.0).
+ *
+ * Feeds the bridge's status tool so an operator can see which callers the
+ * host is serving, and is what every session test asserts against.
+ *
+ * @param handle Engine handle.
+ * @param sessions_json Out: JSON array of {key, messages}
+ *                      (free with entropic_free).
+ * @return ENTROPIC_OK on success.
+ * @req REQ-LOOP-001
+ * @version 2.12.0
+ */
+entropic_error_t entropic_session_list(
+    entropic_handle_t handle,
+    char** sessions_json) {
+    if (!handle || !sessions_json || !handle->engine) {
+        return (handle != nullptr && sessions_json == nullptr)
+            ? ENTROPIC_ERROR_INVALID_ARGUMENT
+            : ENTROPIC_ERROR_INVALID_HANDLE;
+    }
+    entropic::HandleApiLock lock(handle);
+    nlohmann::json arr = nlohmann::json::array();
+    for (const auto& key : handle->engine->session_keys()) {
+        arr.push_back({{"key", key},
+                       {"messages", handle->engine->message_count_for(key)}});
+    }
+    *sessions_json = alloc_cstr(arr.dump());
+    return ENTROPIC_OK;
+}
+
+/**
  * @brief Get conversation message count.
  * @param handle Engine handle returned by entropic_create.
  * @param count Out-param: receives the token count.
