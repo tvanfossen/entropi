@@ -195,7 +195,7 @@ def _model_ctest_tests(build_dir, name_filter=""):
 ## @brief Run one model test's ctest argv with retries + a per-attempt timeout.
 ## @utility
 ## @return Tuple of (status, retries, duration_ms). status: pass|skipped|fail.
-## @version 2.12.0
+## @version 2.12.0-rc1
 def _run_one_model_test(command, timeout_s=DEFAULT_MODEL_TEST_TIMEOUT_S, name="model-test"):
     """Run one model test's argv (retries + a per-attempt timeout).
 
@@ -225,8 +225,14 @@ def _run_one_model_test(command, timeout_s=DEFAULT_MODEL_TEST_TIMEOUT_S, name="m
     # throwing away its diagnosis is the expensive part.
     log_dir = Path("build/test-reports/model/logs")
     log_dir.mkdir(parents=True, exist_ok=True)
-    log_path = log_dir / f"{name}.log"
     for attempt in range(MAX_MODEL_RETRIES + 1):
+        # gh#144 (v2.12.0): one log PER ATTEMPT. A single {name}.log was
+        # reopened in "w" on each retry, so a flaky test overwrote the failing
+        # attempt with the passing one — destroying precisely the output worth
+        # having. Attempt 0 keeps the plain name so the common case is
+        # unchanged.
+        suffix = "" if attempt == 0 else f".retry{attempt}"
+        log_path = log_dir / f"{name}{suffix}.log"
         try:
             with open(log_path, "w") as fh:
                 rc = subprocess.call(
@@ -248,7 +254,7 @@ def _run_one_model_test(command, timeout_s=DEFAULT_MODEL_TEST_TIMEOUT_S, name="m
 ## @brief Run model tests 1:1; a Catch2 SKIP (rc=4) is reported, not failed.
 ## @utility
 ## @return Tuple of (results list, failed count). Skips do NOT count as failures.
-## @version 2.12.0
+## @version 2.12.0-rc1
 def _run_model_tests(build_dir, name_filter=""):
     """Run model tests 1:1. Returns (results, failed_count). gh#89: a Catch2
     SKIP (GGUF/VRAM-gated or a disabled gate) reports SKIP, not PASS/FAIL.
@@ -280,6 +286,7 @@ def _run_model_tests(build_dir, name_filter=""):
         return [], 1
 
     results = []
+    t_suite = time.monotonic()
     passed = failed = flaky = skipped = 0
 
     for idx, test in enumerate(tests):
@@ -327,6 +334,13 @@ def _run_model_tests(build_dir, name_filter=""):
                 "duration_ms": duration_ms,
             }
         )
+        # gh#144 (v2.12.0): persist after EVERY test, not only at the end.
+        # results.json used to be written once the whole suite finished, so a
+        # run killed part-way through lost every completed result — 19 passes
+        # were nearly lost that way, and the audit artifact for an interrupted
+        # gate was simply absent. Writing incrementally costs one small file
+        # write per model test, against minutes of GPU time each.
+        _write_results_json(results, int((time.monotonic() - t_suite) * 1000))
 
     print(f"\n{passed}/{len(tests)} passed, " f"{skipped} skipped, {flaky} flaky, {failed} failed")
     return results, failed

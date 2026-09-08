@@ -337,6 +337,10 @@ set_tests_properties(model/test-gh144-no-regression PROPERTIES TIMEOUT 600)
 add_model_test(test-gh144-session-isolation test_gh144_session_isolation.cpp)
 set_tests_properties(model/test-gh144-session-isolation PROPERTIES TIMEOUT 900)
 
+# gh#144 (v2.12.0): concurrent bridge clients must QUEUE, over a real socket.
+add_model_test(test-gh144-bridge-queue test_gh144_bridge_queue.cpp)
+set_tests_properties(model/test-gh144-bridge-queue PROPERTIES TIMEOUT 900)
+
 # gh#144 (v2.12.0): MTP must stop discarding a provably unchanged prefix.
 # RED-first: written before the fix, expected to fail on current code.
 add_model_test(test-gh144-mtp-retention test_gh144_mtp_prefix_retention.cpp)

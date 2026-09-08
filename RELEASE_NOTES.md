@@ -23,6 +23,8 @@ stated and nothing implemented.
 - **An argument-free tool call no longer kills the run.**
 - **Consumers name their own tools.** `tool_prefix`, `server_name` and
   per-tool description overrides.
+- **MTP stops discarding a prefix it can prove unchanged.** Speculative
+  decoding and prefill reuse now compose instead of being mutually exclusive.
 
 ## Engine bug fixes
 
@@ -61,6 +63,19 @@ stated and nothing implemented.
   the session table, so a queued caller is distinguishable from a hung one.
 - **gh#145 — consumer identity.** `mcp.external.tool_prefix`,
   `server_name` and `tool_descriptions`. All default to today's values.
+- **gh#144 — MTP prefix retention.** `mtp_init_run` cleared the whole
+  context and fully re-prefilled on EVERY generation, so under
+  `speculative.mtp` warm-keep and the prompt cache never executed at all.
+  Nothing about speculative decoding requires discarding the cache; that
+  was an implementation choice in this path. Measured over four turns of a
+  growing conversation, prefill went from 52 -> 116 -> 180 -> 244 tokens
+  (linear in history) to a constant per-turn delta. A consumer had measured
+  18611 tokens prefilled against 196 generated on a three-turn review —
+  95:1, with zero warm-keep events — while the same workload with MTP off
+  avoided 98.1% of prefill.
+- `GenerationResult::prefill_tokens` reports what a run actually decoded.
+  The MTP path counted nothing, so there was no way to tell reuse from
+  re-decode.
 
 ## Breaking changes
 
@@ -85,11 +100,6 @@ consumers that construct `ParsedConfig` directly and must recompile.
 
 ## Known limitations
 
-- **Prefill under `speculative.mtp` is unchanged.** `mtp_init_run` clears the
-  whole context and re-prefills every turn, so warm-keep and the prompt cache
-  never run in that configuration. A consumer measured 95:1 prefill-to-generate
-  with ~85% of prefill being a provably invariant prefix. Prefix retention is
-  tracked separately.
 - The session pool is mutually exclusive with `entropic_run_batch`: gh#98's
   fan-out needs a unified KV buffer and a pool needs private streams. The
   combination is refused at configure time with a typed error naming both keys.
