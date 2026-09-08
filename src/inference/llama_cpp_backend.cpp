@@ -1641,10 +1641,20 @@ std::unique_ptr<Sampler> LlamaCppBackend::create_sampler(
  * @param tokens Input token sequence.
  * @return true on success.
  * @dg_internal
- * @version 2.12.0
+ * @version 2.12.0-rc1
  */
 bool LlamaCppBackend::run_prefill(const std::vector<llama_token>& tokens) {
-    llama_memory_clear(llama_get_memory(ctx_), true);
+    // gh#144 (v2.12.0): clear only this session's sequence when a pool is
+    // configured. A whole-context clear here wiped every OTHER session's KV
+    // on any cold prefill, which is both a correctness hazard and the end of
+    // any cross-session reuse. max_sessions == 1 keeps the original clear so
+    // the single-session path stays byte-identical.
+    if (residency_.slots() > 1) {
+        llama_memory_seq_rm(llama_get_memory(ctx_),
+                            static_cast<llama_seq_id>(active_slot_), -1, -1);
+    } else {
+        llama_memory_clear(llama_get_memory(ctx_), true);
+    }
 
     // gh#144 (v2.12.0): chunking and position arithmetic now live in
     // decode_tokens_into_slot. The memory was just cleared for this slot, so
@@ -2232,17 +2242,29 @@ bool LlamaCppBackend::decode_tokens_from(
  * @param tokens Full token sequence.
  * @return true on success, false to fall back to full prefill.
  * @dg_internal
- * @version 2.0.6
+ * @version 2.12.0
  */
 bool LlamaCppBackend::restore_cached_prefix(
     const CacheEntry* cached,
     const std::vector<llama_token>& tokens)
 {
     auto* mem = llama_get_memory(ctx_);
-    llama_memory_clear(mem, true);
+    const auto seq = static_cast<llama_seq_id>(active_slot_);
+
+    // gh#144 (v2.12.0): restore into THIS session's sequence, and clear only
+    // it. Both halves were wrong for a pool and the model test caught it:
+    // the cached prefix landed in sequence 0 while the remainder decoded into
+    // the caller's own slot, so every session except the one that happened to
+    // own slot 0 attended to a fragment with no system prompt — and the
+    // whole-context clear wiped the other sessions on the way past.
+    if (residency_.slots() > 1) {
+        llama_memory_seq_rm(mem, seq, -1, -1);
+    } else {
+        llama_memory_clear(mem, true);
+    }
 
     size_t restored = llama_state_seq_set_data(
-        ctx_, cached->data.data(), cached->data_size, 0);
+        ctx_, cached->data.data(), cached->data_size, seq);
     if (restored == 0) {
         logger->warn("KV state restore failed, falling back to full prefill");
         return false;

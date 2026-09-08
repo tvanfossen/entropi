@@ -326,6 +326,23 @@ set_tests_properties(model/test-gh95-identity-grammar PROPERTIES TIMEOUT 300)
 add_model_test(test-gh96-warmkeep test_gh96_warmkeep.cpp)
 set_tests_properties(model/test-gh96-warmkeep PROPERTIES TIMEOUT 300)
 
+# gh#144 (v2.12.0): max_sessions == 1 must keep the pre-2.12.0 prefill shape.
+# The dispositive check on the explicit-batch position rewrite, which fails
+# silently on CPU.
+add_model_test(test-gh144-no-regression
+               test_gh144_no_regression_single_session.cpp)
+set_tests_properties(model/test-gh144-no-regression PROPERTIES TIMEOUT 600)
+
+# gh#144 (v2.12.0): three interleaved sessions must not leak context.
+add_model_test(test-gh144-session-isolation test_gh144_session_isolation.cpp)
+set_tests_properties(model/test-gh144-session-isolation PROPERTIES TIMEOUT 900)
+
+# gh#144 (v2.12.0): what a session switch costs. Asserts the INSTRUMENTATION
+# (prefill token counts), not output — a correctness test passes via
+# cold-prefill fallback even when residency is dead.
+add_model_test(test-gh144-switch-cost test_gh144_session_switch_cost.cpp)
+set_tests_properties(model/test-gh144-switch-cost PROPERTIES TIMEOUT 900)
+
 add_model_test(test-gh96-warmkeep-oracle test_gh96_warmkeep_oracle.cpp)
 set_tests_properties(model/test-gh96-warmkeep-oracle PROPERTIES TIMEOUT 600)
 
