@@ -10,6 +10,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include <exception>
+
 static auto logger = entropic::log::get("mcp.server_base");
 
 namespace entropic {
@@ -68,6 +70,63 @@ std::string MCPServerBase::list_tools() const {
 }
 
 /**
+ * @brief Coerce arguments that are valid JSON but not an object to `{}`.
+ *
+ * gh#143 (v2.12.0). Normalises exactly two payloads that mean "no
+ * arguments" into the empty object every tool's `inputSchema` declares:
+ * an empty/whitespace-only string, and a literal JSON `null`. MCP treats
+ * a tool call's `arguments` as optional, and a client that serialises an
+ * absent field as `null` is making a well-formed statement — "I sent no
+ * arguments" — not a malformed one.
+ *
+ * `ToolExecutor::serialize_args` fixes the case where ENTROPIC produced
+ * the payload. This covers the cases it cannot see: a plugin `.so`, an
+ * external MCP server, or any other caller whose "no arguments" reaches
+ * us spelled as `null`.
+ *
+ * DELIBERATELY NOT NORMALISED — an array, a scalar, or anything that
+ * fails to parse. Those are malformed emissions, and rewriting them to
+ * `{}` would substitute a silent default for a caller error: the model
+ * sent something wrong and would never be told. `EntropicServer`'s
+ * followup tool already demonstrates the better contract, answering a
+ * non-object with a typed "invalid args" naming the actual problem.
+ * Masking that would be exactly the silent-fallback failure the repo's
+ * fail-fast rule exists to prevent.
+ *
+ * Those payloads stay unmodified and reach the tool, which either reports
+ * them itself or throws — and a throw is caught by the barrier in
+ * execute() and returned to the model as a tool error. Survivable either
+ * way; never silently reinterpreted.
+ *
+ * @param tool_name Tool name, for the log line only.
+ * @param raw Arguments exactly as the caller supplied them.
+ * @return `{}` when `raw` is empty/whitespace or a literal JSON null;
+ *         otherwise `raw` unchanged.
+ * @req REQ-MCP-013
+ * @dg_internal
+ * @version 2.12.0
+ */
+std::string MCPServerBase::normalize_args(
+    const std::string& tool_name,
+    const std::string& raw) const {
+    const auto first = raw.find_first_not_of(" \t\r\n");
+    if (first == std::string::npos) {
+        return "{}";
+    }
+    // Non-throwing parse: a discarded value is unparseable and is left
+    // alone on purpose, as is any non-null non-object.
+    const auto parsed = nlohmann::json::parse(raw, nullptr, false);
+    if (!parsed.is_null()) {
+        return raw;
+    }
+    logger->info(
+        "[{}.{}] arguments arrived as JSON null — reading as \"no "
+        "arguments\" and dispatching with {{}}",
+        name_, tool_name);
+    return "{}";
+}
+
+/**
  * @brief Execute a tool and return ServerResponse JSON.
  *
  * The base owns the whole dispatch path — registry lookup, automatic
@@ -75,26 +134,58 @@ std::string MCPServerBase::list_tools() const {
  * envelope serialisation — so a concrete server that overrides nothing
  * still produces the exact shape the DirectiveProcessor parses.
  *
+ * gh#143 (v2.12.0): a tool that THROWS is answered the same way as an
+ * unknown one — the exception becomes error text in `result`. This is the
+ * in-process counterpart of gh#133's `ServerManager::route_plugin_call`,
+ * which already guarantees that a misbehaving PLUGIN server "becomes a
+ * normal tool error rather than an exception unwinding through the loop".
+ * In-process servers had no equivalent, so an unhandled throw — a
+ * `.value()` on a non-object (type_error.306), a missing `.at()` key
+ * (out_of_range.403) — escaped four uncaught hops up to `run_as_inner` and
+ * aborted the entire turn. The model never saw the failure and could not
+ * correct it.
+ *
+ * The barrier is HERE rather than in ToolRegistry::dispatch so that a
+ * throwing tool also skips `inject_anchor_if_needed`. A tool that failed
+ * must not have its arguments recorded as a ContextAnchor: for
+ * FilesystemServer a rejected path traversal would otherwise be anchored
+ * into context as though it had been legitimately read.
+ *
  * @param tool_name Tool name (without server prefix).
  * @param args_json JSON arguments.
  * @return ServerResponse JSON envelope: a string `result` plus a
  *         `directives` array (empty when the tool has no side effects).
- *         An unknown tool yields the same envelope with error text in
- *         `result` rather than a throw.
+ *         An unknown tool, or one that throws, yields the same envelope
+ *         with error text in `result` rather than a throw — and with no
+ *         directives, anchor included.
  * @req REQ-MCP-001
  * @req REQ-MCP-002
- * @version 1.8.5
+ * @version 2.12.0
  */
 std::string MCPServerBase::execute(
     const std::string& tool_name,
-    const std::string& args_json) {
+    const std::string& raw_args_json) {
     logger->info("[EXECUTE] {}.{}", name_, tool_name);
 
-    auto response = registry_.dispatch(tool_name, args_json);
+    const std::string args_json = normalize_args(tool_name, raw_args_json);
 
-    auto* tool = registry_.get_tool(tool_name);
-    if (tool != nullptr) {
-        inject_anchor_if_needed(*tool, args_json, response);
+    ServerResponse response;
+    try {
+        response = registry_.dispatch(tool_name, args_json);
+
+        auto* tool = registry_.get_tool(tool_name);
+        if (tool != nullptr) {
+            inject_anchor_if_needed(*tool, args_json, response);
+        }
+    } catch (const std::exception& e) {
+        // Full args are logged, never truncated — for this failure class
+        // the arguments are the whole diagnosis.
+        logger->error("Tool '{}.{}' threw: {} — args: {}",
+                      name_, tool_name, e.what(), args_json);
+        response.directives.clear();
+        response.result =
+            "Error: tool '" + name_ + "." + tool_name + "' failed: "
+            + e.what();
     }
 
     return serialize_response(response);

@@ -13,6 +13,8 @@
 #include <catch2/catch_test_macros.hpp>
 #include <nlohmann/json.hpp>
 
+#include <stdexcept>
+
 using namespace entropic;
 
 // ── Test tools and server ────────────────────────────────
@@ -1329,4 +1331,188 @@ TEST_CASE("gh#83: empty locked_tier bypasses enforcement",
 
     REQUIRE(results.size() == 1);
     CHECK(results[0].content.find("ok") != std::string::npos);
+}
+
+// ── gh#143: argument-free tool calls ─────────────────────
+
+/**
+ * @brief Tool with NO required fields that reads its args via .value().
+ *
+ * gh#143 RED. This is the shape of every real no-required-fields tool
+ * (`git.diff`, `filesystem.list_directory`): the schema declares only
+ * optional properties, so schema validation passes, and `execute`
+ * reaches for `.value()` on the parsed arguments.
+ *
+ * The pre-existing `OkTool` cannot reproduce the defect because it
+ * ignores `args_json` entirely — which is precisely why the suite
+ * drove the buggy path on every run for 25 releases without observing
+ * it. The read of `args_json` is the whole point of this fixture.
+ *
+ * @dg_internal
+ * @version 2.12.0
+ */
+class OptionalArgsTool : public ToolBase {
+public:
+    OptionalArgsTool() : ToolBase(ToolDefinition{
+        "diff",
+        "Reads an optional flag, mirroring GitDiffTool",
+        R"({"type":"object","properties":{"staged":{"type":"boolean"}}})"
+    }) {}
+
+    ServerResponse execute(const std::string& args_json) override {
+        auto args = nlohmann::json::parse(args_json);
+        bool staged = args.value("staged", false);
+        return ServerResponse{staged ? "staged" : "unstaged", {}};
+    }
+};
+
+/**
+ * @brief Tool whose execute always throws, for the dispatch barrier.
+ * @dg_internal
+ * @version 2.12.0
+ */
+class ThrowingTool : public ToolBase {
+public:
+    ThrowingTool() : ToolBase(ToolDefinition{
+        "boom",
+        "Always throws",
+        R"({"type":"object","properties":{}})"
+    }) {}
+
+    ServerResponse execute(const std::string& /*args_json*/) override {
+        throw std::runtime_error("tool exploded");
+    }
+};
+
+/**
+ * @brief Server exposing the two gh#143 fixtures.
+ * @dg_internal
+ * @version 2.12.0
+ */
+class OptionalArgsServer : public MCPServerBase {
+public:
+    OptionalArgsServer() : MCPServerBase("git") {
+        register_tool(&diff_);
+        register_tool(&boom_);
+    }
+private:
+    OptionalArgsTool diff_;
+    ThrowingTool boom_;
+};
+
+/**
+ * @brief ServerManager carrying the gh#143 fixtures.
+ * @dg_internal
+ * @version 2.12.0
+ */
+static ServerManager make_optional_args_manager() {
+    PermissionsConfig perms;
+    ServerManager mgr(perms, "/tmp/test");
+    mgr.register_server(std::make_unique<OptionalArgsServer>());
+    mgr.initialize();
+    return mgr;
+}
+
+SCENARIO("gh#143: an argument-free call to a no-required-fields tool "
+         "does not kill the run",
+         "[tool_executor][gh143][regression][2.12.0]") {
+    GIVEN("a tool whose schema has only optional properties") {
+        auto mgr = make_optional_args_manager();
+        LoopConfig lc;
+        lc.auto_approve_tools = true;
+        EngineCallbacks cb;
+        ToolExecutor executor(mgr, lc, cb);
+
+        WHEN("the model emits a call carrying no arguments at all") {
+            // Empty `arguments` map AND empty `arguments_json` — the
+            // exact shape observed in the consumer's runs.
+            LoopContext ctx;
+            auto call = make_call("git.diff");
+            REQUIRE(call.arguments.empty());
+            REQUIRE(call.arguments_json.empty());
+
+            THEN("the executor returns a result instead of throwing") {
+                // RED before the fix: serialize_args yields "null",
+                // json::parse("null") succeeds, and .value() throws
+                // type_error.306 straight out of dispatch.
+                std::vector<Message> results;
+                REQUIRE_NOTHROW(
+                    results = executor.process_tool_calls(ctx, {call}));
+                REQUIRE(results.size() == 1);
+            }
+            AND_THEN("the tool ran and saw its default, not an error") {
+                auto results = executor.process_tool_calls(ctx, {call});
+                REQUIRE(results.size() == 1);
+                CHECK(results[0].content.find("unstaged")
+                      != std::string::npos);
+            }
+        }
+    }
+}
+
+SCENARIO("gh#143: dispatch converts a throwing tool into a tool error",
+         "[tool_executor][gh143][regression][2.12.0]") {
+    GIVEN("a tool whose execute throws") {
+        auto mgr = make_optional_args_manager();
+        LoopConfig lc;
+        lc.auto_approve_tools = true;
+        EngineCallbacks cb;
+        ToolExecutor executor(mgr, lc, cb);
+
+        WHEN("it is dispatched") {
+            LoopContext ctx;
+
+            THEN("the exception does not unwind through the loop") {
+                // The general form of the fix: plugin servers already
+                // get this via gh#133's route_plugin_call; in-process
+                // servers had no equivalent.
+                std::vector<Message> results;
+                REQUIRE_NOTHROW(results = executor.process_tool_calls(
+                    ctx, {make_call("git.boom")}));
+                REQUIRE(results.size() == 1);
+            }
+            AND_THEN("the model is told what went wrong") {
+                auto results = executor.process_tool_calls(
+                    ctx, {make_call("git.boom")});
+                REQUIRE(results.size() == 1);
+                CHECK(results[0].content.find("tool exploded")
+                      != std::string::npos);
+            }
+        }
+    }
+}
+
+SCENARIO("gh#143: an argument-free call serialises as an object "
+         "everywhere it is observable",
+         "[tool_executor][gh143][regression][2.12.0]") {
+    GIVEN("an executor with a PRE_TOOL_CALL hook") {
+        auto mgr = make_optional_args_manager();
+        LoopConfig lc;
+        lc.auto_approve_tools = true;
+        EngineCallbacks cb;
+        ToolExecutor executor(mgr, lc, cb);
+
+        HookRegistry reg;
+        std::vector<HookEvent> events;
+        reg.register_hook(ENTROPIC_HOOK_PRE_TOOL_CALL,
+                          record_hook_cb, &events, 0);
+        attach_registry(executor, reg);
+
+        WHEN("an argument-free call is processed") {
+            LoopContext ctx;
+            executor.process_tool_calls(ctx, {make_call("git.diff")});
+
+            THEN("the hook payload carries an object, not null") {
+                // RED before the fix: build_pre_tool_json puts a JSON
+                // null here, which crosses the plugin .so boundary and
+                // throws 306 in any hook that calls .value() on it.
+                // The pre-existing assertion was only contains("args"),
+                // which a null value satisfies.
+                REQUIRE(events.size() == 1);
+                auto pre = nlohmann::json::parse(events[0].context_json);
+                REQUIRE(pre.contains("args"));
+                CHECK(pre.at("args").is_object());
+            }
+        }
+    }
 }

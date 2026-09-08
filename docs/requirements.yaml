@@ -595,9 +595,29 @@
 
     thread B THEN the run terminates early rather than blocking on the API mutex.
 
+    GIVEN a run in flight on a handle WHEN a second run is entered on the same
+
+    handle from any thread THEN it returns ENTROPIC_ERROR_ALREADY_RUNNING and does
+
+    not touch the conversation; GIVEN that rejection THEN entropic_interrupt
+
+    remains callable without blocking, because the claim is a compare-exchange and
+
+    not a lock.
+
     '
   verified_by: 'TEST_CASE("entropic_run rejects NULL handle") / ("entropic_run on unconfigured
     handle returns INVALID_STATE") — tests/unit/api/entropic_capi_test.cpp
+
+    gh#144 (v2.12.0), the turn-claim mechanism the six entry points share:
+    SCENARIO("gh#144: a second turn cannot start while one is in flight"),
+    SCENARIO("gh#144: exactly one of many racing claimants wins"),
+    SCENARIO("gh#144: run_turn nested under an outer claim does not release it"),
+    SCENARIO("gh#144: an unclaimed run_turn still reports itself running")
+    — tests/unit/core/turn_exclusion_test.cpp. These are CPU-only and cover the
+    claim itself; the facade-level assertion that ENTROPIC_ERROR_ALREADY_RUNNING
+    reaches a caller needs a CONFIGURED handle (a model load) and therefore lands
+    in the gh#144 model suite rather than here.
 
     TEST_CASE("entropic_run_streaming rejects NULL handle") / ("... on unconfigured handle
     returns INVALID_STATE") — tests/unit/api/entropic_capi_test.cpp
@@ -613,7 +633,7 @@
     SCENARIO("gh#93: entropic_interrupt stops a long run early (cancel-bridge)") — tests/model/test_gh93_behavioral.cpp
 
     '
-  version: 2.10.4
+  version: 2.12.0
 - id: REQ-API-010
   name: Observer and callback slots survive configure and fire uniformly
   module: Public C API and Facade
@@ -5072,6 +5092,46 @@
 
     dispatch path.
 
+
+    gh#143 (v2.12.0): "unparseable" was too narrow. `null`, an array and a
+
+    scalar are all VALID JSON, so they parse cleanly and defeat a guard that
+
+    only tests for a parse failure — while still throwing type_error.306 at
+
+    the first `args.value(key, default)` inside the server. Two places now
+
+    guarantee an object reaches a tool: `ToolExecutor::serialize_args` seeds
+
+    its accumulator as an object, so an argument-free call serialises as `{}`
+
+    rather than the four characters `null`; and `MCPServerBase::execute`
+
+    normalises any payload that is empty or parses to a non-object to `{}`
+
+    before dispatch, covering payloads entropic did not generate (plugin
+
+    `.so`, external MCP server). A non-empty payload that fails to parse is
+
+    deliberately left alone and surfaces as a tool error, so a malformed
+
+    emission is reported to the model rather than silently rewritten.
+
+
+    Independently, no exception escapes tool dispatch at all:
+
+    `MCPServerBase::execute` converts any throw into error text in the
+
+    response `result` with an empty directives array — the in-process
+
+    counterpart of the plugin guarantee gh#133 added in
+
+    `ServerManager::route_plugin_call`. The barrier sits above
+
+    `inject_anchor_if_needed` so a failed call never has its arguments
+
+    anchored into context.
+
     '
   acceptance_criteria: 'Given a tool whose schema declares an enum, When the model supplies
     a value
@@ -5080,15 +5140,59 @@
 
     the tool is not invoked; Given a schema with a required field, When it is
 
-    omitted, Then the call is likewise rejected.
+    omitted, Then the call is likewise rejected;
+
+    Given a tool declaring NO required fields, When a call arrives carrying no
+
+    arguments at all, Then the tool runs and observes its declared defaults,
+
+    and the run is not aborted;
+
+    Given arguments that are valid JSON but not an object (null, array,
+
+    scalar), When the tool is dispatched, Then they are normalised to an empty
+
+    object; Given arguments that cannot be parsed at all, Then they are NOT
+
+    normalised and the failure is returned to the model as a tool error;
+
+    Given a tool that throws, When it is dispatched, Then the exception is
+
+    converted to a tool error result carrying the message, no ContextAnchor is
+
+    injected for that call, and the exception does not unwind through the
+
+    agent loop.
 
     '
   verified_by: '"Schema validation rejects invalid enum value", "Schema validation rejects
 
-    missing required field" — tests/unit/mcp/tool_executor_test.cpp
+    missing required field" — tests/unit/mcp/tool_executor_test.cpp.
+
+    gh#143 (v2.12.0): "gh#143: an argument-free call to a no-required-fields tool
+
+    does not kill the run", "gh#143: dispatch converts a throwing tool into a tool
+
+    error", "gh#143: an argument-free call serialises as an object everywhere it is
+
+    observable" — tests/unit/mcp/tool_executor_test.cpp; "gh#143: git.diff with no
+
+    arguments does not throw" — tests/unit/mcp/servers/git_test.cpp (the reported
+
+    reproduction, plus the non-object and unparseable cases);
+
+    "gh#143: context_inspect survives non-object arguments" —
+
+    tests/unit/mcp/servers/context_inspect_test.cpp;
+
+    "test_path_security_rejects_traversal" —
+
+    tests/unit/mcp/servers/filesystem_test.cpp asserts the no-anchor-on-failure
+
+    half, which a first cut of the barrier violated.
 
     '
-  version: 2.10.4
+  version: 2.12.0
 - id: REQ-MCP-014
   name: A locked tier's allowed_tools list is enforced at dispatch time
   module: MCP Servers and Tool Dispatch

@@ -140,8 +140,8 @@ MODEL_TEST_SETTLE_S = 30
 ## @brief Enumerate the model tests exactly as ctest has them registered.
 ## @utility
 ## @return List of {name, command, timeout} dicts; empty on any failure.
-## @version 2.11.0
-def _model_ctest_tests(build_dir):
+## @version 2.12.0
+def _model_ctest_tests(build_dir, name_filter=""):
     """Enumerate model tests from ctest — argv, timeout and all.
 
     v2.11.0: ctest's registration is the SINGLE SOURCE OF TRUTH for what a
@@ -156,12 +156,19 @@ def _model_ctest_tests(build_dir):
 
     gh#111: TIMEOUT comes from each test's own CMake property, never a blanket
     constant, so a legitimately slow test is not killed and misreported.
+
+    gh#144 (v2.12.0): `name_filter` is a ctest -R regex applied to the MODEL
+    phase. Without it `inv test --model --filter X` filtered only the CPU
+    phase and then ran the entire model suite anyway — which on a developer
+    box means loading every GGUF in the registry to debug one test, and
+    reliably reaching the OOM killer. An empty filter keeps the full-suite
+    behaviour the release gate depends on.
     """
+    cmd = ["ctest", "--test-dir", build_dir, "--show-only=json-v1", "-L", "model"]
+    if name_filter:
+        cmd += ["-R", name_filter]
     try:
-        out = subprocess.check_output(
-            ["ctest", "--test-dir", build_dir, "--show-only=json-v1", "-L", "model"],
-            stderr=subprocess.DEVNULL,
-        )
+        out = subprocess.check_output(cmd, stderr=subprocess.DEVNULL)
     except (subprocess.CalledProcessError, FileNotFoundError):
         return []
 
@@ -188,8 +195,8 @@ def _model_ctest_tests(build_dir):
 ## @brief Run one model test's ctest argv with retries + a per-attempt timeout.
 ## @utility
 ## @return Tuple of (status, retries, duration_ms). status: pass|skipped|fail.
-## @version 2.11.1
-def _run_one_model_test(command, timeout_s=DEFAULT_MODEL_TEST_TIMEOUT_S):
+## @version 2.12.0-rc1
+def _run_one_model_test(command, timeout_s=DEFAULT_MODEL_TEST_TIMEOUT_S, name="model-test"):
     """Run one model test's argv (retries + a per-attempt timeout).
 
     v2.11.0: takes the full argv ctest registered rather than a bare executable
@@ -211,14 +218,29 @@ def _run_one_model_test(command, timeout_s=DEFAULT_MODEL_TEST_TIMEOUT_S):
     """
     t0 = time.monotonic()
     retries = 0
+    # gh#144 (v2.12.0): keep each attempt's output. It used to go to DEVNULL,
+    # so a FAILING model test reported pass/fail and discarded every assertion
+    # message, backtrace and log line that said why — leaving a hand-rolled
+    # re-run as the only way to see a failure. The GPU time is already spent;
+    # throwing away its diagnosis is the expensive part.
+    log_dir = Path("build/test-reports/model/logs")
+    log_dir.mkdir(parents=True, exist_ok=True)
     for attempt in range(MAX_MODEL_RETRIES + 1):
+        # gh#144 (v2.12.0): one log PER ATTEMPT. A single {name}.log was
+        # reopened in "w" on each retry, so a flaky test overwrote the failing
+        # attempt with the passing one — destroying precisely the output worth
+        # having. Attempt 0 keeps the plain name so the common case is
+        # unchanged.
+        suffix = "" if attempt == 0 else f".retry{attempt}"
+        log_path = log_dir / f"{name}{suffix}.log"
         try:
-            rc = subprocess.call(
-                command,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                timeout=timeout_s,
-            )
+            with open(log_path, "w") as fh:
+                rc = subprocess.call(
+                    command,
+                    stdout=fh,
+                    stderr=subprocess.STDOUT,
+                    timeout=timeout_s,
+                )
         except subprocess.TimeoutExpired:
             rc = 124
         if rc == 0:
@@ -232,8 +254,8 @@ def _run_one_model_test(command, timeout_s=DEFAULT_MODEL_TEST_TIMEOUT_S):
 ## @brief Run model tests 1:1; a Catch2 SKIP (rc=4) is reported, not failed.
 ## @utility
 ## @return Tuple of (results list, failed count). Skips do NOT count as failures.
-## @version 2.11.1
-def _run_model_tests(build_dir):
+## @version 2.12.0-rc1
+def _run_model_tests(build_dir, name_filter=""):
     """Run model tests 1:1. Returns (results, failed_count). gh#89: a Catch2
     SKIP (GGUF/VRAM-gated or a disabled gate) reports SKIP, not PASS/FAIL.
 
@@ -254,13 +276,17 @@ def _run_model_tests(build_dir):
     # ctest's registration is the single source of truth for what a model test
     # IS, including its argv and its per-case isolation. results.json is the
     # release audit record; it has to describe the same run the gate describes.
-    tests = _model_ctest_tests(build_dir)
+    tests = _model_ctest_tests(build_dir, name_filter)
 
     if not tests:
-        print("ERROR: No model tests registered in ctest")
+        if name_filter:
+            print(f"ERROR: No model tests match -R '{name_filter}'")
+        else:
+            print("ERROR: No model tests registered in ctest")
         return [], 1
 
     results = []
+    t_suite = time.monotonic()
     passed = failed = flaky = skipped = 0
 
     for idx, test in enumerate(tests):
@@ -283,7 +309,9 @@ def _run_model_tests(build_dir):
         # argv comes from ctest, so a per-case entry carries its own case
         # filter and runs in its own process — the isolation that
         # add_model_test_per_case exists to provide.
-        status, retries, duration_ms = _run_one_model_test(test["command"], test["timeout"])
+        status, retries, duration_ms = _run_one_model_test(
+            test["command"], test["timeout"], test["name"]
+        )
         if status == "pass":
             passed += 1
             if retries > 0:
@@ -306,6 +334,13 @@ def _run_model_tests(build_dir):
                 "duration_ms": duration_ms,
             }
         )
+        # gh#144 (v2.12.0): persist after EVERY test, not only at the end.
+        # results.json used to be written once the whole suite finished, so a
+        # run killed part-way through lost every completed result — 19 passes
+        # were nearly lost that way, and the audit artifact for an interrupted
+        # gate was simply absent. Writing incrementally costs one small file
+        # write per model test, against minutes of GPU time each.
+        _write_results_json(results, int((time.monotonic() - t_suite) * 1000))
 
     print(f"\n{passed}/{len(tests)} passed, " f"{skipped} skipped, {flaky} flaky, {failed} failed")
     return results, failed
@@ -380,7 +415,7 @@ def _write_results_json(test_results, duration_ms):
 
 ## @brief Run tests. Builds first unless --no-build.
 ## @utility
-## @version 2.11.0
+## @version 2.12.0
 @task(
     help={
         "model": "Include model tests (GPU recommended, writes results.json)",
@@ -422,7 +457,7 @@ def test(  # noqa: CFQ002
         # Model tests: run 1:1 with retries, write results.json
         print("\n── Model tests (GPU) ──")
         t0 = time.monotonic()
-        results, failed = _run_model_tests(build_dir)
+        results, failed = _run_model_tests(build_dir, filter)
         duration_ms = int((time.monotonic() - t0) * 1000)
 
         if results:

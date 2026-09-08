@@ -9,21 +9,33 @@
  * on the already-configured engine handle — no second engine instance.
  *
  * @par Exposed tools:
- * - entropic.ask — submit a prompt, get the full response
- * - entropic.status — engine version + message count
- * - entropic.context_clear — reset conversation
- * - entropic.context_count — message count
+ * Named `<prefix>.<suffix>`, where prefix is `mcp.external.tool_prefix`
+ * (default "entropic", so the stock names are unchanged). gh#145: a consumer
+ * app hosting this engine advertises its OWN namespace — the engine is a
+ * substrate, not the product.
+ * - `<prefix>.ask` — submit a prompt, get the full response
+ * - `<prefix>.ask_status` — poll an async ask
+ * - `<prefix>.status` — engine version + message count
+ * - `<prefix>.context_clear` — reset conversation
+ * - `<prefix>.context_count` — message count
  *
  * @par Socket path:
  * Uses ExternalMCPConfig.socket_path if set, otherwise derived from
  * the project directory via compute_socket_path().
  *
  * @par Thread safety:
- * The bridge runs a background accept loop. Each connected client is
- * served sequentially (one request at a time). The engine handle's
- * api_mutex serializes access to the engine.
+ * The bridge runs a background accept loop and serves EACH CLIENT ON ITS OWN
+ * THREAD (v2.1.2, issue #4 — a TUI and a Claude Code session may be connected
+ * at once). Requests on a single connection are sequential.
  *
- * @version 2.0.8
+ * The engine handle's api_mutex does NOT serialize access to the engine: gh#109
+ * removed it from every run entry point so a long turn cannot block
+ * entropic_interrupt(). Until v2.12.0 that made two concurrent asks a data race
+ * on the shared conversation and on the llama context (gh#144). The bridge now
+ * serializes turns itself, so a second caller QUEUES rather than racing or
+ * being refused, and reports its position through the status tool.
+ *
+ * @version 2.12.0
  */
 
 #pragma once
@@ -35,9 +47,11 @@
 
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <filesystem>
 #include <memory>
 #include <mutex>
+#include <set>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -62,8 +76,12 @@ namespace entropic {
  * `<log_dir>/async/<task_id>.{done,failed,cancelled}` so external
  * monitors can use inotify rather than parsing log output.
  *
+ * gh#145 (v2.12.0): exposes config() so the tool-name handlers can read the
+ * consumer's configured namespace. gh#144 (v2.12.0): owns the FIFO turn queue
+ * that serialises every caller reaching the engine.
+ *
  * @dg_internal
- * @version 2.11.0
+ * @version 2.12.0-rc2
  */
 class ENTROPIC_EXPORT ExternalBridge {
 public:
@@ -72,7 +90,7 @@ public:
      * @param handle Engine handle (must outlive the bridge).
      * @param config External MCP configuration.
      * @param project_dir Project directory (for socket path derivation).
-     * @version 2.0.8
+     * @version 2.12.0
      */
     ExternalBridge(
         entropic_handle_t handle,
@@ -117,6 +135,108 @@ public:
     bool ask_streaming() const { return config_.ask_streaming; }
 
     /**
+     * @brief The external MCP config this bridge was constructed with.
+     *
+     * gh#145 (v2.12.0): file-scope handlers holding an `ExternalBridge*` need
+     * the configured `tool_prefix` and description overrides to build and
+     * resolve tool names. Same static-dispatch rationale as ask_streaming().
+     *
+     * @return Const reference to the config snapshot.
+     * @utility
+     * @version 2.12.0
+     */
+    const ExternalMCPConfig& config() const { return config_; }
+
+    /**
+     * @brief Dispatch one JSON-RPC request and return the response.
+     *
+     * Public since gh#144 (v2.12.0) for the same reason handle_ask_status is:
+     * this is the bridge's protocol entry point, and the tool schemas it
+     * serves are otherwise observable only over a real unix socket. The class
+     * is @dg_internal and crosses no public ABI, so exposing it costs
+     * nothing a consumer can depend on.
+     *
+     * @param request Raw JSON-RPC request line.
+     * @param client_fd Socket fd for streaming progress (-1 when none).
+     * @return JSON-RPC response string, or empty for a notification.
+     * @req REQ-BRIDGE-001
+     * @version 2.12.0
+     */
+    std::string dispatch(const std::string& request, int client_fd);
+
+    // ── Turn queue (gh#144, v2.12.0) ─────────────────────────
+
+    /**
+     * @brief Take a ticket and wait for this caller's turn on the engine.
+     *
+     * The engine admits one turn at a time and refuses the loser with
+     * ENTROPIC_ERROR_ALREADY_RUNNING (gh#144 stage 1). A refusal is the right
+     * contract for a direct C API consumer, but the wrong one for a shared
+     * host: several MCP clients on one engine want to QUEUE, which is the
+     * whole point of one resident model. This serialises them here so the
+     * engine's refusal is never reached from the bridge.
+     *
+     * FIFO by ticket rather than a bare mutex: a mutex gives no fairness
+     * guarantee (a caller can starve), no observable depth, and no way to
+     * bound the wait — and MCP clients have their own timeouts, so blocking
+     * one indefinitely is worse than telling it the truth.
+     *
+     * @param timeout_ms Give up after this long and let the caller report a
+     *                   busy engine rather than hang.
+     * @param waited_ms_out Optional; receives the time actually spent waiting.
+     * @return true when it is this caller's turn — the caller MUST then call
+     *         end_turn_wait(). false on timeout, owning nothing.
+     * @req REQ-BRIDGE-001
+     * @version 2.12.0
+     */
+    bool begin_turn_wait(long timeout_ms, long* waited_ms_out);
+
+    /**
+     * @brief Hand the turn to the next ticket in line.
+     * @req REQ-BRIDGE-001
+     * @version 2.12.0
+     */
+    void end_turn_wait();
+
+    /**
+     * @brief Mark an async task failed because its turn never came (gh#144).
+     * @param task_id Task that gave up waiting.
+     * @param waited_ms How long it waited before giving up.
+     * @utility
+     * @version 2.12.0
+     */
+    void fail_task_engine_busy(const std::string& task_id, long waited_ms);
+
+    /**
+     * @brief Record an async task's terminal state and write its sentinel.
+     * @param task_id Task reaching a terminal state.
+     * @param status Terminal status string.
+     * @param phase Terminal phase string.
+     * @param text Result or error text.
+     * @utility
+     * @version 2.12.0
+     */
+    void commit_async_final_state(const std::string& task_id,
+                                  const std::string& status,
+                                  const std::string& phase,
+                                  const std::string& text);
+
+    /**
+     * @brief How many callers are waiting behind the one in flight.
+     * @return Queue depth, excluding the caller currently running.
+     * @utility
+     * @version 2.12.0
+     */
+    size_t turn_queue_depth() const { return waiters_.load(); }
+
+    /**
+     * @brief Whether a turn is currently running on the engine.
+     * @utility
+     * @version 2.12.0
+     */
+    bool turn_in_flight() const { return turn_busy_.load(); }
+
+    /**
      * @brief Handle entropic.ask_status — check async task state.
      * @param args Tool arguments (JSON with task_id).
      * @return MCP tool result JSON.
@@ -157,7 +277,8 @@ public:
 
     void run_async_ask(const std::string& prompt,
                        const std::string& task_id,
-                       int client_fd);
+                       int client_fd,
+                       const std::string& session_key = "");
 
     /**
      * @brief Write the sentinel file for an async task completion.
@@ -356,15 +477,6 @@ private:
      */
     void serve_client(int client_fd);
 
-    /**
-     * @brief Dispatch a JSON-RPC request and return the response.
-     * @param request Raw JSON-RPC request string.
-     * @param client_fd Socket fd for streaming progress notifications.
-     * @return JSON-RPC response string, or empty for notifications.
-     * @dg_internal
-     * @version 2.0.10
-     */
-    std::string dispatch(const std::string& request, int client_fd);
 
     /**
      * @brief Reap finished client threads from client_threads_.
@@ -380,6 +492,27 @@ private:
 
     entropic_handle_t handle_;                 ///< Engine handle (not owned)
     ExternalMCPConfig config_;                 ///< Config snapshot
+
+    // ── Turn queue (gh#144, v2.12.0) ─────────────────────────
+    // Serialises every path that reaches the engine — sync ask, streaming
+    // ask, AND the detached async worker. Missing the async path would let
+    // an async ask bypass the queue and collide with a sync one, earning an
+    // ALREADY_RUNNING where the caller expected to be queued.
+    //
+    // Nothing else on the bridge may take turn_mutex_. In particular
+    // handle_clear -> cancel_inflight_async_tasks raises the engine
+    // interrupt, and must NOT wait behind the turn it is trying to cancel —
+    // that would be gh#109's failure one layer up. It reaches the engine
+    // through entropic_context_clear (api_mutex), which runs never take.
+    mutable std::mutex turn_mutex_;            ///< Guards the ticket counters
+    std::condition_variable turn_cv_;          ///< Signalled when a turn ends
+    uint64_t next_ticket_ = 0;                 ///< Next ticket to hand out
+    uint64_t now_serving_ = 0;                 ///< Ticket whose turn it is
+    std::atomic<size_t> waiters_{0};           ///< Callers waiting in line
+    std::atomic<bool> turn_busy_{false};       ///< A turn is running
+    /// Tickets whose owner timed out. Skipped when the line reaches them,
+    /// so one abandoned waiter cannot stall every caller behind it.
+    std::set<uint64_t> abandoned_tickets_;
     std::filesystem::path socket_path_;        ///< Unix socket path
     std::string bound_canonical_;              ///< Process-registry key
     int listen_fd_ = -1;                       ///< Listening socket fd

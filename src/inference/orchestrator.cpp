@@ -2007,7 +2007,7 @@ size_t ModelOrchestrator::resolve_vram_budget_bytes() {
  * @return Inputs for estimate_vram_footprint.
  * @dg_internal
  * @req REQ-INFER-019
- * @version 2.11.0
+ * @version 2.12.0
  */
 static FootprintInputs footprint_inputs_for(
     const TierConfig& tier_cfg, uint64_t weights_bytes, int vram_reserve_mb) {
@@ -2018,6 +2018,10 @@ static FootprintInputs footprint_inputs_for(
     in.cache_type_k = tier_cfg.cache_type_k;
     in.cache_type_v = tier_cfg.cache_type_v;
     in.vram_reserve_mb = vram_reserve_mb;
+    // gh#144 (v2.12.0): context_length is per session, so the pool's KV term
+    // multiplies. Omitting this under-counts by exactly N and can admit a
+    // configuration that aborts the host — what this gate exists to prevent.
+    in.max_sessions = tier_cfg.max_sessions;
     if (!tier_cfg.mmproj_path.empty()) {
         std::error_code proj_ec;
         auto proj = std::filesystem::file_size(tier_cfg.mmproj_path, proj_ec);

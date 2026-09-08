@@ -29,7 +29,7 @@ namespace entropic::config {
  * knots ABC gate as new MVP-10 model-load knobs land.
  * @utility
  * @dg_internal
- * @version 2.3.19
+ * @version 2.12.0
  */
 static void parse_model_runtime_knobs(
     ryml::ConstNodeRef node, ModelConfig& config)
@@ -46,6 +46,7 @@ static void parse_model_runtime_knobs(
     extract(node, "rope_freq_base", config.rope_freq_base); // gh#23 v2.3.21
     extract(node, "rope_freq_scale", config.rope_freq_scale); // gh#23 v2.3.22
     extract(node, "n_parallel", config.n_parallel); // gh#23 v2.3.23
+    extract(node, "max_sessions", config.max_sessions); // gh#144 v2.12.0
     extract(node, "flash_attn", config.flash_attn);
 }
 
@@ -402,12 +403,42 @@ static std::string parse_filesystem_config(
 }
 
 /**
+ * @brief Parse `mcp.external.tool_descriptions` into the override map.
+ *
+ * gh#145 (v2.12.0). Keys are bare tool suffixes ("ask", "status", ...) so a
+ * consumer writes them independently of whatever `tool_prefix` is set to.
+ * Unknown keys are carried through and simply never matched — an unknown name
+ * is a no-op rather than an error, so a consumer's config does not break when
+ * a tool is renamed or removed.
+ *
+ * @param node YAML node for the "tool_descriptions" map.
+ * @param[out] config Output external MCP config.
+ * @dg_internal
+ * @version 2.12.0
+ */
+static void parse_tool_descriptions(
+    ryml::ConstNodeRef node,
+    ExternalMCPConfig& config)
+{
+    if (!node.is_map()) {
+        return;
+    }
+    for (auto child : node) {
+        if (!child.has_key() || !child.has_val() || child.val_is_null()) {
+            continue;
+        }
+        config.tool_descriptions[to_string(child.key())] =
+            to_string(child.val());
+    }
+}
+
+/**
  * @brief Parse the external MCP section from a YAML node.
  * @param node YAML node for "external" section.
  * @param[out] config Output external MCP config.
  * @return Empty string on success, error message on failure.
  * @dg_internal
- * @version 2.9.12
+ * @version 2.12.0
  */
 static std::string parse_external_mcp_config(
     ryml::ConstNodeRef node,
@@ -416,12 +447,20 @@ static std::string parse_external_mcp_config(
     extract(node, "enabled", config.enabled);
     extract(node, "rate_limit", config.rate_limit);
     extract(node, "ask_streaming", config.ask_streaming);
+    // gh#145: consumer-owned identity. Both default to "entropic", so an
+    // unset config advertises exactly the pre-2.12.0 names.
+    extract(node, "tool_prefix", config.tool_prefix);
+    extract(node, "server_name", config.server_name);
 
     if (node.is_map() && node.has_child("socket_path")
         && !node["socket_path"].val_is_null()) {
         std::filesystem::path tmp;
         extract_path(node, "socket_path", tmp);
         config.socket_path = tmp;
+    }
+
+    if (node.is_map() && node.has_child("tool_descriptions")) {
+        parse_tool_descriptions(node["tool_descriptions"], config);
     }
 
     return "";

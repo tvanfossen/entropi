@@ -1180,7 +1180,7 @@ ServerResponse InspectTool::execute(const std::string& args_json) {
  *         provider-not-configured error when no state provider is
  *         wired.
  * @req REQ-MCP-024
- * @version 2.0.6-rc16
+ * @version 2.12.0
  */
 ServerResponse ContextInspectTool::execute(
     const std::string& args_json) {
@@ -1190,6 +1190,16 @@ ServerResponse ContextInspectTool::execute(
     }
 
     auto args = nlohmann::json::parse(args_json, nullptr, false);
+    // gh#143 (v2.12.0): the gh#33 coercion at InspectTool::execute was
+    // never applied to this sibling, so an argument-free
+    // `entropic.context_inspect()` threw type_error.306 here even after
+    // gh#33 was closed. Note it is the `!is_object()` half that does the
+    // work: a non-throwing parse of the four characters `null` returns a
+    // NULL value, not a discarded one, so the is_discarded() half alone
+    // would not have caught it.
+    if (args.is_discarded() || !args.is_object()) {
+        args = nlohmann::json::object();
+    }
     int max_messages = args.value("max_messages", 0);
 
     logger->info("[context_inspect] max_messages={}", max_messages);

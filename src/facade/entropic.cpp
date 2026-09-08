@@ -2038,21 +2038,27 @@ void entropic_free(void* ptr) {
  * @req REQ-API-008
  * @req REQ-API-005
  * @req REQ-ABI-002
- * @version 2.9.5
+ * @version 2.12.0
  */
 entropic_error_t entropic_run(
     entropic_handle_t handle,
     const char* input,
     char** result_json) {
+    // gh#109: NO api_mutex — a long turn must not block entropic_interrupt()
+    // called from another thread. gh#144 (v2.12.0): the claim is a single
+    // compare-exchange, so that property holds by construction. The guard is
+    // declared BEFORE validation but claim() is evaluated LAST in the chain
+    // below, so a call rejected for a bad argument never momentarily claims
+    // the engine and bounces a legitimate concurrent caller.
+    entropic::HandleTurnGuard turn(handle);
     auto rc = check_orchestrator(handle);
-    if (rc != ENTROPIC_OK || !input || !result_json || !handle->engine) {
+    if (rc != ENTROPIC_OK || !input || !result_json || !handle->engine
+        || !turn.claim()) {
         return rc != ENTROPIC_OK ? rc
             : (!input || !result_json) ? ENTROPIC_ERROR_INVALID_ARGUMENT
-            : ENTROPIC_ERROR_INVALID_STATE;
+            : !handle->engine ? ENTROPIC_ERROR_INVALID_STATE
+            : ENTROPIC_ERROR_ALREADY_RUNNING;
     }
-    // gh#109: log scope only (no api_mutex) — a long turn must not block
-    // entropic_interrupt() called from another thread.
-    entropic::log::HandleLogScope log_scope(handle->log_id);
     try {
         auto result = handle->engine->run_turn(input);
         *result_json = alloc_cstr(
@@ -2134,24 +2140,29 @@ static entropic_error_t run_as_inner(
  * @req REQ-API-010
  * @req REQ-API-008
  * @req REQ-API-005
- * @version 2.9.5
+ * @version 2.12.0
  */
 entropic_error_t entropic_run_as(
     entropic_handle_t handle,
     const char* tier_or_identity,
     const char* input,
     char** result_json) {
+    // gh#109: NO api_mutex — a long turn must not block entropic_interrupt()
+    // called from another thread. gh#144 (v2.12.0): the claim is a single
+    // compare-exchange, so that property holds by construction. The guard is
+    // declared BEFORE validation but claim() is evaluated LAST in the chain
+    // below, so a call rejected for a bad argument never momentarily claims
+    // the engine and bounces a legitimate concurrent caller.
+    entropic::HandleTurnGuard turn(handle);
     auto rc = check_orchestrator(handle);
     if (rc != ENTROPIC_OK || !tier_or_identity || !input || !result_json
-        || !handle->engine) {
+        || !handle->engine || !turn.claim()) {
         return rc != ENTROPIC_OK ? rc
             : (!tier_or_identity || !input || !result_json)
                 ? ENTROPIC_ERROR_INVALID_ARGUMENT
-                : ENTROPIC_ERROR_INVALID_STATE;
+            : !handle->engine ? ENTROPIC_ERROR_INVALID_STATE
+            : ENTROPIC_ERROR_ALREADY_RUNNING;
     }
-    // gh#109: log scope only (no api_mutex) — a long turn must not block
-    // entropic_interrupt() called from another thread.
-    entropic::log::HandleLogScope log_scope(handle->log_id);
     if (!handle->engine->has_tier(tier_or_identity)) {
         handle->last_error =
             std::string("unknown tier: ") + tier_or_identity;
@@ -2241,7 +2252,7 @@ static std::vector<std::vector<entropic::Message>> build_batch_messages(
  * @req REQ-API-008
  * @req REQ-API-005
  * @req REQ-ABI-002
- * @version 2.9.5
+ * @version 2.12.0
  */
 entropic_error_t entropic_run_batch(
     entropic_handle_t handle,
@@ -2249,17 +2260,22 @@ entropic_error_t entropic_run_batch(
     const char** prompts,
     size_t n,
     char** result_json) {
+    // gh#109: NO api_mutex — a long turn must not block entropic_interrupt()
+    // called from another thread. gh#144 (v2.12.0): the claim is a single
+    // compare-exchange, so that property holds by construction. The guard is
+    // declared BEFORE validation but claim() is evaluated LAST in the chain
+    // below, so a call rejected for a bad argument never momentarily claims
+    // the engine and bounces a legitimate concurrent caller.
+    entropic::HandleTurnGuard turn(handle);
     auto rc = check_orchestrator(handle);
     if (rc != ENTROPIC_OK || !prompts || !result_json || !handle->engine
-        || n == 0) {
+        || n == 0 || !turn.claim()) {
         return rc != ENTROPIC_OK ? rc
             : (!prompts || !result_json || n == 0)
                 ? ENTROPIC_ERROR_INVALID_ARGUMENT
-                : ENTROPIC_ERROR_INVALID_STATE;
+            : !handle->engine ? ENTROPIC_ERROR_INVALID_STATE
+            : ENTROPIC_ERROR_ALREADY_RUNNING;
     }
-    // gh#109: log scope only (no api_mutex) — a long turn must not block
-    // entropic_interrupt() called from another thread.
-    entropic::log::HandleLogScope log_scope(handle->log_id);
     try {
         std::vector<std::string> tiers_vec;
         auto msgs = build_batch_messages(handle, tiers, prompts, n, tiers_vec);
@@ -2296,7 +2312,7 @@ entropic_error_t entropic_run_batch(
  * @req REQ-API-010
  * @req REQ-API-005
  * @req REQ-ABI-002
- * @version 2.9.5
+ * @version 2.12.0
  */
 entropic_error_t entropic_run_streaming(
     entropic_handle_t handle,
@@ -2304,14 +2320,22 @@ entropic_error_t entropic_run_streaming(
     void (*on_token)(const char* token, size_t len, void* user_data),
     void* user_data,
     int* cancel_flag) {
+    // gh#109: NO api_mutex — a long turn must not block entropic_interrupt()
+    // called from another thread. gh#144 (v2.12.0): the claim is a single
+    // compare-exchange, so that property holds by construction. The guard is
+    // declared BEFORE validation but claim() is evaluated LAST in the chain
+    // below, so a call rejected for a bad argument never momentarily claims
+    // the engine and bounces a legitimate concurrent caller.
+    entropic::HandleTurnGuard turn(handle);
     auto rc = check_orchestrator(handle);
-    if (rc != ENTROPIC_OK || !input || !on_token || !handle->engine) {
-        return rc != ENTROPIC_OK ? rc : ENTROPIC_ERROR_INVALID_ARGUMENT;
+    if (rc != ENTROPIC_OK || !input || !on_token || !handle->engine
+        || !turn.claim()) {
+        return rc != ENTROPIC_OK ? rc
+            : (!input || !on_token || !handle->engine)
+                ? ENTROPIC_ERROR_INVALID_ARGUMENT
+            : ENTROPIC_ERROR_ALREADY_RUNNING;
     }
 
-    // gh#109: log scope only (no api_mutex) — a long turn must not block
-    // entropic_interrupt() called from another thread.
-    entropic::log::HandleLogScope log_scope(handle->log_id);
 
     // Observer multiplexing is handled inside ResponseGenerator — the
     // facade passes on_token through untouched. (P0-1, 2.0.6-rc16)
@@ -2415,20 +2439,27 @@ static entropic_error_t run_messages_inner(
  * @req REQ-API-008
  * @req REQ-API-005
  * @req REQ-ABI-002
- * @version 2.9.5
+ * @version 2.12.0
  */
 entropic_error_t entropic_run_messages(
     entropic_handle_t handle,
     const char* messages_json,
     char** result_json) {
+    // gh#109: NO api_mutex — a long turn must not block entropic_interrupt()
+    // called from another thread. gh#144 (v2.12.0): the claim is a single
+    // compare-exchange, so that property holds by construction. The guard is
+    // declared BEFORE validation but claim() is evaluated LAST in the chain
+    // below, so a call rejected for a bad argument never momentarily claims
+    // the engine and bounces a legitimate concurrent caller.
+    entropic::HandleTurnGuard turn(handle);
     auto rc = check_orchestrator(handle);
-    if (rc != ENTROPIC_OK
-            || !messages_json || !result_json || !handle->engine) {
-        return rc != ENTROPIC_OK ? rc : ENTROPIC_ERROR_INVALID_ARGUMENT;
+    if (rc != ENTROPIC_OK || !messages_json || !result_json
+            || !handle->engine || !turn.claim()) {
+        return rc != ENTROPIC_OK ? rc
+            : (!messages_json || !result_json || !handle->engine)
+                ? ENTROPIC_ERROR_INVALID_ARGUMENT
+            : ENTROPIC_ERROR_ALREADY_RUNNING;
     }
-    // gh#109: log scope only (no api_mutex) — a long turn must not block
-    // entropic_interrupt() called from another thread.
-    entropic::log::HandleLogScope log_scope(handle->log_id);
     try {
         return run_messages_inner(handle, messages_json, result_json);
     } catch (const std::exception& e) {
@@ -2484,7 +2515,7 @@ static entropic_error_t run_messages_stream_inner(
  * @req REQ-INFER-025
  * @req REQ-API-005
  * @req REQ-ABI-002
- * @version 2.9.5
+ * @version 2.12.0
  */
 entropic_error_t entropic_run_messages_streaming(
     entropic_handle_t handle,
@@ -2492,14 +2523,21 @@ entropic_error_t entropic_run_messages_streaming(
     void (*on_token)(const char* token, size_t len, void* user_data),
     void* user_data,
     int* cancel_flag) {
+    // gh#109: NO api_mutex — a long turn must not block entropic_interrupt()
+    // called from another thread. gh#144 (v2.12.0): the claim is a single
+    // compare-exchange, so that property holds by construction. The guard is
+    // declared BEFORE validation but claim() is evaluated LAST in the chain
+    // below, so a call rejected for a bad argument never momentarily claims
+    // the engine and bounces a legitimate concurrent caller.
+    entropic::HandleTurnGuard turn(handle);
     auto rc = check_orchestrator(handle);
-    if (rc != ENTROPIC_OK
-            || !messages_json || !on_token || !handle->engine) {
-        return rc != ENTROPIC_OK ? rc : ENTROPIC_ERROR_INVALID_ARGUMENT;
+    if (rc != ENTROPIC_OK || !messages_json || !on_token
+            || !handle->engine || !turn.claim()) {
+        return rc != ENTROPIC_OK ? rc
+            : (!messages_json || !on_token || !handle->engine)
+                ? ENTROPIC_ERROR_INVALID_ARGUMENT
+            : ENTROPIC_ERROR_ALREADY_RUNNING;
     }
-    // gh#109: log scope only (no api_mutex) — a long turn must not block
-    // entropic_interrupt() called from another thread.
-    entropic::log::HandleLogScope log_scope(handle->log_id);
     try {
         return run_messages_stream_inner(
             handle, messages_json, on_token, user_data, cancel_flag);
@@ -2844,15 +2882,286 @@ entropic_error_t entropic_context_clear(entropic_handle_t handle) {
  * @req REQ-SAFE-001
  * @req REQ-API-008
  * @req REQ-API-005
- * @version 2.0.1
+ * @version 2.12.0
  */
 entropic_error_t entropic_context_get(
     entropic_handle_t handle, char** messages_json) {
-    if (!handle) { return ENTROPIC_ERROR_INVALID_HANDLE; }
-    if (!messages_json) { return ENTROPIC_ERROR_INVALID_ARGUMENT; }
+    // gh#144 (v2.12.0): the !handle->engine leg is new — an unconfigured
+    // handle has no engine, and this function dereferenced it. The siblings
+    // entropic_context_clear and entropic_context_usage both guarded it;
+    // this one and entropic_context_count did not. INVALID_HANDLE matches
+    // those siblings' contract for an unconfigured handle.
+    //
+    // Ordering matters and is not the siblings': a NULL out-param on a
+    // created-but-unconfigured handle must still report INVALID_ARGUMENT,
+    // which v2.3.10 pinned. Folded into one exit for the returns <= 3 gate.
+    if (!handle || !messages_json || !handle->engine) {
+        return (handle != nullptr && messages_json == nullptr)
+            ? ENTROPIC_ERROR_INVALID_ARGUMENT
+            : ENTROPIC_ERROR_INVALID_HANDLE;
+    }
     entropic::HandleApiLock lock(handle);  // gh#59 v2.3.1: mutex + log scope
     *messages_json = alloc_cstr(
         facade_json::serialize_messages(handle->engine->get_messages()));
+    return ENTROPIC_OK;
+}
+
+/**
+ * @brief Run a turn on a named session (gh#144, v2.12.0).
+ *
+ * The keyed sibling of entropic_run(). A NULL or empty `session_key` means
+ * the default session, so this is exactly entropic_run() in that case.
+ *
+ * The key is OPAQUE — the engine never interprets it. Two callers that pass
+ * the same string deliberately share a conversation; that choice belongs to
+ * the consumer, which is the only party that knows what identifies a caller.
+ *
+ * Added as a NEW NAMED FUNCTION rather than by changing entropic_run's
+ * signature, per REQ-ABI-001 and the entropic_run -> _streaming -> _messages
+ * -> _as -> _batch lineage, none of which ever modified an existing one. It
+ * is additive, so ENTROPIC_API_VERSION does NOT move.
+ *
+ * @param handle Engine handle.
+ * @param session_key Session to run under; NULL or "" = default session.
+ * @param input User input.
+ * @param result_json Out: JSON result (free with entropic_free).
+ * @return ENTROPIC_OK, or ENTROPIC_ERROR_ALREADY_RUNNING when a turn is
+ *         already in flight on this handle.
+ * @req REQ-API-009
+ * @req REQ-LOOP-001
+ * @version 2.12.0
+ */
+entropic_error_t entropic_run_session(
+    entropic_handle_t handle,
+    const char* session_key,
+    const char* input,
+    char** result_json) {
+    entropic::HandleTurnGuard turn(handle);
+    auto rc = check_orchestrator(handle);
+    if (rc != ENTROPIC_OK || !input || !result_json || !handle->engine
+        || !turn.claim()) {
+        return rc != ENTROPIC_OK ? rc
+            : (!input || !result_json) ? ENTROPIC_ERROR_INVALID_ARGUMENT
+            : !handle->engine ? ENTROPIC_ERROR_INVALID_STATE
+            : ENTROPIC_ERROR_ALREADY_RUNNING;
+    }
+    handle->engine->set_active_session(session_key ? session_key : "");
+    try {
+        auto result = handle->engine->run_turn(input);
+        *result_json = alloc_cstr(
+            facade_json::serialize_messages(result));
+        if (handle->stream_observer != nullptr) {
+            handle->stream_observer("", 0, handle->stream_observer_data);
+        }
+        return ENTROPIC_OK;
+    } catch (const std::exception& e) {
+        handle->last_error = e.what();
+        s_log->error("run_session: {}", handle->last_error);
+        *result_json = nullptr;
+        return ENTROPIC_ERROR_GENERATE_FAILED;
+    }
+}
+
+/**
+ * @brief Run a turn on a named session under a named tier (gh#144).
+ * @param handle Engine handle.
+ * @param session_key Session to run under; NULL or "" = default session.
+ * @param tier_or_identity Tier to lock this call to.
+ * @param input User input.
+ * @param result_json Out: JSON result (free with entropic_free).
+ * @return ENTROPIC_OK, ENTROPIC_ERROR_IDENTITY_NOT_FOUND for an unknown
+ *         tier, or ENTROPIC_ERROR_ALREADY_RUNNING.
+ * @req REQ-API-009
+ * @req REQ-IDEN-001
+ * @version 2.12.0
+ */
+entropic_error_t entropic_run_session_as(
+    entropic_handle_t handle,
+    const char* session_key,
+    const char* tier_or_identity,
+    const char* input,
+    char** result_json) {
+    entropic::HandleTurnGuard turn(handle);
+    auto rc = check_orchestrator(handle);
+    if (rc != ENTROPIC_OK || !tier_or_identity || !input || !result_json
+        || !handle->engine || !turn.claim()) {
+        return rc != ENTROPIC_OK ? rc
+            : (!tier_or_identity || !input || !result_json)
+                ? ENTROPIC_ERROR_INVALID_ARGUMENT
+            : !handle->engine ? ENTROPIC_ERROR_INVALID_STATE
+            : ENTROPIC_ERROR_ALREADY_RUNNING;
+    }
+    if (!handle->engine->has_tier(tier_or_identity)) {
+        handle->last_error =
+            std::string("unknown tier: ") + tier_or_identity;
+        return ENTROPIC_ERROR_IDENTITY_NOT_FOUND;
+    }
+    handle->engine->set_active_session(session_key ? session_key : "");
+    return run_as_inner(handle, tier_or_identity, input, result_json);
+}
+
+/**
+ * @brief Streaming turn on a named session (gh#144, v2.12.0).
+ * @param handle Engine handle.
+ * @param session_key Session to run under; NULL or "" = default session.
+ * @param input User input.
+ * @param on_token Per-token callback.
+ * @param user_data Forwarded to on_token.
+ * @param cancel_flag Optional cancel flag.
+ * @return ENTROPIC_OK or ENTROPIC_ERROR_ALREADY_RUNNING.
+ * @req REQ-API-009
+ * @version 2.12.0
+ */
+entropic_error_t entropic_run_session_streaming(
+    entropic_handle_t handle,
+    const char* session_key,
+    const char* input,
+    void (*on_token)(const char* token, size_t len, void* user_data),
+    void* user_data,
+    int* cancel_flag) {
+    entropic::HandleTurnGuard turn(handle);
+    auto rc = check_orchestrator(handle);
+    if (rc != ENTROPIC_OK || !input || !on_token || !handle->engine
+        || !turn.claim()) {
+        return rc != ENTROPIC_OK ? rc
+            : (!input || !on_token || !handle->engine)
+                ? ENTROPIC_ERROR_INVALID_ARGUMENT
+            : ENTROPIC_ERROR_ALREADY_RUNNING;
+    }
+    handle->engine->set_active_session(session_key ? session_key : "");
+    try {
+        int code = handle->engine->run_streaming(
+            input, on_token, user_data, cancel_flag);
+        if (handle->stream_observer != nullptr) {
+            handle->stream_observer("", 0, handle->stream_observer_data);
+        }
+        return code == 1 ? ENTROPIC_ERROR_CANCELLED : ENTROPIC_OK;
+    } catch (const std::exception& e) {
+        handle->last_error = e.what();
+        s_log->error("run_session_streaming: {}", handle->last_error);
+        return ENTROPIC_ERROR_GENERATE_FAILED;
+    }
+}
+
+/**
+ * @brief Read one session's conversation as JSON (gh#144, v2.12.0).
+ * @param handle Engine handle.
+ * @param session_key Session to read; NULL or "" = default session.
+ * @param messages_json Out: JSON array (free with entropic_free).
+ * @return ENTROPIC_OK on success.
+ * @req REQ-LOOP-001
+ * @version 2.12.0
+ */
+entropic_error_t entropic_session_context_get(
+    entropic_handle_t handle,
+    const char* session_key,
+    char** messages_json) {
+    if (!handle || !messages_json || !handle->engine) {
+        return (handle != nullptr && messages_json == nullptr)
+            ? ENTROPIC_ERROR_INVALID_ARGUMENT
+            : ENTROPIC_ERROR_INVALID_HANDLE;
+    }
+    entropic::HandleApiLock lock(handle);
+    *messages_json = alloc_cstr(facade_json::serialize_messages(
+        handle->engine->messages_for(session_key ? session_key : "")));
+    return ENTROPIC_OK;
+}
+
+/**
+ * @brief Message count for one session (gh#144, v2.12.0).
+ * @param handle Engine handle.
+ * @param session_key Session to count; NULL or "" = default session.
+ * @param count Out: message count.
+ * @return ENTROPIC_OK on success.
+ * @req REQ-LOOP-001
+ * @version 2.12.0
+ */
+entropic_error_t entropic_session_context_count(
+    entropic_handle_t handle,
+    const char* session_key,
+    size_t* count) {
+    if (!handle || !count || !handle->engine) {
+        return (handle != nullptr && count == nullptr)
+            ? ENTROPIC_ERROR_INVALID_ARGUMENT
+            : ENTROPIC_ERROR_INVALID_HANDLE;
+    }
+    entropic::HandleApiLock lock(handle);
+    *count = handle->engine->message_count_for(
+        session_key ? session_key : "");
+    return ENTROPIC_OK;
+}
+
+/**
+ * @brief Clear one session's history, leaving others intact (gh#144).
+ *
+ * The unscoped entropic_context_clear wiped every caller's context, which is
+ * why the issue observed it "is not isolation" — with two callers active
+ * there was no ordering in which it was correct.
+ *
+ * @param handle Engine handle.
+ * @param session_key Session to clear; NULL or "" = default session.
+ * @return ENTROPIC_OK on success.
+ * @req REQ-LOOP-001
+ * @version 2.12.0
+ */
+entropic_error_t entropic_session_context_clear(
+    entropic_handle_t handle,
+    const char* session_key) {
+    if (!handle || !handle->engine) {
+        return ENTROPIC_ERROR_INVALID_HANDLE;
+    }
+    entropic::HandleApiLock lock(handle);
+    handle->engine->clear_conversation_for(session_key ? session_key : "");
+    return ENTROPIC_OK;
+}
+
+/**
+ * @brief Forget a session entirely (gh#144, v2.12.0).
+ * @param handle Engine handle.
+ * @param session_key Session to drop; "" is cleared rather than erased.
+ * @return ENTROPIC_OK on success.
+ * @req REQ-LOOP-001
+ * @version 2.12.0
+ */
+entropic_error_t entropic_session_drop(
+    entropic_handle_t handle,
+    const char* session_key) {
+    if (!handle || !handle->engine) {
+        return ENTROPIC_ERROR_INVALID_HANDLE;
+    }
+    entropic::HandleApiLock lock(handle);
+    handle->engine->drop_session(session_key ? session_key : "");
+    return ENTROPIC_OK;
+}
+
+/**
+ * @brief List the sessions this handle holds (gh#144, v2.12.0).
+ *
+ * Feeds the bridge's status tool so an operator can see which callers the
+ * host is serving, and is what every session test asserts against.
+ *
+ * @param handle Engine handle.
+ * @param sessions_json Out: JSON array of {key, messages}
+ *                      (free with entropic_free).
+ * @return ENTROPIC_OK on success.
+ * @req REQ-LOOP-001
+ * @version 2.12.0
+ */
+entropic_error_t entropic_session_list(
+    entropic_handle_t handle,
+    char** sessions_json) {
+    if (!handle || !sessions_json || !handle->engine) {
+        return (handle != nullptr && sessions_json == nullptr)
+            ? ENTROPIC_ERROR_INVALID_ARGUMENT
+            : ENTROPIC_ERROR_INVALID_HANDLE;
+    }
+    entropic::HandleApiLock lock(handle);
+    nlohmann::json arr = nlohmann::json::array();
+    for (const auto& key : handle->engine->session_keys()) {
+        arr.push_back({{"key", key},
+                       {"messages", handle->engine->message_count_for(key)}});
+    }
+    *sessions_json = alloc_cstr(arr.dump());
     return ENTROPIC_OK;
 }
 
@@ -2863,12 +3172,17 @@ entropic_error_t entropic_context_get(
  * @return ENTROPIC_OK on success.
  * @req REQ-API-005
  * @req REQ-ABI-001
- * @version 2.0.1
+ * @version 2.12.0
  */
 entropic_error_t entropic_context_count(
     entropic_handle_t handle, size_t* count) {
-    if (!handle) { return ENTROPIC_ERROR_INVALID_HANDLE; }
-    if (!count) { return ENTROPIC_ERROR_INVALID_ARGUMENT; }
+    // gh#144 (v2.12.0): see entropic_context_get — same missing engine
+    // guard, same ordering constraint, same single-exit fold.
+    if (!handle || !count || !handle->engine) {
+        return (handle != nullptr && count == nullptr)
+            ? ENTROPIC_ERROR_INVALID_ARGUMENT
+            : ENTROPIC_ERROR_INVALID_HANDLE;
+    }
     *count = handle->engine->message_count();
     return ENTROPIC_OK;
 }

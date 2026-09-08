@@ -87,6 +87,16 @@ struct FootprintInputs {
     std::string cache_type_k = "f16";  ///< KV key cache quantization.
     std::string cache_type_v = "f16";  ///< KV value cache quantization.
     int vram_reserve_mb = 0;      ///< Configured headroom to leave free.
+
+    /// @brief Resident conversation sessions this tier keeps KV for (gh#144).
+    ///
+    /// The KV term multiplies by this. `context_length` is PER SESSION, so a
+    /// pool of 3 at 32768 allocates 98304 cells. Without this field the gate
+    /// under-counts a pool by exactly N and can admit a configuration that
+    /// then aborts the host process inside llama.cpp — the precise failure
+    /// gh#142 built this gate to prevent.
+    /// @version 2.12.0
+    int max_sessions = 1;
 };
 
 /// @brief An estimate, or an explicit admission that there isn't one.
@@ -175,7 +185,7 @@ inline double kv_bytes_per_token(const FootprintInputs& in) {
  * @param in Tier footprint inputs.
  * @return The estimate, with `known == false` when the placement is unpriceable.
  * @req REQ-INFER-019
- * @version 2.11.0
+ * @version 2.12.0
  */
 inline FootprintEstimate estimate_vram_footprint(const FootprintInputs& in) {
     FootprintEstimate est;
@@ -190,8 +200,16 @@ inline FootprintEstimate estimate_vram_footprint(const FootprintInputs& in) {
         ? in.weights_bytes + in.mmproj_bytes
         : 0ull;
     const int ctx = in.context_length > 0 ? in.context_length : 0;
+    const int sessions = in.max_sessions > 0 ? in.max_sessions : 1;
+    // gh#144 (v2.12.0): context_length is per session; the pool allocates
+    // ctx * sessions cells. Deliberately an over-count for an iSWA model
+    // like Gemma-4: kBaseKvPerTokenF16 is a flat rate and does not model
+    // sliding-window layers (5:1 SWA at window 512 under swa_full=false),
+    // so the real figure is well below this. That is the safe direction
+    // per this header's own rule — never silently under-count.
     const uint64_t kv = static_cast<uint64_t>(
-        static_cast<double>(ctx) * kv_bytes_per_token(in));
+        static_cast<double>(ctx) * static_cast<double>(sessions)
+        * kv_bytes_per_token(in));
     est.known = true;
     est.bytes = resident + kv
         + static_cast<uint64_t>(in.vram_reserve_mb) * 1024ull * 1024ull;
@@ -210,7 +228,7 @@ inline FootprintEstimate estimate_vram_footprint(const FootprintInputs& in) {
  * @param available_bytes VRAM actually available on the device.
  * @return A context length in tokens, rounded down to a 512 multiple, or 0.
  * @req REQ-INFER-019
- * @version 2.11.0
+ * @version 2.12.0
  */
 inline int recommend_context_length(const FootprintInputs& in,
                                     uint64_t available_bytes) {
@@ -220,7 +238,13 @@ inline int recommend_context_length(const FootprintInputs& in,
     if (!fixed.known || fixed.bytes >= available_bytes) {
         return 0;
     }
-    const double per_token = kv_bytes_per_token(in);
+    // gh#144 (v2.12.0): divide the budget across the pool, or the
+    // recommendation is a PER-SESSION window N times too large — handing an
+    // operator a config that aborts, from the very function whose job is to
+    // offer one that works.
+    const int sessions = in.max_sessions > 0 ? in.max_sessions : 1;
+    const double per_token =
+        kv_bytes_per_token(in) * static_cast<double>(sessions);
     const uint64_t kv_budget = available_bytes - fixed.bytes;
     const uint64_t fits = static_cast<uint64_t>(
         static_cast<double>(kv_budget) / per_token);
