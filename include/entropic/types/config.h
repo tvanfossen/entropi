@@ -328,6 +328,15 @@ struct GPUResourceProfile {
  * @version 2.3.16 — added logit_bias (gh#23 MVP item 4)
  */
 struct GenerationParams {
+    /// @brief Caller-scoped session this generation belongs to (gh#144).
+    ///
+    /// `""` (default) is the single legacy sequence — bit-identical to
+    /// pre-v2.12.0. The BACKEND owns the key-to-llama-sequence mapping and
+    /// its eviction, because it owns the slots and the residency; the engine
+    /// deliberately knows nothing about sequence ids.
+    /// @version 2.12.0
+    std::string session_key;
+
     float temperature = 0.7f;                ///< Sampling temperature
     float top_p = 0.9f;                      ///< Nucleus sampling threshold
     int top_k = 40;                          ///< Top-K sampling

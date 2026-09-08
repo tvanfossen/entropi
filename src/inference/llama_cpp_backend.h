@@ -1062,6 +1062,13 @@ protected:
                                 int start_offset, int slot);
 
     /**
+     * @brief Bind this generation to its session's sequence slot (gh#144).
+     * @param params Generation parameters carrying the session key.
+     * @version 2.12.0
+     */
+    void bind_session_slot(const GenerationParams& params);
+
+    /**
      * @brief Decode tokens starting at a given offset.
      * @param tokens Full token sequence.
      * @param start_offset First token to decode.

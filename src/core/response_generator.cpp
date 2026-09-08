@@ -296,7 +296,7 @@ static std::string resolve_stream_finish_reason(int rc,
  * @param mode Label for the log line ("stream"/"batch").
  * @return {messages_json, params_json}.
  * @req REQ-LOOP-007
- * @version 2.7.0
+ * @version 2.12.0
  */
 std::pair<std::string, std::string> ResponseGenerator::prepare_prompts(
     LoopContext& ctx, const char* mode) {
@@ -309,7 +309,7 @@ std::pair<std::string, std::string> ResponseGenerator::prepare_prompts(
                  mode, ctx.locked_tier, messages.size());
     log_prompt(messages, ctx.locked_tier);
     return {serialize_messages(messages),
-            build_params_json(ctx.locked_tier)};
+            build_params_json(ctx.locked_tier, ctx.session_key)};
 }
 
 /**
@@ -662,9 +662,12 @@ std::string ResponseGenerator::serialize_messages(
  * @version 2.7.0
  */
 std::string ResponseGenerator::build_params_json(
-    const std::string& tier) {
+    const std::string& tier, const std::string& session_key) {
     nlohmann::json j = nlohmann::json::object();
     if (!tier.empty()) { j["tier"] = tier; }
+    // gh#144 (v2.12.0): only emitted when non-empty, so a handle that never
+    // names a session sends a byte-identical params payload.
+    if (!session_key.empty()) { j["session"] = session_key; }
 
     if (inference_.get_tool_prompt != nullptr) {
         char* tools = nullptr;

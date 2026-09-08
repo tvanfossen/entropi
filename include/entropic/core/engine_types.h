@@ -276,6 +276,12 @@ struct LoopContext {
     bool has_pending_tool_results = false;                 ///< Tool results awaiting presentation
     std::string locked_tier;                               ///< Tier locked for this loop ("" = none)
     std::string task_id;                                   ///< External task ID (MCP integration)
+    /// @brief Caller-scoped session this turn belongs to (gh#144, v2.12.0).
+    /// Distinct from conversation_id below, which is a STORAGE FK minted
+    /// fresh on every run() and is neither caller-supplied nor stable. This
+    /// is opaque, caller-supplied and stable — the backend maps it to a KV
+    /// sequence.
+    std::string session_key;
     std::string conversation_id;                             ///< Conversation ID for storage (v1.8.8)
     std::string source = "human";                          ///< Message source
     std::vector<std::string> all_tools;                    ///< Full tool list as raw JSON strings

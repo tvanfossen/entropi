@@ -387,7 +387,7 @@ void AgentEngine::run_loop(LoopContext& ctx, bool inherit_interrupt) {
  * @req REQ-LOOP-001
  * @req REQ-LOOP-002
  * @req REQ-COMPACT-002
- * @version 2.8.0
+ * @version 2.12.0
  */
 std::vector<Message> AgentEngine::run(std::vector<Message> messages,
                                       const std::string& tier_override) {
@@ -401,6 +401,9 @@ std::vector<Message> AgentEngine::run(std::vector<Message> messages,
     LoopContext ctx;
     ctx.messages = std::move(messages);
     ctx.locked_tier = tier_override;  // gh#99: "" routes; non-empty locks
+    // gh#144 (v2.12.0): carry the caller-scoped session down to the backend,
+    // which maps it to a KV sequence. "" is the default session.
+    ctx.session_key = active_session_key_;
     ctx.metrics.start_time = now_seconds();
 
     init_session_conversation(ctx);

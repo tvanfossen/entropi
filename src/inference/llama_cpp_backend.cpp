@@ -2812,6 +2812,45 @@ GenerationResult LlamaCppBackend::generate_multimodal(
 // ── Generation entry points ────────────────────────────────
 
 /**
+ * @brief Bind this generation to its session's sequence slot (gh#144).
+ *
+ * Resolves the caller-supplied key to a llama sequence and, when the pool is
+ * full, evicts the least recently used session's KV to make room. Eviction
+ * drops KV ONLY — the engine still holds that session's message history,
+ * which is authoritative and re-prefillable, so its next turn costs a cold
+ * prefill. That is exactly what every turn costs today.
+ *
+ * An empty key resolves to slot 0, so a caller that never names a session is
+ * bit-identical to pre-v2.12.0.
+ *
+ * @param params Generation parameters carrying the session key.
+ * @dg_internal
+ * @version 2.12.0
+ */
+void LlamaCppBackend::bind_session_slot(const GenerationParams& params) {
+    const int pool = derive_pool_geometry(config()).n_seq_max;
+    if (residency_.slots() != pool) {
+        residency_ = SessionResidency<llama_token>(pool);
+    }
+    if (pool <= 1) {
+        active_slot_ = 0;
+        return;
+    }
+    std::string evicted;
+    active_slot_ = residency_.acquire(params.session_key, &evicted);
+    if (!evicted.empty() && ctx_ != nullptr) {
+        // The slot is being reused, so the departing session's cells must go
+        // with it — otherwise the incoming session inherits a prefix that
+        // matches nothing it will send.
+        llama_memory_seq_rm(llama_get_memory(ctx_),
+                            static_cast<llama_seq_id>(active_slot_), -1, -1);
+        residency_.invalidate(active_slot_);
+        logger->info("Session pool: evicted '{}' from slot {} for '{}'",
+                     evicted, active_slot_, params.session_key);
+    }
+}
+
+/**
  * @brief Generate a complete response using chat template.
  *
  * v2.1.8 (gh#37 / v1.9.11 Phases 5–7): dispatches to
@@ -2824,12 +2863,15 @@ GenerationResult LlamaCppBackend::generate_multimodal(
  * @param params Generation parameters.
  * @return GenerationResult.
  * @dg_internal
- * @version 2.1.8
+ * @version 2.12.0
  */
 GenerationResult LlamaCppBackend::do_generate(
     const std::vector<Message>& messages,
     const GenerationParams& params)
 {
+    // gh#144 (v2.12.0): every generate path goes through here, so this is the
+    // one place a session has to be bound to a sequence.
+    bind_session_slot(params);
     if (!any_image_in(messages)) {
         return do_generate_text_only(messages, params);
     }
