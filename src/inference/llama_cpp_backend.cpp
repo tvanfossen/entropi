@@ -3408,6 +3408,12 @@ struct SpeculativeRunState {
     std::string generated;
     std::vector<std::string> stop;  ///< gh#108: stop seqs (effective_stop); empty for gh#36
     int n_generated = 0;
+    /// gh#144 (v2.12.0): prompt tokens actually pushed through llama_decode
+    /// during this run's prefill. The MTP path counted NOTHING, so
+    /// last_prefill_tokens() read 0 for every MTP turn and there was no way
+    /// to measure whether a prefix was reused or re-decoded. Instrument
+    /// before optimising.
+    int n_prefilled = 0;
     int n_drafted = 0;
     int n_accepted = 0;
     bool has_eos = false;
@@ -3958,7 +3964,7 @@ static void spec_run_loop(
  * @brief Assemble final GenerationResult + log metrics. Helper to
  *        keep the public entry under SLOC ≤ 50.
  * @dg_internal
- * @version 2.10.4
+ * @version 2.12.0
  */
 static GenerationResult spec_finalize(
     SpeculativeRunState& state,
@@ -3983,6 +3989,10 @@ static GenerationResult spec_finalize(
     // so the gh#88 envelope recovery and fenced-JSON fallbacks are unaffected.
     result.content = entropic::mcp::sanitize_utf8(state.generated);
     result.token_count = state.n_generated;
+    // gh#144 (v2.12.0): carry the prefill count out of the speculative path,
+    // which previously reported nothing and left last_prefill_tokens() at 0
+    // for every MTP turn.
+    result.prefill_tokens = state.n_prefilled;
     result.finish_reason = state.finish_reason;
     result.error_code = state.error_code;
     result.error_message = state.error_message;
@@ -4248,13 +4258,19 @@ bool mtp_process_chunk(SpeculativeRunState& state, int off, int chunk) {
  * @dg_internal
  * @version 2.9.0
  */
-bool mtp_prefill_and_seed(SpeculativeRunState& state) {
+bool mtp_prefill_and_seed(SpeculativeRunState& state, int start = 0) {
     int total = static_cast<int>(state.prompt_tgt.size());
     if (total == 0) { return true; }  // 1-token prompt: round 1 drafts cold
+    // gh#144 (v2.12.0): decode only from `start`. Tokens below it are already
+    // resident and provably unchanged — the caller matched them against the
+    // KV's own occupancy before choosing the cut.
     int n_batch = llama_n_batch(state.ctx_tgt);
-    for (int off = 0; off < total; off += n_batch) {
+    for (int off = start; off < total; off += n_batch) {
         int chunk = std::min(n_batch, total - off);
         if (!mtp_process_chunk(state, off, chunk)) { return false; }
+        // gh#144 (v2.12.0): count what this path actually decodes, so
+        // last_prefill_tokens() is meaningful under speculative.mtp.
+        state.n_prefilled += chunk;
     }
     return true;
 }
@@ -4309,16 +4325,38 @@ std::string mtp_init_run(
     const std::vector<llama_token>& tokens,
     const GenerationParams& params, int n_max,
     const std::string& tool_grammar, bool tool_grammar_lazy,
-    const std::string& generation_prompt) {
+    const std::string& generation_prompt, int reuse_cut) {
     state.id_last = tokens.back();
     state.prompt_tgt.assign(tokens.begin(), tokens.end() - 1);
     state.n_past = static_cast<int>(tokens.size()) - 1;
-    llama_memory_clear(llama_get_memory(state.ctx_tgt), true);
+
+    // gh#144 (v2.12.0): retain a prefix this run can prove unchanged.
+    //
+    // This used to be an unconditional llama_memory_clear(ctx_tgt, true)
+    // followed by a full re-prefill, on EVERY generation. Nothing about
+    // speculative decoding requires discarding the cache — it was an
+    // implementation choice in this path, and it cost the whole prompt every
+    // turn: a consumer measured 18611 tokens prefilled against 196 generated
+    // (95:1) on a three-turn review, with ~85% of that being an invariant
+    // prefix of constitution, identity and a 16 KB staged tool-schema block.
+    //
+    // `reuse_cut` is 0 when nothing is reusable, which reproduces the old
+    // behaviour exactly; the caller clears the sequence in that case.
+    auto* mem = llama_get_memory(state.ctx_tgt);
+    if (reuse_cut > 0) {
+        // Drop only the divergent tail, then decode the delta.
+        llama_memory_seq_rm(mem, state.seq_id,
+                            static_cast<llama_pos>(reuse_cut), -1);
+    } else {
+        llama_memory_clear(mem, true);
+    }
     auto err = mtp_init_decoder(state, model_tgt, params, n_max,
                                 tool_grammar, tool_grammar_lazy,
                                 generation_prompt);
     if (!err.empty()) { return err; }
-    if (!mtp_prefill_and_seed(state)) { return "MTP prefill/process failed"; }
+    if (!mtp_prefill_and_seed(state, reuse_cut)) {
+        return "MTP prefill/process failed";
+    }
     common_speculative_begin(state.spec, state.seq_id, state.prompt_tgt);
     return "";
 }
@@ -4362,14 +4400,14 @@ GenerationResult mtp_run_from_tokens(
     const std::vector<std::string>& stop,
     std::chrono::steady_clock::time_point t0,
     const std::string& tool_grammar, bool tool_grammar_lazy,
-    const std::string& generation_prompt) {
+    const std::string& generation_prompt, int reuse_cut) {
     SpeculativeRunState state;
     state.ctx_tgt = ctx_tgt;
     state.ctx_dft = ctx_dft;
     state.stop = stop;  // gh#108: MTP honors stop sequences (effective_stop)
     auto init_err = mtp_init_run(state, model_tgt, tokens, params, n_max,
                                  tool_grammar, tool_grammar_lazy,
-                                 generation_prompt);
+                                 generation_prompt, reuse_cut);
     if (!init_err.empty()) {
         spec_cleanup(state);
         return spec_error(ENTROPIC_ERROR_GENERATE_FAILED,
@@ -4447,6 +4485,38 @@ GenerationResult LlamaCppBackend::mtp_guard(
 }
 
 /**
+ * @brief How much of an MTP prompt is already resident and reusable.
+ *
+ * gh#144 (v2.12.0). Same rule the plain decode path uses: a prefix match
+ * validated against the KV's OWN occupancy (llama_memory_seq_pos_max), never
+ * a software counter — so an out-of-band wipe fails the gate rather than
+ * being trusted.
+ *
+ * `mtp_prefill_and_seed` decodes `prompt_tgt`, which is the prompt minus its
+ * final token, so the cut is clamped to that length.
+ *
+ * Extracted from generate_mtp to keep it inside the ABC gate.
+ *
+ * @param tokens Full incoming prompt.
+ * @return Tokens reusable from the front; 0 when nothing is.
+ * @dg_internal
+ * @version 2.12.0
+ */
+int LlamaCppBackend::mtp_reuse_cut(
+    const std::vector<llama_token>& tokens) const {
+    if (!prompt_cache_config_.warm_keep || ctx_ == nullptr) {
+        return 0;
+    }
+    const auto seq = static_cast<llama_seq_id>(active_slot_);
+    const long pos_max = static_cast<long>(
+        llama_memory_seq_pos_max(llama_get_memory(ctx_), seq));
+    const std::size_t cut = warm_keep_cut(
+        residency_.resident(active_slot_), tokens, pos_max);
+    return static_cast<int>(
+        std::min(cut, tokens.empty() ? std::size_t{0} : tokens.size() - 1));
+}
+
+/**
  * @brief Speculative generation via a target-owned MTP head (gh#106).
  *
  * gh#108: holds mtp_mutex_ across head setup + the whole decode so a concurrent
@@ -4464,7 +4534,7 @@ GenerationResult LlamaCppBackend::mtp_guard(
  *         this route owns the outcome and never degrades to plain decode.
  * @req REQ-INFER-015
  * @req REQ-INFER-005
- * @version 2.12.0
+ * @version 2.12.0-rc1
  */
 GenerationResult LlamaCppBackend::generate_mtp(
     const std::vector<Message>& messages,
@@ -4480,19 +4550,37 @@ GenerationResult LlamaCppBackend::generate_mtp(
     if (result.error_code != ENTROPIC_OK) {
         return result;
     }
-    invalidate_all_resident_kv();  // MTP kernel owns seq 0 itself
+    bind_session_slot(params);
     auto tokens = tokenize(render_prompt(messages, params), true);
     if (tokens.size() < 2) {
         return spec_error(ENTROPIC_ERROR_GENERATE_FAILED,
             "MTP prompt must have at least 2 tokens");
     }
-    logger->info("MTP: {} input tokens, max_tokens={}, n_max={}",
-                 tokens.size(), params.max_tokens, mtp_n_max_);
-    return mtp_run_from_tokens(ctx_, mtp_draft_ctx_, model_, tokens, params,
-                               on_token, cancel, mtp_n_max_,
-                               effective_stop(params), t0,  // gh#108: honor stops
-                               tool_grammar_, tool_grammar_lazy_,   // gh#134
-                               parse_generation_prompt_);
+
+    const int reuse_cut = mtp_reuse_cut(tokens);
+    if (reuse_cut == 0) {
+        invalidate_all_resident_kv();  // cold run: nothing survives the clear
+    }
+    logger->info("MTP: {} input tokens, reusing {}, max_tokens={}, n_max={}",
+                 tokens.size(), reuse_cut, params.max_tokens, mtp_n_max_);
+    auto mtp_result = mtp_run_from_tokens(
+        ctx_, mtp_draft_ctx_, model_, tokens, params,
+        on_token, cancel, mtp_n_max_,
+        effective_stop(params), t0,  // gh#108: honor stops
+        tool_grammar_, tool_grammar_lazy_,   // gh#134
+        parse_generation_prompt_, reuse_cut);
+    // gh#144 (v2.12.0): publish it so last_prefill_tokens() is meaningful
+    // under speculative.mtp, exactly as it is on the plain decode path.
+    last_prefill_tokens_ = mtp_result.prefill_tokens;
+    if (mtp_result.error_code == ENTROPIC_OK) {
+        // Record what this slot now holds so the NEXT turn can match against
+        // it. Only on success: a failed run leaves the KV in a state we did
+        // not author and must not claim to know.
+        residency_.set_resident(active_slot_, tokens);
+    } else {
+        invalidate_resident_kv();
+    }
+    return mtp_result;
 }
 
 /**

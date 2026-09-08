@@ -35,6 +35,16 @@ struct GenerationResult {
     int token_count = 0;                   ///< Generated token count
     double generation_time_ms = 0.0;       ///< Wall-clock generation time
 
+    /// @brief Prompt tokens actually pushed through llama_decode during this
+    ///        run's prefill (gh#144, v2.12.0).
+    ///
+    /// The instrumentation every prefill-reuse claim rests on. A correctness
+    /// test passes via full-reprefill fallback even when reuse is completely
+    /// dead, so "the answer was right" says nothing about whether a prefix
+    /// was reused — this does. Zero when the path does not report it.
+    /// @version 2.12.0
+    int prefill_tokens = 0;
+
     /* ── Orchestrator timing (populated by ModelOrchestrator) ── */
     double routing_ms = 0.0;               ///< Router classification time
     double swap_ms = 0.0;                  ///< Model swap time

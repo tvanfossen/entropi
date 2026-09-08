@@ -1069,6 +1069,14 @@ protected:
     void bind_session_slot(const GenerationParams& params);
 
     /**
+     * @brief How much of an MTP prompt is already resident (gh#144).
+     * @param tokens Full incoming prompt.
+     * @return Reusable prefix length; 0 when nothing is.
+     * @version 2.12.0
+     */
+    int mtp_reuse_cut(const std::vector<llama_token>& tokens) const;
+
+    /**
      * @brief Decode tokens starting at a given offset.
      * @param tokens Full token sequence.
      * @param start_offset First token to decode.
