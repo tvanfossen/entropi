@@ -25,9 +25,15 @@
 #include <entropic/types/message.h>
 
 #include "../../src/inference/llama_cpp_backend.h"
+// v2.12.0: shared WARM-load host-RAM predicate, so this path and the v2.1.9
+// family helper gate the same models by the same rule.
+#include "../../src/inference/partial_offload.h"
 
+#include <cstdint>
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -75,6 +81,38 @@ inline void verify_family_common_chat(const std::string& gguf,
     auto path = model_path(gguf);
     if (!std::filesystem::is_regular_file(path)) {
         SKIP("GGUF not present: " + path.string());
+    }
+
+    // v2.12.0: the WARM load maps the WHOLE GGUF into host RAM regardless of
+    // gpu_layers, so peak host usage is the file size — not the CPU-side
+    // remainder after offload. A 13 GB model therefore needs ~13 GB free
+    // even though most of it ends up on the card.
+    //
+    // This check lives in the shared pure header rather than being copied:
+    // the v2.1.9 family helper gates the same models by the same rule, and
+    // the FIRST cut gated only that helper — so this path loaded the same
+    // 13 GB Qwen hybrid ungated and took the whole suite down with it.
+    {
+        std::error_code sz_ec;
+        const auto file_bytes = std::filesystem::file_size(path, sz_ec);
+        std::ifstream mi("/proc/meminfo");
+        std::string key;
+        uint64_t kb = 0;
+        while (mi >> key) {
+            if (key == "MemAvailable:") { mi >> kb; break; }
+            mi.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        }
+        const uint64_t avail = kb * 1024ull;
+        if (!sz_ec
+            && (entropic::large_model_tests_waived(file_bytes)
+                || !entropic::host_can_hold_warm_load(file_bytes, avail))) {
+            SKIP("host RAM insufficient for the WARM load of "
+                 + gguf + ": needs ~"
+                 + std::to_string((file_bytes / (1024ull * 1024)) + 2048)
+                 + " MiB, "
+                 + std::to_string(avail / (1024ull * 1024))
+                 + " MiB available. Hardware limit, not a defect.");
+        }
     }
 
     entropic::LlamaCppBackend backend;

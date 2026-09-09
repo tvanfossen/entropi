@@ -236,6 +236,23 @@ struct ModelConfig {
     /// `LLAMA_MAX_SEQ`; consult llama.cpp for the current ceiling.
     /// @version 2.3.23
     int n_parallel = 1;
+
+    /// @brief Resident per-caller conversation sessions this tier keeps
+    /// KV for (gh#144).
+    ///
+    /// `1` (default) is bit-identical to pre-v2.12.0. Greater than 1
+    /// DERIVES the context geometry rather than being set alongside it —
+    /// `n_seq_max`, `kv_unified` and `n_ctx` are computed from this and
+    /// `context_length`, and the derivation is logged. Three independently
+    /// settable knobs an operator can get inconsistent is precisely the
+    /// silent-misconfiguration shape this codebase's fail-fast rule exists
+    /// to prevent, and `kv_unified` is not a config key at all.
+    ///
+    /// `context_length` stays PER SESSION: a pool of 3 at 32768 allocates
+    /// 98304 cells, not 3 sessions sharing 32768.
+    /// @version 2.12.0
+    int max_sessions = 1;
+
     bool flash_attn = true;                  ///< Enable flash attention
 
     /* ── Tool filtering ────────────────────────────────── */
@@ -311,6 +328,15 @@ struct GPUResourceProfile {
  * @version 2.3.16 — added logit_bias (gh#23 MVP item 4)
  */
 struct GenerationParams {
+    /// @brief Caller-scoped session this generation belongs to (gh#144).
+    ///
+    /// `""` (default) is the single legacy sequence — bit-identical to
+    /// pre-v2.12.0. The BACKEND owns the key-to-llama-sequence mapping and
+    /// its eviction, because it owns the slots and the residency; the engine
+    /// deliberately knows nothing about sequence ids.
+    /// @version 2.12.0
+    std::string session_key;
+
     float temperature = 0.7f;                ///< Sampling temperature
     float top_p = 0.9f;                      ///< Nucleus sampling threshold
     int top_k = 40;                          ///< Top-K sampling
@@ -637,7 +663,7 @@ struct FilesystemConfig {
 
 /**
  * @brief External MCP server configuration (Entropic-as-server).
- * @version 2.9.12
+ * @version 2.12.0
  */
 struct ExternalMCPConfig {
     bool enabled = false;                                ///< Enable external MCP
@@ -647,6 +673,37 @@ struct ExternalMCPConfig {
     /// (true, default). Set false when MTP is active — streaming binds on_token
     /// and trips the MTP incompatibility guard (gh#115, v2.9.12).
     bool ask_streaming = true;
+
+    /// @brief Namespace for the tools this bridge advertises (gh#145).
+    ///
+    /// The engine is a substrate, not the product: `librentropic.so` is
+    /// deliberately consumable by more than one app, so the tools a given host
+    /// exposes are that HOST's identity. Default "entropic" reproduces the
+    /// pre-2.12.0 names exactly, so an unset config is bit-identical.
+    /// A prefix of "sumac" advertises sumac.ask, sumac.status, and so on.
+    /// @version 2.12.0
+    std::string tool_prefix = "entropic";
+
+    /// @brief serverInfo.name reported in the MCP `initialize` response (gh#145).
+    ///
+    /// Independent of tool_prefix on purpose: the tool namespace is what a
+    /// MODEL reasons over when choosing a tool, while this is what a PERSON
+    /// reads in their MCP server list. A consumer may legitimately want to
+    /// namespace its tools while still disclosing which engine is behind the
+    /// bridge, or vice versa.
+    /// @version 2.12.0
+    std::string server_name = "entropic";
+
+    /// @brief Optional per-tool description overrides, keyed by bare suffix
+    ///        ("ask", "status", "context_clear", ...) — gh#145.
+    ///
+    /// A tool description is the string a model actually reasons over when
+    /// deciding what to call. The stock text describes the TRANSPORT
+    /// ("Submit a prompt to the running entropic engine") rather than the
+    /// capability, so a host with one specific job cannot express it. An
+    /// absent or unknown key leaves the built-in description untouched.
+    /// @version 2.12.0
+    std::unordered_map<std::string, std::string> tool_descriptions;
 };
 
 /**

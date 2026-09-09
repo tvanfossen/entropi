@@ -130,7 +130,7 @@ static double now_seconds() {
  * @param loop_config Loop configuration.
  * @param compaction_config Compaction configuration.
  * @dg_internal
- * @version 2.0.4
+ * @version 2.12.0
  */
 AgentEngine::AgentEngine(
     const InferenceInterface& inference,
@@ -148,6 +148,12 @@ AgentEngine::AgentEngine(
       response_generator_(
           inference, loop_config, callbacks_,
           GenerationEvents{&interrupt_flag_, &pause_flag_}) {
+    // gh#144 (v2.12.0): the default session must exist before any accessor
+    // runs. get_messages() and message_count() return a reference / a count
+    // from `conversations_.at("")`, and every pre-2.12.0 caller reaches them
+    // without ever naming a session — so the entry is created here, once, and
+    // never erased.
+    conversations_[""];
     register_directive_handlers();
 }
 
@@ -381,7 +387,7 @@ void AgentEngine::run_loop(LoopContext& ctx, bool inherit_interrupt) {
  * @req REQ-LOOP-001
  * @req REQ-LOOP-002
  * @req REQ-COMPACT-002
- * @version 2.8.0
+ * @version 2.12.0
  */
 std::vector<Message> AgentEngine::run(std::vector<Message> messages,
                                       const std::string& tier_override) {
@@ -395,6 +401,9 @@ std::vector<Message> AgentEngine::run(std::vector<Message> messages,
     LoopContext ctx;
     ctx.messages = std::move(messages);
     ctx.locked_tier = tier_override;  // gh#99: "" routes; non-empty locks
+    // gh#144 (v2.12.0): carry the caller-scoped session down to the backend,
+    // which maps it to a KV sequence. "" is the default session.
+    ctx.session_key = active_session_key_;
     ctx.metrics.start_time = now_seconds();
 
     init_session_conversation(ctx);
@@ -2848,6 +2857,22 @@ void AgentEngine::set_session_logger(SessionLogger* log) {
 }
 
 /**
+ * @brief The conversation this turn belongs to (gh#144, v2.12.0).
+ *
+ * Resolved once per turn rather than per touch point, so no path can read one
+ * session and append to another. `""` is the default session and is
+ * constructed in set_active_session / on first use, so this reference is
+ * always valid.
+ *
+ * @return The active session's state.
+ * @dg_internal
+ * @version 2.12.0
+ */
+ConversationState& AgentEngine::active_conversation() {
+    return conversations_[active_session_key_];
+}
+
+/**
  * @brief Run a single conversation turn (stateful).
  *
  * gh#40 (v2.1.10): after the agent loop reaches top-level COMPLETE,
@@ -2858,22 +2883,31 @@ void AgentEngine::set_session_logger(SessionLogger* log) {
  * @param input User input string.
  * @return Result messages from engine.
  * @req REQ-LOOP-001
- * @version 2.8.0
+ * @version 2.12.0-rc1
  */
 std::vector<Message> AgentEngine::run_turn(const std::string& input) {
     // gh#40 (v2.1.10): the drain loop turns mid-generation queued user
     // messages into subsequent turns at this single top-level COMPLETE
     // boundary. running_flag_ lets the facade reject
     // entropic_queue_user_message with INVALID_STATE when idle.
-    running_flag_.store(true);
-    if (conversation_.empty() && !system_prompt_.empty()) {
+    //
+    // gh#144 (v2.12.0): claim only if the caller has not already. The
+    // facade claims BEFORE calling in, and must keep the claim until it
+    // has finished serialising results out of conversation_ — if this
+    // function released the flag on its way out, a second thread could
+    // start appending to that vector while the first was still reading it.
+    // A direct engine caller (tests, embedders) still gets is_running()
+    // set for the duration, preserving the gh#40 contract.
+    const bool owns_turn = try_begin_turn();
+    auto& convo = active_conversation();
+    if (convo.messages.empty() && !system_prompt_.empty()) {
         Message sys;
         sys.role = "system";
         sys.content = system_prompt_;
-        conversation_.push_back(std::move(sys));
+        convo.messages.push_back(std::move(sys));
     }
     auto result = run_drain_loop(input, /*tier_override=*/"");
-    running_flag_.store(false);
+    if (owns_turn) { end_turn(); }
     return result;
 }
 
@@ -2892,14 +2926,16 @@ std::vector<Message> AgentEngine::run_turn(const std::string& input) {
  * @param input User input string.
  * @return Result messages.
  * @req REQ-IDEN-001
- * @version 2.8.0
+ * @version 2.12.0
  */
 std::vector<Message> AgentEngine::run_turn_as(const std::string& tier,
                                               const std::string& input) {
-    running_flag_.store(true);
+    // gh#144 (v2.12.0): see run_turn(const std::string&) — claim only if
+    // the caller has not already.
+    const bool owns_turn = try_begin_turn();
     seed_system_prompt_for_tier(tier);
     auto result = run_drain_loop(input, tier);
-    running_flag_.store(false);
+    if (owns_turn) { end_turn(); }
     return result;
 }
 
@@ -2913,10 +2949,11 @@ std::vector<Message> AgentEngine::run_turn_as(const std::string& tier,
  * grammar/samplers still switch; only the prompt persists). See run_turn_as.
  * @param tier Tier whose system prompt to seed.
  * @req REQ-IDEN-001
- * @version 2.8.0
+ * @version 2.12.0
  */
 void AgentEngine::seed_system_prompt_for_tier(const std::string& tier) {
-    if (!conversation_.empty()) { return; }
+    auto& convo = active_conversation();
+    if (!convo.messages.empty()) { return; }
     auto it = tier_info_.find(tier);
     const std::string& sp =
         (it != tier_info_.end() && !it->second.system_prompt.empty())
@@ -2926,7 +2963,7 @@ void AgentEngine::seed_system_prompt_for_tier(const std::string& tier) {
     Message sys;
     sys.role = "system";
     sys.content = sp;
-    conversation_.push_back(std::move(sys));
+    convo.messages.push_back(std::move(sys));
 }
 
 /**
@@ -2935,7 +2972,7 @@ void AgentEngine::seed_system_prompt_for_tier(const std::string& tier) {
  * @param tier_override Tier to lock the run to ("" = route).
  * @return Result messages from the final turn.
  * @dg_internal
- * @version 2.8.0
+ * @version 2.12.0
  */
 std::vector<Message> AgentEngine::run_drain_loop(
     std::string pending, const std::string& tier_override) {
@@ -2944,12 +2981,14 @@ std::vector<Message> AgentEngine::run_drain_loop(
         Message usr;
         usr.role = "user";
         usr.content = pending;
-        conversation_.push_back(std::move(usr));
+        auto& convo = active_conversation();
+        convo.messages.push_back(std::move(usr));
 
-        size_t sent_len = conversation_.size();
-        result = run(conversation_, tier_override);  // copy — run() may mutate
+        size_t sent_len = convo.messages.size();
+        // copy — run() may mutate
+        result = run(convo.messages, tier_override);
         for (size_t i = sent_len; i < result.size(); ++i) {
-            conversation_.push_back(result[i]);
+            convo.messages.push_back(result[i]);
         }
         auto next = pop_queued_user_message();
         if (!next.has_value()) { break; }
@@ -2979,7 +3018,7 @@ std::vector<Message> AgentEngine::run_drain_loop(
  * @brief Prepend the configured system prompt if this turn needs it.
  * @param new_messages The messages the caller is adding this turn.
  * @dg_internal
- * @version 2.3.7
+ * @version 2.12.0
  */
 void AgentEngine::seed_system_prompt(
     const std::vector<Message>& new_messages) {
@@ -2987,12 +3026,13 @@ void AgentEngine::seed_system_prompt(
     for (const auto& m : new_messages) {
         if (m.role == "system") { caller_has_system = true; break; }
     }
-    if (conversation_.empty() && !system_prompt_.empty()
+    auto& convo = active_conversation();
+    if (convo.messages.empty() && !system_prompt_.empty()
             && !caller_has_system) {
         Message sys;
         sys.role = "system";
         sys.content = system_prompt_;
-        conversation_.push_back(std::move(sys));
+        convo.messages.push_back(std::move(sys));
     }
 }
 
@@ -3020,29 +3060,31 @@ bool AgentEngine::prepare_next_turn(std::vector<Message>& pending) {
  * @param new_messages Messages to add this turn.
  * @return Full result messages from the engine loop.
  * @req REQ-LOOP-001
- * @version 2.3.7
+ * @version 2.12.0-rc1
  */
 std::vector<Message> AgentEngine::run_turn(std::vector<Message> new_messages) {
     // gh#40 (v2.1.10): mirror the single-string overload's drain
     // loop. Queued messages enqueued via entropic_queue_user_message
     // become subsequent plain-text user turns at this top-level
     // boundary (no content_parts — the queue ABI is text-only).
-    running_flag_.store(true);
+    // gh#144 (v2.12.0): see run_turn(const std::string&).
+    const bool owns_turn = try_begin_turn();
     seed_system_prompt(new_messages);
+    auto& convo = active_conversation();
     std::vector<Message> pending = std::move(new_messages);
     std::vector<Message> result;
     while (true) {
         for (auto& m : pending) {
-            conversation_.push_back(std::move(m));
+            convo.messages.push_back(std::move(m));
         }
-        size_t sent_len = conversation_.size();
-        result = run(conversation_);
+        size_t sent_len = convo.messages.size();
+        result = run(convo.messages);
         for (size_t i = sent_len; i < result.size(); ++i) {
-            conversation_.push_back(result[i]);
+            convo.messages.push_back(result[i]);
         }
         if (!prepare_next_turn(pending)) { break; }
     }
-    running_flag_.store(false);
+    if (owns_turn) { end_turn(); }
     return result;
 }
 
@@ -3186,10 +3228,10 @@ int AgentEngine::run_streaming(
 /**
  * @brief Clear conversation history.
  * @dg_internal
- * @version 2.0.2
+ * @version 2.12.0
  */
 void AgentEngine::clear_conversation() {
-    conversation_.clear();
+    active_conversation().clear();
     logger->info("conversation cleared");
 }
 
@@ -3197,20 +3239,20 @@ void AgentEngine::clear_conversation() {
  * @brief Get conversation message count.
  * @return Number of messages.
  * @dg_internal
- * @version 2.0.2
+ * @version 2.12.0
  */
 size_t AgentEngine::message_count() const {
-    return conversation_.size();
+    return conversations_.at(active_session_key_).count();
 }
 
 /**
  * @brief Get conversation messages.
  * @return Const reference to messages.
  * @dg_internal
- * @version 2.0.2
+ * @version 2.12.0
  */
 const std::vector<Message>& AgentEngine::get_messages() const {
-    return conversation_;
+    return conversations_.at(active_session_key_).messages;
 }
 
 // ── Mid-generation user-message queue (gh#40, v2.1.10) ─────────

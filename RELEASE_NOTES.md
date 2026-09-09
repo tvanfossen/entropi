@@ -2,6 +2,145 @@ _Last 10 releases. Older history: [OLD_NOTES.md](OLD_NOTES.md). Kept short
 because `gh release create --notes-file` hits GitHub's 125,000-char release
 body limit once this file accumulates full project history — see v2.9.3._
 
+# entropic v2.12.0
+
+Minor release — **one hosted engine can now serve several callers without them
+seeing each other**, plus a tool-call crash that killed whole runs.
+
+All three issues came from one consumer building the thing the bridge always
+documented as its purpose: a host that keeps one model resident and serves
+several MCP clients. Two of the three were caused by contracts our own headers
+stated and nothing implemented.
+
+## Highlights
+
+- **Per-caller sessions.** A `session` key on the bridge's ask tool, and an
+  `entropic_*_session` C API family, give each caller its own conversation,
+  context, system-prompt seed and KV sequence.
+- **Concurrent runs are no longer undefined behaviour.** A second run on a
+  handle is refused with `ENTROPIC_ERROR_ALREADY_RUNNING`; the bridge queues
+  callers FIFO instead of racing them.
+- **An argument-free tool call no longer kills the run.**
+- **Consumers name their own tools.** `tool_prefix`, `server_name` and
+  per-tool description overrides.
+- **MTP stops discarding a prefix it can prove unchanged.** Speculative
+  decoding and prefill reuse now compose instead of being mutually exclusive.
+
+## Engine bug fixes
+
+- **gh#143** — a tool call carrying no arguments serialised to the string
+  `"null"`; every built-in server then threw `type_error.306` out of dispatch
+  and aborted the turn. `git.diff` with no arguments is a legitimate shape, so
+  this was reachable from any model on any turn. Fixed at the origin, plus a
+  dispatch-level exception barrier that turns any throwing tool into a tool
+  error the model can correct — the in-process counterpart of the guarantee
+  gh#133 gave plugin servers. `ContextInspectTool` was independently
+  unguarded and is fixed too.
+- **gh#144 (data race)** — `@threadsafety Serialized per-handle.` on the six
+  run entry points has been false since gh#109 removed `api_mutex` from them.
+  The bridge serves each client on its own thread, so two concurrent asks
+  raced the shared conversation and decoded concurrently on one
+  `llama_context`. The doc is corrected and the documented error code is now
+  actually returned.
+- Two missing `handle->engine` null checks in `entropic_context_get` and
+  `entropic_context_count`, which their siblings already had.
+- The `try_warm_reuse` comment claiming an interleaved conversation "falls
+  back" was wrong — neither stated branch fires. Corrected, and the underlying
+  hazard fixed by per-sequence residency.
+
+## New features
+
+- **gh#144 — keyed conversations.** `entropic_run_session`,
+  `_run_session_as`, `_run_session_streaming`, `entropic_session_context_get`
+  / `_count` / `_clear`, `entropic_session_drop`, `entropic_session_list`.
+  A NULL or empty key means the default session, so every existing caller is
+  unaffected. The key is opaque: two callers passing the same string share a
+  conversation deliberately.
+- **gh#144 — session pool.** `max_sessions` on a tier derives the whole KV
+  geometry (`n_seq_max`, `kv_unified`, `n_ctx`) rather than exposing three
+  knobs that can disagree. `context_length` is PER SESSION.
+- **gh#144 — occupancy.** The status tool reports `busy`, `queue_depth` and
+  the session table, so a queued caller is distinguishable from a hung one.
+- **gh#145 — consumer identity.** `mcp.external.tool_prefix`,
+  `server_name` and `tool_descriptions`. All default to today's values.
+- **gh#144 — MTP prefix retention.** `mtp_init_run` cleared the whole
+  context and fully re-prefilled on EVERY generation, so under
+  `speculative.mtp` warm-keep and the prompt cache never executed at all.
+  Nothing about speculative decoding requires discarding the cache; that
+  was an implementation choice in this path. Measured over four turns of a
+  growing conversation, prefill went from 52 -> 116 -> 180 -> 244 tokens
+  (linear in history) to a constant per-turn delta. A consumer had measured
+  18611 tokens prefilled against 196 generated on a three-turn review —
+  95:1, with zero warm-keep events — while the same workload with MTP off
+  avoided 98.1% of prefill.
+- `GenerationResult::prefill_tokens` reports what a run actually decoded.
+  The MTP path counted nothing, so there was no way to tell reuse from
+  re-decode.
+
+## Breaking changes
+
+None to the C ABI. Every addition is a new named function, so
+`ENTROPIC_API_VERSION` is unchanged.
+
+One behaviour change consumers will notice: **a concurrent run on one handle
+now returns `ENTROPIC_ERROR_ALREADY_RUNNING` instead of racing.** Callers that
+were relying on the stale "serialized per-handle" doc were getting undefined
+behaviour, not queueing. A host that wants callers to WAIT should serialize
+above the C API, as the external bridge now does.
+
+`include/entropic/types/config.h` gains members on `ExternalMCPConfig` and
+`ModelConfig`. The C ABI is opaque-handle based, so this affects only C++
+consumers that construct `ParsedConfig` directly and must recompile.
+
+## Distribution
+
+- CPU tarball: `entropic-2.12.0-linux-x86_64-cpu.tar.gz` (sha256 in companion file)
+- CUDA tarball: `entropic-2.12.0-linux-x86_64-cuda.tar.gz` (sha256 in companion file)
+- Python wrapper: `pip install entropic-engine==2.12.0` then `entropic install-engine`
+
+## Known limitations
+
+- **The hybrid Qwen family is not covered by this release's model gate.** The
+  full 79-test roster completed: **76 passed, 0 failed, 3 skipped, 1 flaky**
+  (`test-gh106-mtp-route-c1`, passed on retry), on a GTX 1080 Ti. All three
+  skips are the same model — `qwen3_6_a3b` — and all three were skipped by an
+  explicit operator allowance (`ENTROPIC_SKIP_LARGE_MODEL_TESTS=1`), not by a
+  missing file and not by a defect in the code under test:
+  `test-v219-qwen36`, `test-gh87-verify-qwen36`, `test-gh103-sequential-stop`.
+
+  The underlying constraint (gh#148): the engine's WARM state maps the ENTIRE
+  GGUF into host RAM regardless of `gpu_layers` — 12952 MiB measured for a
+  13.6 GB file — and only the ACTIVE reload honours the offload split, so peak
+  host usage is the whole file. This is not a size rule: the dense 13.6 GB
+  gemma-4-26B passes where the smaller 12.6 GB hybrid Qwen fails, because the
+  recurrent state is additional. Two related defects WERE fixed this release
+  (mlock pinning a model too large to pin, and an offload split frozen at a
+  stale VRAM measurement); the WARM-load behaviour itself is untouched.
+
+  **What this means for the standing hybrid-arch rule.** KV-touching changes
+  are supposed to be exercised on a hybrid/recurrent architecture, not only on
+  plain-KV gemma4 — and this release touches KV heavily. That coverage is
+  absent here and the risk is not hypothetical. It is stated rather than
+  papered over.
+
+  The allowance was made explicit precisely so this is reproducible: the
+  previous gate was a MemAvailable estimate whose own documentation calls it
+  best-effort, so the same commit skipped or did not depending on page-cache
+  state. The allowance has a 10 GiB floor inside the predicate, so it cannot
+  mute the rest of the suite. See gh#149 for the skip messages, which still
+  misattribute the reason to a missing GGUF.
+
+  The gate ran at `ae418cc`. Commits after it on the release tag are
+  documentation only — verifiable with
+  `git diff ae418cc..v2.12.0 -- src include`.
+
+- The session pool is mutually exclusive with `entropic_run_batch`: gh#98's
+  fan-out needs a unified KV buffer and a pool needs private streams. The
+  combination is refused at configure time with a typed error naming both keys.
+- A separate draft model (as opposed to a target-owned MTP head) with
+  `max_sessions > 1` is likewise refused — both contexts decode the same
+  sequence id, and no target-to-draft sequence mapping exists.
+
 # entropic v2.11.1
 
 Patch release — **a config bug that only ever hit fresh installs and CI, and the

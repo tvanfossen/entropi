@@ -167,7 +167,8 @@ private:
      * @req REQ-IDEN-001
      * @version 2.7.0
      */
-    std::string build_params_json(const std::string& tier);
+    std::string build_params_json(const std::string& tier,
+                                  const std::string& session_key = "");
 
     /**
      * @brief Append an "[engine] iteration N/MAX..." reminder to the

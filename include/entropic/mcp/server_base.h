@@ -98,17 +98,23 @@ public:
     /**
      * @brief Execute a tool and wrap result in ServerResponse JSON.
      * @param tool_name Tool name (without server prefix).
-     * @param args_json JSON string of arguments.
-     * @return ServerResponse JSON envelope string.
-     * @version 1.8.5
+     * @param raw_args_json JSON string of arguments, as supplied.
+     * @return ServerResponse JSON envelope string. An unknown tool, or one
+     *         that throws, yields the envelope with error text in `result`
+     *         and no directives — never a throw (gh#143).
+     * @version 2.12.0
      *
      * Flow:
-     * 1. Dispatch to registered ToolBase::execute()
-     * 2. If tool declares anchor_key(): auto-inject ContextAnchor directive
-     * 3. Serialize to JSON ServerResponse envelope
+     * 1. Normalise non-object arguments to `{}` (gh#143)
+     * 2. Dispatch to registered ToolBase::execute()
+     * 3. If tool declares anchor_key(): auto-inject ContextAnchor directive
+     * 4. Serialize to JSON ServerResponse envelope
+     *
+     * Steps 2-3 run under an exception barrier, so a throwing tool neither
+     * escapes nor gets its arguments anchored into context.
      */
     std::string execute(const std::string& tool_name,
-                        const std::string& args_json);
+                        const std::string& raw_args_json);
 
     /**
      * @brief Generate permission pattern for 'Always Allow/Deny'.
@@ -188,6 +194,21 @@ private:
         const ToolBase& tool,
         const std::string& args_json,
         ServerResponse& response);
+
+    /**
+     * @brief Read a "no arguments" payload as `{}` before dispatch (gh#143).
+     * @param tool_name Tool name, for the log line only.
+     * @param raw Arguments exactly as supplied by the caller.
+     * @return `{}` when `raw` is empty/whitespace or a literal JSON null;
+     *         otherwise `raw` unchanged. Arrays, scalars and unparseable
+     *         input are NOT rewritten — they are caller errors and must
+     *         reach the tool so it can report them.
+     * @req REQ-MCP-013
+     * @version 2.12.0
+     */
+    std::string normalize_args(
+        const std::string& tool_name,
+        const std::string& raw) const;
 };
 
 } // namespace entropic

@@ -289,6 +289,28 @@ SCENARIO("Comprehensive config exercises every parse_* helper",
                 REQUIRE(config.mcp.external.socket_path.has_value());
                 // gh#115 (v2.9.12): ask_streaming knob for MTP compatibility
                 CHECK(config.mcp.external.ask_streaming == false);
+                // gh#145 (v2.12.0): consumer-owned identity
+                CHECK(config.mcp.external.tool_prefix == "sumac");
+                CHECK(config.mcp.external.server_name == "sumac-reviewer");
+                REQUIRE(config.mcp.external.tool_descriptions.count("ask")
+                        == 1);
+                CHECK(config.mcp.external.tool_descriptions.at("ask")
+                      == "Review this repository against the documentation "
+                         "ruleset.");
+                CHECK(config.mcp.external.tool_descriptions.at("status")
+                      == "Reviewer engine health.");
+                CHECK(config.mcp.external.tool_descriptions.count("nope")
+                      == 0);
+            }
+
+            THEN("gh#145: unset external identity keys default to entropic") {
+                // The defaults are load-bearing: an existing consumer that
+                // never heard of gh#145 must keep advertising entropic.* and
+                // a serverInfo of "entropic", byte-identical to 2.11.1.
+                entropic::ExternalMCPConfig fresh;
+                CHECK(fresh.tool_prefix == "entropic");
+                CHECK(fresh.server_name == "entropic");
+                CHECK(fresh.tool_descriptions.empty());
             }
 
             THEN("generation section parses defaults") {

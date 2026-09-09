@@ -115,6 +115,11 @@ mcp:
     rate_limit: 100
     socket_path: /tmp/entropic-test-external.sock
     ask_streaming: false
+    tool_prefix: sumac
+    server_name: sumac-reviewer
+    tool_descriptions:
+      ask: Review this repository against the documentation ruleset.
+      status: Reviewer engine health.
 
 generation:
   max_tokens: 2048

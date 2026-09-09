@@ -8,6 +8,9 @@
 #include <entropic/config/validate.h>
 #include <entropic/types/logging.h>
 
+// gh#144 (v2.12.0): pure session-pool geometry + conflict rules.
+#include "../inference/session_pool_util.h"
+
 static auto s_log = entropic::log::get("config");
 
 namespace entropic::config {
@@ -35,7 +38,7 @@ std::string validate_allowed_tools(const std::vector<std::string>& tools)
  * @param config Model config to validate.
  * @return Empty string on success, error message on failure.
  * @req REQ-CFG-006
- * @version 1.8.2
+ * @version 2.12.0
  */
 std::string validate(const ModelConfig& config)
 {
@@ -51,6 +54,15 @@ std::string validate(const ModelConfig& config)
               + std::to_string(config.n_batch);
     } else if (config.allowed_tools.has_value()) {
         err = validate_allowed_tools(*config.allowed_tools);
+    }
+
+    // gh#144 (v2.12.0): a session pool and the gh#98 batch fan-out want
+    // opposite KV buffers. Refuse the combination by name at CONFIGURE time
+    // rather than picking one silently — either choice would fail later and
+    // far from its cause (a pool without private streams, or seq_cp
+    // asserting at decode).
+    if (err.empty()) {
+        err = session_pool_conflict_reason(config);
     }
 
     return err;

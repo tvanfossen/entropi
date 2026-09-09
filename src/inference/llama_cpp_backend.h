@@ -29,6 +29,8 @@
 #include <entropic/inference/tokenizer.h>
 
 #include "prompt_cache.h"
+// gh#144 (v2.12.0): per-session KV residency bookkeeping.
+#include "session_residency.h"
 
 #include <llama.h>
 
@@ -668,7 +670,22 @@ protected:
     int last_gen_decode_calls_ = 0;            ///< gh#98: batched-decode step count of last batch
     int last_input_tokens_ = 0;                ///< gh#97: tokenized prompt size of last generate()
     double last_prefill_ms_ = 0.0;             ///< gh#96: prefill wall-clock ms of last generate()
-    std::vector<llama_token> resident_tokens_; ///< gh#96: tokens resident in KV seq 0 (warm-keep)
+    /// @brief gh#144 (v2.12.0): per-sequence warm-keep residency.
+    ///
+    /// Replaces the single `resident_tokens_` vector, which was hardcoded to
+    /// sequence 0. That was correct while one shared conversation meant one
+    /// monotonically growing history; with keyed sessions two conversations
+    /// share a system prompt, so a prefix scan against the WRONG session's
+    /// tokens returns a non-zero cut and warm-keep reuses destructively.
+    /// See session_residency.h.
+    ///
+    /// At max_sessions == 1 this holds exactly one slot and behaves
+    /// identically to the vector it replaces.
+    SessionResidency<llama_token> residency_{1};
+
+    /// @brief Sequence slot the current generation is bound to (gh#144).
+    /// 0 unless a session pool is configured and a session_key resolved.
+    int active_slot_ = 0;
 
     /* ── gh#106 (v2.9.0): MTP draft head (target-owned, shared-KV) ── */
     llama_model* mtp_draft_model_ = nullptr;   ///< MTP head GGUF (separate, trunk-sharing)
@@ -1025,6 +1042,39 @@ protected:
      * @version 2.7.5
      */
     void invalidate_resident_kv();
+
+    /**
+     * @brief Drop EVERY slot's warm-keep record (gh#144, v2.12.0).
+     * @utility
+     * @version 2.12.0
+     */
+    void invalidate_all_resident_kv();
+
+    /**
+     * @brief Decode a token run into an explicit sequence slot (gh#144).
+     * @param tokens Full token sequence.
+     * @param start_offset First index to decode.
+     * @param slot Sequence slot to decode into.
+     * @return true when every chunk decoded.
+     * @version 2.12.0
+     */
+    bool decode_tokens_into_slot(const std::vector<llama_token>& tokens,
+                                int start_offset, int slot);
+
+    /**
+     * @brief Bind this generation to its session's sequence slot (gh#144).
+     * @param params Generation parameters carrying the session key.
+     * @version 2.12.0
+     */
+    void bind_session_slot(const GenerationParams& params);
+
+    /**
+     * @brief How much of an MTP prompt is already resident (gh#144).
+     * @param tokens Full incoming prompt.
+     * @return Reusable prefix length; 0 when nothing is.
+     * @version 2.12.0
+     */
+    int mtp_reuse_cut(const std::vector<llama_token>& tokens) const;
 
     /**
      * @brief Decode tokens starting at a given offset.

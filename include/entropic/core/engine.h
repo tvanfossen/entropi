@@ -27,6 +27,7 @@
 #include <entropic/core/compaction.h>
 #include <entropic/core/context_manager.h>
 #include <entropic/core/directives.h>
+#include <entropic/core/conversation_state.h>
 #include <entropic/core/engine_types.h>
 #include <entropic/core/response_generator.h>
 #include <entropic/core/sandbox.h>  // gh#33 (v2.1.6): engine-owned session sandbox
@@ -596,6 +597,148 @@ public:
      * @version 2.1.10
      */
     bool is_running() const { return running_flag_.load(); }
+
+    /**
+     * @brief Try to claim the engine for one turn (gh#144, v2.12.0).
+     *
+     * A single compare-exchange on `running_flag_` — deliberately NOT a
+     * mutex. gh#109 removed `api_mutex` from every run entry point so a
+     * long turn could not block `entropic_interrupt()` called from another
+     * thread, and that property must survive: a second thread interrupting
+     * a 40-second turn must touch only atomics. Reintroducing a lock on
+     * this path would silently re-break gh#109.
+     *
+     * Until v2.12.0 nothing claimed at all. `ENTROPIC_ERROR_ALREADY_RUNNING`
+     * was declared, documented on two run entry points, and returned from
+     * nowhere; two concurrent runs raced into the shared conversation
+     * vector and decoded on one llama_context (gh#144).
+     *
+     * @return true when this caller now owns the turn and MUST call
+     *         end_turn(); false when a turn is already in flight, in which
+     *         case the caller owns nothing and must not release.
+     * @req REQ-API-009
+     * @version 2.12.0
+     */
+    bool try_begin_turn() {
+        bool expected = false;
+        return running_flag_.compare_exchange_strong(expected, true);
+    }
+
+    /**
+     * @brief Release a turn claimed by try_begin_turn (gh#144, v2.12.0).
+     *
+     * Only the caller whose try_begin_turn() returned true may call this.
+     * @req REQ-API-009
+     * @version 2.12.0
+     */
+    void end_turn() { running_flag_.store(false); }
+
+    /**
+     * @brief Bind this turn to a caller-scoped session (gh#144, v2.12.0).
+     *
+     * `""` is the default session and reproduces pre-2.12.0 behaviour
+     * exactly. The key is OPAQUE to the engine — a consumer picks whatever
+     * identifies a caller for it (a canonical repository path, a hash),
+     * which is why two callers may deliberately share one by using the same
+     * string.
+     *
+     * Distinct from `LoopContext::conversation_id`, which is a storage FK
+     * minted fresh per run() and is neither caller-supplied nor stable, and
+     * from the per-handle log scope. One word, one meaning.
+     *
+     * @param key Session key for the turn about to run.
+     * @req REQ-LOOP-001
+     * @version 2.12.0
+     */
+    void set_active_session(const std::string& key) {
+        active_session_key_ = key;
+        conversations_[key];  // default-construct on first use
+    }
+
+    /**
+     * @brief Session whose turn is currently running.
+     * @return The active key; `""` when idle or unkeyed.
+     * @utility
+     * @version 2.12.0
+     */
+    const std::string& active_session_key() const {
+        return active_session_key_;
+    }
+
+    /**
+     * @brief Messages held by a named session.
+     *
+     * Returns BY VALUE, unlike the legacy `get_messages()`. A keyed entry can
+     * be erased by `drop_session`, and handing out a reference into an
+     * erasable node is a use-after-free waiting for a later refactor. The
+     * copy is a few thousand short strings on a path that runs once per turn,
+     * against a turn measured in seconds.
+     *
+     * @param key Session key.
+     * @return That session's messages; empty when the key is unknown.
+     * @req REQ-LOOP-001
+     * @version 2.12.0
+     */
+    std::vector<Message> messages_for(const std::string& key) const {
+        auto it = conversations_.find(key);
+        return it == conversations_.end() ? std::vector<Message>{}
+                                          : it->second.messages;
+    }
+
+    /**
+     * @brief Message count for a named session.
+     * @param key Session key.
+     * @return Count, or 0 when the key is unknown.
+     * @utility
+     * @version 2.12.0
+     */
+    std::size_t message_count_for(const std::string& key) const {
+        auto it = conversations_.find(key);
+        return it == conversations_.end() ? 0 : it->second.count();
+    }
+
+    /**
+     * @brief Clear one session's history, keeping the session itself.
+     * @param key Session key.
+     * @req REQ-LOOP-001
+     * @version 2.12.0
+     */
+    void clear_conversation_for(const std::string& key) {
+        auto it = conversations_.find(key);
+        if (it != conversations_.end()) { it->second.clear(); }
+    }
+
+    /**
+     * @brief Forget a session entirely.
+     *
+     * The default session (`""`) is cleared rather than erased, so the legacy
+     * reference-returning accessors stay total.
+     *
+     * @param key Session key.
+     * @return true when a session was dropped or cleared.
+     * @req REQ-LOOP-001
+     * @version 2.12.0
+     */
+    bool drop_session(const std::string& key) {
+        if (key.empty()) {
+            conversations_[key].clear();
+            return true;
+        }
+        return conversations_.erase(key) > 0;
+    }
+
+    /**
+     * @brief Keys of every session the engine currently holds.
+     * @return Session keys, unordered.
+     * @utility
+     * @version 2.12.0
+     */
+    std::vector<std::string> session_keys() const {
+        std::vector<std::string> keys;
+        keys.reserve(conversations_.size());
+        for (const auto& [k, v] : conversations_) { keys.push_back(k); }
+        return keys;
+    }
 
     /**
      * @brief Register an observer that fires when a queued user
@@ -1475,7 +1618,33 @@ private:
     void fire_queue_consumed(const std::string& consumed, size_t remaining);
 
     // ── Conversation state (v2.0.2) ─────────────────────────
-    std::vector<Message> conversation_;                    ///< Persistent conversation
+    /**
+     * @brief The conversation this turn belongs to (gh#144, v2.12.0).
+     * @return The active session's state.
+     * @version 2.12.0
+     */
+    ConversationState& active_conversation();
+
+    /// @brief gh#144 (v2.12.0): caller-scoped conversations, keyed.
+    ///
+    /// Replaces the single `conversation_` vector. `unordered_map` is chosen
+    /// for its reference/pointer STABILITY across rehash (only iterators are
+    /// invalidated): `get_messages()` returns a reference into the mapped
+    /// value and every existing caller depends on that, so a container that
+    /// relocates its elements would turn a working accessor into a dangling
+    /// one.
+    ///
+    /// The `""` entry is constructed once and never erased, so the legacy
+    /// accessors are total — they never have to invent an empty vector.
+    std::unordered_map<std::string, ConversationState> conversations_;
+
+    /// @brief Session whose turn is currently running (gh#144).
+    ///
+    /// Set for the duration of a turn. Read by the StateProvider bridge so a
+    /// tool inspecting context during session B's turn sees session B — no
+    /// vtable change needed, because `get_history` is only ever invoked from
+    /// inside a tool call, i.e. inside a turn.
+    std::string active_session_key_;
     std::string system_prompt_;                            ///< Cached system prompt
     SessionLogger* session_logger_ = nullptr;              ///< Non-owning model log
 

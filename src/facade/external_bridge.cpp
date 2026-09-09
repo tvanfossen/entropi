@@ -15,12 +15,14 @@
 
 #include "engine_handle.h"
 #include "final_text.h"  // gh#130 (v2.10.2)
+#include "tool_namespace.h"  // gh#145 (v2.12.0)
 
 #include <nlohmann/json.hpp>
 
 #include <atomic>
 #include <cerrno>
 #include <chrono>
+#include <condition_variable>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -100,52 +102,182 @@ static json tool_text(const std::string& text) {
 // ── Tool definitions ─────────────────────────────────────
 
 /**
- * @brief MCP tool definitions exposed by the bridge.
- * @return JSON array of tool schemas.
- * @utility
- * @version 2.0.11
+ * @brief The bare tool suffixes this bridge exposes, in advertised order.
+ *
+ * gh#145 (v2.12.0). SINGLE SOURCE OF TRUTH. Both `tool_definitions()` and the
+ * name-resolution in `dispatch_tool()` derive from this table, so a name can no
+ * longer be advertised under one spelling and dispatched under another — before
+ * this the five names were written out twice, ~470 lines apart.
+ *
+ * @version 2.12.0
  */
-static json tool_definitions() {
-    return json::array({
-        {{"name", "entropic.ask"},
-         {"description",
-          "Submit a prompt to the running entropic engine. "
-          "Set async=true to return immediately with a task_id; "
-          "the engine pushes a notification when done."},
-         {"inputSchema", {
+namespace tool_suffix {
+constexpr const char* kAsk           = "ask";
+constexpr const char* kAskStatus     = "ask_status";
+constexpr const char* kStatus        = "status";
+constexpr const char* kContextClear  = "context_clear";
+constexpr const char* kContextCount  = "context_count";
+} // namespace tool_suffix
+
+/**
+ * @brief Resolve a tool's description, honouring any consumer override.
+ *
+ * gh#145 (v2.12.0): the description is what a MODEL reasons over when choosing
+ * a tool, and the stock text describes the transport rather than the capability
+ * — so a host with one specific job can replace it. An absent or unknown key
+ * leaves the built-in text untouched.
+ *
+ * @param cfg External MCP config carrying any overrides.
+ * @param suffix Bare tool suffix.
+ * @param fallback Built-in description.
+ * @return The override when one is configured, else `fallback`.
+ * @utility
+ * @version 2.12.0
+ */
+static std::string describe(const ExternalMCPConfig& cfg,
+                            const char* suffix,
+                            const char* fallback) {
+    auto it = cfg.tool_descriptions.find(suffix);
+    if (it != cfg.tool_descriptions.end() && !it->second.empty()) {
+        return it->second;
+    }
+    return fallback;
+}
+
+/**
+ * @brief Definition for a tool that takes no arguments.
+ *
+ * gh#145 (v2.12.0): three of the five tools share an empty inputSchema, so
+ * they share a builder. Also keeps tool_definitions() inside the SLOC gate.
+ *
+ * @param cfg External MCP config supplying prefix and description overrides.
+ * @param suffix Bare tool suffix.
+ * @param fallback Built-in description.
+ * @return One MCP tool definition object.
+ * @utility
+ * @version 2.12.0
+ */
+static json no_args_tool(const ExternalMCPConfig& cfg,
+                         const char* suffix,
+                         const char* fallback) {
+    return {{"name", facade::qualify_tool_name(cfg.tool_prefix, suffix)},
+            {"description", describe(cfg, suffix, fallback)},
+            {"inputSchema", {{"type", "object"},
+                             {"properties", json::object()}}}};
+}
+
+/**
+ * @brief Definition for a tool scoped to an optional session (gh#144).
+ *
+ * `session` is optional and NOT in `required`: omitting it means the shared
+ * default session, which is exactly what a pre-2.12.0 client already gets.
+ *
+ * @param cfg External MCP config supplying prefix and description overrides.
+ * @param suffix Bare tool suffix.
+ * @param fallback Built-in description.
+ * @return One MCP tool definition object.
+ * @utility
+ * @version 2.12.0
+ */
+static json session_scoped_tool(const ExternalMCPConfig& cfg,
+                                const char* suffix,
+                                const char* fallback) {
+    return {{"name", facade::qualify_tool_name(cfg.tool_prefix, suffix)},
+            {"description", describe(cfg, suffix, fallback)},
+            {"inputSchema", {
+                {"type", "object"},
+                {"properties", {
+                    {"session", {{"type", "string"},
+                                 {"description",
+                                  "Conversation to act on; omit for the "
+                                  "shared default session."}}}
+                }}
+            }}};
+}
+
+/**
+ * @brief Definition for the ask tool (prompt + optional async).
+ * @param cfg External MCP config supplying prefix and description overrides.
+ * @return One MCP tool definition object.
+ * @utility
+ * @version 2.12.0-rc1
+ */
+static json ask_tool(const ExternalMCPConfig& cfg) {
+    return {
+        {"name", facade::qualify_tool_name(cfg.tool_prefix,
+                                           tool_suffix::kAsk)},
+        {"description",
+         describe(cfg, tool_suffix::kAsk,
+                  "Submit a prompt to the running entropic engine. "
+                  "Set async=true to return immediately with a task_id; "
+                  "the engine pushes a notification when done.")},
+        {"inputSchema", {
             {"type", "object"},
             {"properties", {
                 {"prompt", {{"type", "string"},
                             {"description", "User message"}}},
                 {"async", {{"type", "boolean"},
                            {"description", "Run asynchronously"},
-                           {"default", false}}}
+                           {"default", false}}},
+                // gh#144: optional, and NOT in `required`. Absent means the
+                // shared default session, which is exactly pre-2.12.0
+                // behaviour for every existing client.
+                {"session", {{"type", "string"},
+                             {"description",
+                              "Conversation to run under. Callers passing "
+                              "the same value share a conversation; "
+                              "omit for the shared default session."}}}
             }},
             {"required", json::array({"prompt"})}
-         }}},
-        {{"name", "entropic.ask_status"},
-         {"description",
-          "Check status of an async entropic.ask task."},
-         {"inputSchema", {
+        }}};
+}
+
+/**
+ * @brief Definition for the ask_status tool (task_id lookup).
+ * @param cfg External MCP config supplying prefix and description overrides.
+ * @return One MCP tool definition object.
+ * @utility
+ * @version 2.12.0
+ */
+static json ask_status_tool(const ExternalMCPConfig& cfg) {
+    return {
+        {"name", facade::qualify_tool_name(cfg.tool_prefix,
+                                           tool_suffix::kAskStatus)},
+        {"description",
+         describe(cfg, tool_suffix::kAskStatus,
+                  "Check status of an async ask task.")},
+        {"inputSchema", {
             {"type", "object"},
             {"properties", {{"task_id", {
                 {"type", "string"},
                 {"description", "Task ID from async ask"}
             }}}},
             {"required", json::array({"task_id"})}
-         }}},
-        {{"name", "entropic.status"},
-         {"description", "Engine version and message count."},
-         {"inputSchema", {{"type", "object"},
-                          {"properties", json::object()}}}},
-        {{"name", "entropic.context_clear"},
-         {"description", "Clear conversation history."},
-         {"inputSchema", {{"type", "object"},
-                          {"properties", json::object()}}}},
-        {{"name", "entropic.context_count"},
-         {"description", "Return the message count."},
-         {"inputSchema", {{"type", "object"},
-                          {"properties", json::object()}}}},
+        }}};
+}
+
+/**
+ * @brief MCP tool definitions exposed by the bridge.
+ *
+ * gh#145 (v2.12.0): names and descriptions are consumer-configurable. The
+ * defaults ("entropic" prefix, no description overrides) reproduce the
+ * pre-2.12.0 payload exactly.
+ *
+ * @param cfg External MCP config supplying prefix and description overrides.
+ * @return JSON array of tool schemas.
+ * @utility
+ * @version 2.12.0-rc1
+ */
+static json tool_definitions(const ExternalMCPConfig& cfg) {
+    return json::array({
+        ask_tool(cfg),
+        ask_status_tool(cfg),
+        no_args_tool(cfg, tool_suffix::kStatus,
+                     "Engine version and message count."),
+        session_scoped_tool(cfg, tool_suffix::kContextClear,
+                            "Clear conversation history."),
+        session_scoped_tool(cfg, tool_suffix::kContextCount,
+                            "Return the message count."),
     });
 }
 
@@ -196,15 +328,21 @@ static void send_progress(int fd, const std::string& token_text,
  * gh#130 (v2.10.2): shared by both ask paths so the answer-vs-diagnostic rule
  * cannot drift between them.
  *
+ * gh#144 (v2.12.0): reads THIS session's conversation. The unscoped read it
+ * replaced would have extracted one caller's answer from whichever
+ * conversation the shared accessor happened to return.
+ *
  * @param handle Engine handle.
+ * @param session_key Session whose answer to render.
  * @return MCP tool result JSON.
  * @req REQ-API-012
  * @req REQ-BRIDGE-001
- * @version 2.10.2
+ * @version 2.12.0
  */
-static json final_answer_from_context(entropic_handle_t handle) {
+static json final_answer_from_context(entropic_handle_t handle,
+                                      const std::string& session_key) {
     char* msgs_json = nullptr;
-    entropic_context_get(handle, &msgs_json);
+    entropic_session_context_get(handle, session_key.c_str(), &msgs_json);
     auto answer = facade_text::final_text_or_reason(msgs_json);
     entropic_free(msgs_json);
     return tool_text(answer);
@@ -225,14 +363,16 @@ static json final_answer_from_context(entropic_handle_t handle) {
  * @req REQ-BRIDGE-001
  * @version 2.10.2
  */
-static json handle_ask_plain(entropic_handle_t handle, const json& args) {
+static json handle_ask_plain(entropic_handle_t handle, const json& args,
+                             const std::string& session_key) {
     auto it = args.find("prompt");
     if (it == args.end() || !it->is_string()) {
         return tool_text("error: missing 'prompt' argument");
     }
     char* result_json = nullptr;
-    auto err = entropic_run(handle, it->get<std::string>().c_str(),
-                            &result_json);
+    auto err = entropic_run_session(handle, session_key.c_str(),
+                                    it->get<std::string>().c_str(),
+                                    &result_json);
     if (err != ENTROPIC_OK) {
         const char* msg = entropic_last_error(handle);
         entropic_free(result_json);
@@ -262,6 +402,7 @@ static json handle_ask_plain(entropic_handle_t handle, const json& args) {
  * @version 2.10.2
  */
 static json handle_ask(entropic_handle_t handle, const json& args,
+                       const std::string& session_key,
                        int client_fd, const std::string& call_id) {
     auto it = args.find("prompt");
     if (it == args.end() || !it->is_string()) {
@@ -276,29 +417,53 @@ static json handle_ask(entropic_handle_t handle, const json& args,
         auto* ctx = static_cast<StreamCtx*>(ud);
         send_progress(ctx->fd, std::string(tok, len), ctx->token_id);
     };
-    auto err = entropic_run_streaming(
-        handle, prompt.c_str(), on_token, &sctx, nullptr);
+    auto err = entropic_run_session_streaming(
+        handle, session_key.c_str(), prompt.c_str(), on_token, &sctx,
+        nullptr);
     if (err != ENTROPIC_OK) {
         const char* msg = entropic_last_error(handle);
         return tool_text(std::string("error: ") + (msg ? msg : "unknown"));
     }
 
-    return final_answer_from_context(handle);
+    return final_answer_from_context(handle, session_key);
 }
 
 /**
- * @brief Handle entropic.status.
+ * @brief Handle the status tool.
+ *
+ * gh#144 (v2.12.0) adds the occupancy lines. The issue's second half was
+ * that a caller queued behind another's turn is indistinguishable from one
+ * talking to a hung engine — on a 4B-class local model a review is 15-90
+ * seconds, so a routine wait was presented as an indefinite one. `busy` and
+ * `queue_depth` are what make the difference visible.
+ *
+ * Appended as text lines rather than restructured into JSON on purpose: the
+ * result is an unstructured blob with an embedded `metrics:` payload that
+ * consumers already parse, and changing its shape would break them.
+ *
  * @param handle Engine handle.
+ * @param bridge Bridge instance, for the turn-queue counters.
  * @return MCP tool result JSON.
  * @req REQ-BRIDGE-001
- * @version 2.0.6-rc16.2
+ * @version 2.12.0-rc1
  */
-static json handle_status(entropic_handle_t handle) {
+static json handle_status(entropic_handle_t handle,
+                          const ExternalBridge* bridge) {
     size_t count = 0;
     entropic_context_count(handle, &count);
     std::ostringstream os;
     os << "entropic " << entropic_version()
-       << "\nmessages: " << count;
+       << "\nmessages: " << count
+       << "\nbusy: " << (bridge->turn_in_flight() ? "true" : "false")
+       << "\nqueue_depth: " << bridge->turn_queue_depth();
+    // gh#144 (v2.12.0): which callers this host is serving, and how much
+    // history each holds.
+    char* sessions = nullptr;
+    if (entropic_session_list(handle, &sessions) == ENTROPIC_OK
+        && sessions != nullptr) {
+        os << "\nsessions: " << sessions;
+        entropic_free(sessions);
+    }
     // Metrics + per-tier breakdown (P2-15 follow-up, 2.0.6-rc16.2)
     char* mjson = nullptr;
     if (entropic_metrics_json(handle, &mjson) == ENTROPIC_OK
@@ -460,13 +625,20 @@ static void cancel_inflight_async_tasks(
  * @version 2.0.6-rc16
  */
 static json handle_clear(entropic_handle_t handle,
-                         ExternalBridge* bridge) {
+                         ExternalBridge* bridge,
+                         const std::string& session_key) {
     cancel_inflight_async_tasks(handle, bridge);
-    auto err = entropic_context_clear(handle);
+    // gh#144 (v2.12.0): clear ONLY the named session. The unscoped clear
+    // wiped every caller's context, which the issue correctly observed "is
+    // not isolation" — with two callers active there is no ordering in which
+    // it is correct.
+    auto err = entropic_session_context_clear(handle, session_key.c_str());
     if (err != ENTROPIC_OK) {
         return tool_text("error: clear failed");
     }
-    return tool_text("conversation cleared");
+    return tool_text(session_key.empty()
+        ? "conversation cleared"
+        : "conversation cleared for session '" + session_key + "'");
 }
 
 /**
@@ -476,9 +648,11 @@ static json handle_clear(entropic_handle_t handle,
  * @req REQ-BRIDGE-001
  * @version 2.0.8
  */
-static json handle_count(entropic_handle_t handle) {
+static json handle_count(entropic_handle_t handle,
+                         const std::string& session_key) {
     size_t count = 0;
-    entropic_context_count(handle, &count);
+    // gh#144 (v2.12.0): count only the named session.
+    entropic_session_context_count(handle, session_key.c_str(), &count);
     return tool_text(std::to_string(count));
 }
 
@@ -528,6 +702,75 @@ static std::string generate_task_id() {
     return "task-" + ss.str();
 }
 
+namespace {
+
+/// @brief How long a bridge caller waits before being told the engine is busy.
+constexpr long kTurnWaitTimeoutMs = 300000;  // 5 minutes
+
+/**
+ * @brief RAII wrapper over begin_turn_wait / end_turn_wait (gh#144).
+ * @dg_internal
+ * @version 2.12.0
+ */
+class TurnTicket {
+public:
+    /**
+     * @brief Take a ticket and wait for this caller's turn.
+     * @param b Bridge owning the queue.
+     * @dg_internal
+     * @version 2.12.0
+     */
+    explicit TurnTicket(ExternalBridge* b)
+        : bridge_(b),
+          held_(b->begin_turn_wait(kTurnWaitTimeoutMs, &waited_ms_)) {}
+
+    /**
+     * @brief Hand the turn on, if this ticket held it.
+     * @dg_internal
+     * @version 2.12.0
+     */
+    ~TurnTicket() { if (held_) { bridge_->end_turn_wait(); } }
+
+    TurnTicket(const TurnTicket&) = delete;
+    TurnTicket& operator=(const TurnTicket&) = delete;
+
+    /**
+     * @brief Whether the turn was acquired before the deadline.
+     * @return true when this ticket owns the engine.
+     * @dg_internal
+     * @version 2.12.0
+     */
+    bool held() const { return held_; }
+
+    /**
+     * @brief Time spent waiting in line.
+     * @return Milliseconds waited.
+     * @dg_internal
+     * @version 2.12.0
+     */
+    long waited_ms() const { return waited_ms_; }
+
+private:
+    ExternalBridge* bridge_;
+    long waited_ms_ = 0;
+    bool held_;
+};
+
+/**
+ * @brief The tool result returned when the queue deadline expired.
+ * @dg_internal
+ * @version 2.12.0
+ */
+json turn_timeout_result(const ExternalBridge* bridge, long waited_ms) {
+    std::ostringstream os;
+    os << "error: engine busy — waited " << waited_ms << " ms with "
+       << bridge->turn_queue_depth() << " request(s) still ahead. "
+       << "Another caller's turn is still running; retry shortly.";
+    return tool_text(os.str());
+}
+
+} // namespace
+
 // ── Dispatch ─────────────────────────────────────────────
 
 /**
@@ -539,21 +782,35 @@ static std::string generate_task_id() {
  * @param call_id Request id.
  * @return MCP tool result JSON.
  * @req REQ-BRIDGE-001
- * @version 2.9.12
+ * @version 2.12.0-rc1
  */
 static json dispatch_ask(entropic_handle_t handle,
                          ExternalBridge* bridge,
                          const json& args,
                          int client_fd,
                          const std::string& call_id) {
+    // gh#144 (v2.12.0): optional. Absent means the shared default session,
+    // i.e. exactly what every pre-2.12.0 client already gets.
+    const std::string session_key = args.value("session", std::string{});
     if (args.value("async", false)) {
+        // The async worker takes its own ticket inside run_async_ask — it
+        // must not hold one here, or registering the task would block behind
+        // an in-flight turn and defeat the point of async.
         auto task_id = generate_task_id();
         bridge->run_async_ask(
-            args.value("prompt", ""), task_id, client_fd);
+            args.value("prompt", ""), task_id, client_fd, session_key);
         return tool_text("async task started: " + task_id);
     }
-    if (!bridge->ask_streaming()) { return handle_ask_plain(handle, args); }
-    return handle_ask(handle, args, client_fd, call_id);
+    // gh#144 (v2.12.0): queue rather than race. The engine admits one turn
+    // and refuses the loser with ALREADY_RUNNING; from a shared host the
+    // right answer is to WAIT, so the refusal is never reached from here.
+    TurnTicket ticket(bridge);
+    if (!ticket.held()) {
+        return turn_timeout_result(bridge, ticket.waited_ms());
+    }
+    return bridge->ask_streaming()
+        ? handle_ask(handle, args, session_key, client_fd, call_id)
+        : handle_ask_plain(handle, args, session_key);
 }
 
 /**
@@ -566,11 +823,11 @@ static json dispatch_ask(entropic_handle_t handle,
  * @param handle Engine handle.
  * @param bridge Bridge instance (for async task registry).
  * @param params JSON-RPC params (name + arguments).
- * @param client_fd Socket fd for streaming (entropic.ask only).
+ * @param client_fd Socket fd for streaming (the ask tool only).
  * @param call_id JSON-RPC request id for progress correlation.
  * @return MCP tool result JSON.
  * @req REQ-BRIDGE-001
- * @version 2.0.6-rc16
+ * @version 2.12.0-rc2
  */
 static json dispatch_tool(entropic_handle_t handle,
                           ExternalBridge* bridge,
@@ -579,17 +836,86 @@ static json dispatch_tool(entropic_handle_t handle,
                           const std::string& call_id) {
     std::string name = params.value("name", std::string{});
     json args = params.value("arguments", json::object());
-    if (name == "entropic.ask") {
+    // gh#145: strip the configured namespace, then match bare suffixes
+    // against the same table tool_definitions() advertised from.
+    const std::string suffix =
+        facade::strip_tool_prefix(
+            bridge->config().tool_prefix, name);
+    if (suffix == tool_suffix::kAsk) {
         return dispatch_ask(handle, bridge, args, client_fd, call_id);
     }
     json result;
-    if      (name == "entropic.ask_status")    { result = bridge->handle_ask_status(args); }
-    else if (name == "entropic.status")        { result = handle_status(handle); }
-    else if (name == "entropic.context_clear") { result = handle_clear(handle, bridge); }
-    else if (name == "entropic.context_count") { result = handle_count(handle); }
+    if      (suffix == tool_suffix::kAskStatus)    { result = bridge->handle_ask_status(args); }
+    else if (suffix == tool_suffix::kStatus)       { result = handle_status(handle, bridge); }
+    else if (suffix == tool_suffix::kContextClear) {
+        result = handle_clear(handle, bridge,
+                              args.value("session", std::string{}));
+    } else if (suffix == tool_suffix::kContextCount) {
+        result = handle_count(handle, args.value("session", std::string{}));
+    }
     else { result = tool_text("error: unknown tool '" + name + "'"); }
     return result;
 }
+
+// ── Turn queue (gh#144, v2.12.0) ─────────────────────────
+
+/**
+ * @brief Take a ticket and wait for this caller's turn on the engine.
+ * @param timeout_ms Give up after this long rather than hang the client.
+ * @param waited_ms_out Optional; receives time actually spent waiting.
+ * @return true when it is this caller's turn (caller must end_turn_wait()).
+ * @req REQ-BRIDGE-001
+ * @version 2.12.0
+ */
+bool ExternalBridge::begin_turn_wait(long timeout_ms, long* waited_ms_out) {
+    const auto t0 = std::chrono::steady_clock::now();
+    std::unique_lock<std::mutex> lock(turn_mutex_);
+    const uint64_t ticket = next_ticket_++;
+    const bool first = (ticket == now_serving_);
+    if (!first) { waiters_.fetch_add(1); }
+
+    const bool ours = turn_cv_.wait_for(
+        lock, std::chrono::milliseconds(timeout_ms),
+        [&] { return now_serving_ == ticket; });
+
+    if (!first) { waiters_.fetch_sub(1); }
+    if (waited_ms_out != nullptr) {
+        *waited_ms_out = static_cast<long>(
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - t0).count());
+    }
+    if (!ours) {
+        // Timed out. Record the ticket as abandoned so that when the line
+        // reaches it, it is skipped rather than waited on forever. Do NOT
+        // advance now_serving_ here: it currently names ANOTHER caller's
+        // in-flight turn, and stepping over it would hand the engine to two
+        // callers at once — the exact race this queue exists to prevent.
+        abandoned_tickets_.insert(ticket);
+        return false;
+    }
+    turn_busy_.store(true);
+    return true;
+}
+
+/**
+ * @brief Hand the turn to the next ticket in line.
+ * @req REQ-BRIDGE-001
+ * @version 2.12.0
+ */
+void ExternalBridge::end_turn_wait() {
+    {
+        std::lock_guard<std::mutex> lock(turn_mutex_);
+        turn_busy_.store(false);
+        ++now_serving_;
+        // Step over anyone who gave up while waiting, or the line stalls on
+        // a ticket whose owner is long gone.
+        while (abandoned_tickets_.erase(now_serving_) > 0) {
+            ++now_serving_;
+        }
+    }
+    turn_cv_.notify_all();
+}
+
 
 // ── ExternalBridge ───────────────────────────────────────
 
@@ -1016,14 +1342,25 @@ void ExternalBridge::serve_client(int client_fd) {
 
 /**
  * @brief Build the MCP initialize response payload.
+ *
+ * gh#145 (v2.12.0): `serverInfo.name` comes from `mcp.external.server_name`
+ * (default "entropic"). This is the string a PERSON reads in their MCP server
+ * list, which is why it is configured separately from `tool_prefix` — the
+ * latter is what a MODEL reasons over. `version` remains the engine's own
+ * version: the host owns its identity, but must not misreport the engine
+ * behind it.
+ *
+ * @param cfg External MCP config supplying the server name.
  * @return JSON result object.
  * @utility
- * @version 2.0.9
+ * @version 2.12.0
  */
-static json initialize_result() {
+static json initialize_result(const ExternalMCPConfig& cfg) {
+    const std::string name =
+        cfg.server_name.empty() ? "entropic" : cfg.server_name;
     return {
         {"protocolVersion", "2025-06-18"},
-        {"serverInfo", {{"name", "entropic"},
+        {"serverInfo", {{"name", name},
                         {"version", entropic_version()}}},
         {"capabilities", {{"tools", json::object()}}}
     };
@@ -1040,7 +1377,7 @@ static json initialize_result() {
  * @param client_fd Socket fd for streaming progress (entropic.ask).
  * @return JSON-RPC response string, or empty for notifications.
  * @req REQ-BRIDGE-001
- * @version 2.0.11
+ * @version 2.12.0
  */
 std::string ExternalBridge::dispatch(
     const std::string& request, int client_fd) {
@@ -1057,8 +1394,8 @@ std::string ExternalBridge::dispatch(
     json params = req.value("params", json::object());
     json result;
 
-    if      (method == "initialize")  { result = initialize_result(); }
-    else if (method == "tools/list")  { result = {{"tools", tool_definitions()}}; }
+    if      (method == "initialize")  { result = initialize_result(config_); }
+    else if (method == "tools/list")  { result = {{"tools", tool_definitions(config_)}}; }
     else if (method == "tools/call")  {
         auto id_str = id.is_string() ? id.get<std::string>()
                                      : id.dump();
@@ -1134,6 +1471,62 @@ void ExternalBridge::detach_phase_observer() {
 }
 
 /**
+ * @brief Record an async task's terminal state and write its sentinel.
+ *
+ * Extracted from run_async_ask (gh#144, v2.12.0) to keep it inside the SLOC
+ * and ABC gates once the turn-queue wait was added.
+ *
+ * Issue #12 (v2.1.4): the sentinel is written UNDER tasks_mutex_, before the
+ * MCP notification fires, so an external monitor reacting to the sentinel can
+ * immediately call the ask_status tool and see the same terminal state.
+ *
+ * @param task_id Task reaching a terminal state.
+ * @param status Terminal status string.
+ * @param phase Terminal phase string.
+ * @param text Result or error text.
+ * @dg_internal
+ * @version 2.12.0
+ */
+void ExternalBridge::commit_async_final_state(
+    const std::string& task_id, const std::string& status,
+    const std::string& phase, const std::string& text) {
+    std::lock_guard<std::mutex> lock(tasks_mutex_);
+    auto it = tasks_.find(task_id);
+    if (it != tasks_.end()) {
+        it->second.status = status;
+        it->second.phase = phase;
+        it->second.result = text;
+    }
+    write_sentinel(task_id, status);
+}
+
+/**
+ * @brief Mark an async task failed because its turn never came (gh#144).
+ *
+ * The task stays "queued" until the ticket is actually held, so ask_status
+ * reports the truth rather than claiming to run while blocked. On timeout it
+ * becomes a terminal error with the wait recorded, and the sentinel is
+ * written under tasks_mutex_ like every other terminal transition.
+ *
+ * @param task_id Task that gave up waiting.
+ * @param waited_ms How long it waited before giving up.
+ * @dg_internal
+ * @version 2.12.0
+ */
+void ExternalBridge::fail_task_engine_busy(const std::string& task_id,
+                                           long waited_ms) {
+    update_task_phase(task_id, "error", "engine busy");
+    std::lock_guard<std::mutex> lock(tasks_mutex_);
+    auto it = tasks_.find(task_id);
+    if (it != tasks_.end()) {
+        it->second.status = "error";
+        it->second.result = "engine busy — waited "
+            + std::to_string(waited_ms) + " ms for a turn";
+        write_sentinel(task_id, "error");
+    }
+}
+
+/**
  * @brief Run an async entropic.ask in a detached background thread.
  *
  * Creates a task registry entry, runs the engine, stores the result,
@@ -1144,12 +1537,13 @@ void ExternalBridge::detach_phase_observer() {
  * @param task_id Assigned task ID.
  * @param client_fd Socket fd for completion notification.
  * @req REQ-BRIDGE-001
- * @version 2.1.4
+ * @version 2.12.0
  */
 void ExternalBridge::run_async_ask(
     const std::string& prompt,
     const std::string& task_id,
-    int client_fd) {
+    int client_fd,
+    const std::string& session_key) {
     {
         std::lock_guard<std::mutex> lock(tasks_mutex_);
         AsyncTask t;
@@ -1162,33 +1556,36 @@ void ExternalBridge::run_async_ask(
     // gh#59 (v2.3.1): the async-ask worker runs entropic_run on this
     // handle's behalf — scope its logs to the owning handle.
     int log_id = handle_ ? handle_->log_id : 0;
-    std::thread([this, prompt, task_id, client_fd, log_id]() {
+    std::thread([this, prompt, task_id, client_fd, log_id, session_key]() {
         entropic::log::HandleLogScope scope(log_id);
+
+        // gh#144 (v2.12.0): the async worker reaches the engine like any
+        // other caller and must take the same ticket. Without this an async
+        // ask bypasses the queue and collides with a sync one, earning an
+        // ALREADY_RUNNING where the caller expected to be queued. The task
+        // stays "queued" until the ticket is actually held, so ask_status
+        // reports the truth rather than claiming to run while blocked.
+        long waited_ms = 0;
+        if (!begin_turn_wait(kTurnWaitTimeoutMs, &waited_ms)) {
+            fail_task_engine_busy(task_id, waited_ms);
+            return;
+        }
+
         update_task_phase(task_id, "running", "running");
         attach_phase_observer(task_id);
 
         char* result_json = nullptr;
-        auto err = entropic_run(handle_, prompt.c_str(), &result_json);
+        // gh#144 (v2.12.0): async asks are session-scoped like sync ones.
+        auto err = entropic_run_session(
+            handle_, session_key.c_str(), prompt.c_str(), &result_json);
 
         detach_phase_observer();
+        end_turn_wait();
 
         auto final_state = derive_async_final_state(
             handle_, err, result_json);
-
-        {
-            std::lock_guard<std::mutex> lock(tasks_mutex_);
-            auto it = tasks_.find(task_id);
-            if (it != tasks_.end()) {
-                it->second.status = final_state.status;
-                it->second.phase = final_state.phase;
-                it->second.result = final_state.text;
-            }
-            // Issue #12 (v2.1.4): write sentinel UNDER tasks_mutex_,
-            // before the MCP notification fires. Any external monitor
-            // reacting to the sentinel can immediately call
-            // entropic.ask_status and see the same terminal state.
-            write_sentinel(task_id, final_state.status);
-        }
+        commit_async_final_state(task_id, final_state.status,
+                                 final_state.phase, final_state.text);
         auto status = final_state.status;
 
         // Issue #4 (v2.1.2, parts A+B): emit the spec-defined

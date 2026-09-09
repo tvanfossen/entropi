@@ -18,6 +18,7 @@
 #include "grammar_source.h"
 #include "llama_cpp_sampler.h"
 #include "llama_cpp_tokenizer.h"
+#include "session_pool_util.h"
 #include "warm_keep_util.h"  // gh#96: common_prefix_len / warm_keep_cut
 #include "tool_call_markers.h"  // gh#103: family-aware tool-call close marker
 #include "batch_util.h"  // gh#98: batch_shared_prefix_len / batch_is_viable
@@ -41,6 +42,25 @@
 #include <stdexcept>
 
 namespace entropic {
+
+/**
+ * @brief Fill one cell of a multi-seq llama_batch (defined below).
+ *
+ * Forward-declared because gh#144 (v2.12.0) made the per-token decode path
+ * build explicit batches, and that path sits above the definition.
+ *
+ * @param b Batch to fill.
+ * @param k Cell index.
+ * @param tok Token id.
+ * @param pos Position within the sequence.
+ * @param seq Sequence id.
+ * @param want_logits Whether this cell should emit logits.
+ * @utility
+ * @version 2.12.0
+ */
+static void fill_batch_cell(llama_batch& b, int k, llama_token tok,
+                            llama_pos pos, llama_seq_id seq,
+                            bool want_logits);
 
 namespace {
 
@@ -335,11 +355,17 @@ namespace {
  * n_parallel>1 so the same-prefix batch fan-out's seq_cp is supported.
  *
  * @utility
- * @version 2.9.2
+ * @version 2.12.0
  */
 llama_context_params build_cparams(const entropic::ModelConfig& cfg) {
     llama_context_params c = llama_context_default_params();
-    c.n_ctx = static_cast<uint32_t>(cfg.context_length);
+    // gh#144 (v2.12.0): with max_sessions > 1 the geometry is DERIVED, not
+    // set knob-by-knob — see session_pool_util.h for why non-unified and why
+    // n_ctx multiplies (context_length is PER SESSION). max_sessions == 1
+    // reproduces the previous values exactly, so an existing deployment is
+    // bit-identical.
+    const auto pool = derive_pool_geometry(cfg);
+    c.n_ctx = static_cast<uint32_t>(pool.n_ctx);
     c.n_batch = static_cast<uint32_t>(cfg.n_batch);
     // gh#23 MVP item 5 (v2.3.17): n_ubatch. 0 keeps llama.cpp's default
     // (== n_batch in practice), preserving pre-v2.3.17 chunking.
@@ -363,13 +389,13 @@ llama_context_params build_cparams(const entropic::ModelConfig& cfg) {
     c.rope_freq_scale = cfg.rope_freq_scale;
     // gh#23 MVP item 11 (v2.3.23): n_parallel maps to cparams.n_seq_max.
     // 1 (default) matches llama.cpp's default — bit-identical.
-    c.n_seq_max = static_cast<uint32_t>(cfg.n_parallel);
+    c.n_seq_max = static_cast<uint32_t>(pool.n_seq_max);
     // gh#98 (v2.8.0): a unified KV buffer is REQUIRED for llama_memory_seq_cp
     // (the same-prefix batch fan-out) — seq_cp asserts on per-sequence buffers.
     // llama.cpp also recommends kv_unified exactly when sequences share a large
     // prefix (our case). Only enabled when batching is configured (n_parallel>1)
     // so single-sequence handles keep llama.cpp's default.
-    c.kv_unified = (cfg.n_parallel > 1);
+    c.kv_unified = pool.kv_unified;
     // gh#108 (v2.9.2): llama_context_default_params() returns swa_full=true (a
     // full-context SWA cache), but the CLI default is false. For Gemma-4 (mostly
     // sliding-window: window=512, 5:1 SWA:global) the un-windowed cache wastes
@@ -650,7 +676,7 @@ bool LlamaCppBackend::build_mtp_head(const std::string& head_path) {
  * via the next activate, which reloads from scratch).
  *
  * @dg_internal
- * @version 2.9.1
+ * @version 2.12.0
  */
 void LlamaCppBackend::do_deactivate() {
     // gh#108 (v2.9.1): serialise vs an in-flight generate_mtp — it holds
@@ -674,7 +700,7 @@ void LlamaCppBackend::do_deactivate() {
         llama_free(ctx_);
         ctx_ = nullptr;
     }
-    invalidate_resident_kv();  // gh#96: KV is gone with the context
+    invalidate_all_resident_kv();  // gh#96: KV is gone with the context
 
     // Free the GPU model FIRST (releasing VRAM — the point of
     // deactivate), then reload CPU-only for the WARM state. tokenizer_
@@ -783,7 +809,7 @@ void LlamaCppBackend::inject_sampler_factory_for_test(
  * second engine handle in the same process fail its GPU model load.
  *
  * @req REQ-INFER-002
- * @version 2.10.4
+ * @version 2.12.0
  */
 void LlamaCppBackend::do_unload() {
     // gh#108 (v2.9.1): serialise vs in-flight generate_mtp (see do_deactivate).
@@ -828,7 +854,7 @@ void LlamaCppBackend::do_unload() {
         llama_free(ctx_);
         ctx_ = nullptr;
     }
-    invalidate_resident_kv();  // gh#96: KV is gone with the context
+    invalidate_all_resident_kv();  // gh#96: KV is gone with the context
     if (model_) {
         llama_model_free(model_);
         model_ = nullptr;
@@ -1615,26 +1641,29 @@ std::unique_ptr<Sampler> LlamaCppBackend::create_sampler(
  * @param tokens Input token sequence.
  * @return true on success.
  * @dg_internal
- * @version 2.7.5
+ * @version 2.12.0-rc1
  */
 bool LlamaCppBackend::run_prefill(const std::vector<llama_token>& tokens) {
-    llama_memory_clear(llama_get_memory(ctx_), true);
-
-    const int n_batch = config().n_batch;
-    const int n_tokens = static_cast<int>(tokens.size());
-
-    for (int i = 0; i < n_tokens; i += n_batch) {
-        int chunk = std::min(n_batch, n_tokens - i);
-        std::vector<llama_token> slice(
-            tokens.begin() + i, tokens.begin() + i + chunk);
-        llama_batch batch = llama_batch_get_one(
-            slice.data(), static_cast<int32_t>(chunk));
-        if (llama_decode(ctx_, batch) != 0) {
-            logger->error("Prefill decode failed at offset {}", i);
-            return false;
-        }
+    // gh#144 (v2.12.0): clear only this session's sequence when a pool is
+    // configured. A whole-context clear here wiped every OTHER session's KV
+    // on any cold prefill, which is both a correctness hazard and the end of
+    // any cross-session reuse. max_sessions == 1 keeps the original clear so
+    // the single-session path stays byte-identical.
+    if (residency_.slots() > 1) {
+        llama_memory_seq_rm(llama_get_memory(ctx_),
+                            static_cast<llama_seq_id>(active_slot_), -1, -1);
+    } else {
+        llama_memory_clear(llama_get_memory(ctx_), true);
     }
-    last_prefill_tokens_ += n_tokens;  // gh#96: count tokens decoded in prefill
+
+    // gh#144 (v2.12.0): chunking and position arithmetic now live in
+    // decode_tokens_into_slot. The memory was just cleared for this slot, so
+    // its sequence is empty and positions start at 0 — exactly what the
+    // previous auto-positioned llama_batch_get_one produced.
+    if (!decode_tokens_into_slot(tokens, 0, active_slot_)) {
+        logger->error("Prefill decode failed (slot={})", active_slot_);
+        return false;
+    }
     return true;
 }
 
@@ -1652,7 +1681,7 @@ bool LlamaCppBackend::run_prefill(const std::vector<llama_token>& tokens) {
  * @param stop Stop sequences.
  * @return "continue", "stop", "eos", or "error".
  * @dg_internal
- * @version 2.3.10
+ * @version 2.12.0
  */
 std::string LlamaCppBackend::step_token(
     Sampler& sampler,
@@ -1676,9 +1705,20 @@ std::string LlamaCppBackend::step_token(
         return "stop";
     }
 
+    // gh#144 (v2.12.0): the freshly sampled token must extend THIS session's
+    // sequence. Under a pool, auto-positioning into seq 0 would append one
+    // session's generated token onto another's KV.
     llama_token tok = new_token;
-    llama_batch single = llama_batch_get_one(&tok, 1);
-    return (llama_decode(ctx_, single) == 0) ? "continue" : "error";
+    auto* mem = llama_get_memory(ctx_);
+    const auto seq = static_cast<llama_seq_id>(active_slot_);
+    llama_batch single = llama_batch_init(1, 0, 1);
+    single.n_tokens = 1;
+    fill_batch_cell(single, 0, tok,
+                    llama_memory_seq_pos_max(mem, seq) + 1, seq,
+                    /*want_logits=*/true);
+    const bool ok = (llama_decode(ctx_, single) == 0);
+    llama_batch_free(single);
+    return ok ? "continue" : "error";
 }
 
 /**
@@ -2001,7 +2041,7 @@ void LlamaCppBackend::release_temp_seqs(std::vector<BatchSeq>& seqs) {
  * prefilled once); `last_gen_decode_calls_` holds the batched step count.
  *
  * @dg_internal
- * @version 2.8.0
+ * @version 2.12.0
  */
 std::vector<GenerationResult> LlamaCppBackend::run_batched_decode(
     const std::vector<std::vector<llama_token>>& toks,
@@ -2020,7 +2060,7 @@ std::vector<GenerationResult> LlamaCppBackend::run_batched_decode(
     for (const auto& p : params) { max_steps = std::max(max_steps, p.max_tokens); }
 
     llama_memory_clear(llama_get_memory(ctx_), true);
-    invalidate_resident_kv();
+    invalidate_all_resident_kv();
     last_prefill_tokens_ = 0;
     last_gen_decode_calls_ = 0;
 
@@ -2032,7 +2072,7 @@ std::vector<GenerationResult> LlamaCppBackend::run_batched_decode(
                   : std::vector<GenerationResult>(
                         n, batch_error_result("batch prefill"));
     release_temp_seqs(seqs);
-    invalidate_resident_kv();
+    invalidate_all_resident_kv();
     logger->info("gh#98 batch: requests={} prefix.tokens_shared={} "
                  "prefix.tokens_saved={} total_prefill_tokens={} gen_decodes={}",
                  n, shared, shared * (n - 1), last_prefill_tokens_,
@@ -2100,6 +2140,74 @@ std::string LlamaCppBackend::extract_system_prompt(
 }
 
 /**
+ * @brief Decode a token run into an explicit sequence at explicit positions.
+ *
+ * gh#144 (v2.12.0). `llama_batch_get_one` builds a batch with seq_id 0 and
+ * AUTO-POSITIONS from the cache cursor, which is correct only while every
+ * decode targets sequence 0. A session pool needs the same run decoded into
+ * an arbitrary slot, so the batch has to be built by hand.
+ *
+ * The position arithmetic is the whole risk of this function. Positions must
+ * continue THIS slot's sequence: `seq_pos_max(mem, slot) + 1 + i`. Getting it
+ * wrong does not crash and does not fail a unit test — it writes KV cells at
+ * the wrong positions and degrades output silently, which is why the
+ * single-session path is asserted byte-identical by a model test rather than
+ * trusted.
+ *
+ * `seq_pos_max` returns -1 for an empty sequence, so a cold slot starts at 0
+ * exactly as the auto-positioning path did.
+ *
+ * @param tokens Full token sequence.
+ * @param start_offset First index to decode.
+ * @param slot Sequence slot to decode into.
+ * @return true when every chunk decoded.
+ * @dg_internal
+ * @version 2.12.0
+ */
+bool LlamaCppBackend::decode_tokens_into_slot(
+    const std::vector<llama_token>& tokens, int start_offset, int slot)
+{
+    const int total = static_cast<int>(tokens.size());
+    if (start_offset >= total) { return true; }
+
+    auto* mem = llama_get_memory(ctx_);
+    const auto seq = static_cast<llama_seq_id>(slot);
+    // -1 on an empty sequence, so base is 0 for a cold slot.
+    llama_pos base = llama_memory_seq_pos_max(mem, seq) + 1;
+
+    const int n_batch = llama_n_batch(ctx_);
+    const int n_remaining = total - start_offset;
+    last_prefill_tokens_ += n_remaining;
+
+    bool ok = true;
+    for (int off = 0; off < n_remaining && ok; off += n_batch) {
+        const int chunk = std::min(n_batch, n_remaining - off);
+        llama_batch batch = llama_batch_init(chunk, 0, 1);
+        batch.n_tokens = chunk;
+        for (int k = 0; k < chunk; ++k) {
+            fill_batch_cell(batch, k,
+                            tokens[static_cast<std::size_t>(
+                                start_offset + off + k)],
+                            base + off + k, seq, /*want_logits=*/false);
+        }
+        // Each chunk's last token carries logits. llama_batch_get_one passes
+        // logits = nullptr, which makes llama.cpp emit logits for the last
+        // token of EACH decode call — so requesting them per chunk, not just
+        // on the final one, keeps this byte-identical to the path it
+        // replaces. Cheaper to compute a few unused logits than to differ
+        // from a path whose divergence would be silent.
+        batch.logits[chunk - 1] = 1;
+        if (llama_decode(ctx_, batch) != 0) {
+            logger->error("Decode chunk failed (slot={}, start={}, off={}, "
+                          "chunk={})", slot, start_offset, off, chunk);
+            ok = false;
+        }
+        llama_batch_free(batch);
+    }
+    return ok;
+}
+
+/**
  * @brief Decode remaining tokens starting at `start_offset`.
  *
  * Assumes `seq_pos_max(0) == start_offset - 1` so that
@@ -2109,30 +2217,15 @@ std::string LlamaCppBackend::extract_system_prompt(
  * @param start_offset Index of the first token to decode.
  * @return true on success, false on decode failure.
  * @dg_internal
- * @version 2.7.5
+ * @version 2.12.0
  */
 bool LlamaCppBackend::decode_tokens_from(
     const std::vector<llama_token>& tokens, int start_offset)
 {
-    int total = static_cast<int>(tokens.size());
-    if (start_offset >= total) { return true; }
-
-    int n_batch = llama_n_batch(ctx_);
-    int n_remaining = total - start_offset;
-    last_prefill_tokens_ += n_remaining;  // gh#96: count tokens decoded here
-    for (int off = 0; off < n_remaining; off += n_batch) {
-        int chunk = std::min(n_batch, n_remaining - off);
-        llama_batch batch = llama_batch_get_one(
-            const_cast<llama_token*>(tokens.data())
-                + start_offset + off,
-            chunk);
-        if (llama_decode(ctx_, batch) != 0) {
-            logger->error("Decode chunk failed (start={}, off={}, "
-                          "chunk={})", start_offset, off, chunk);
-            return false;
-        }
-    }
-    return true;
+    // gh#144 (v2.12.0): decode into whichever slot this generation is bound
+    // to. active_slot_ is 0 unless a session pool is configured, so the
+    // single-session path is unchanged.
+    return decode_tokens_into_slot(tokens, start_offset, active_slot_);
 }
 
 /**
@@ -2149,17 +2242,29 @@ bool LlamaCppBackend::decode_tokens_from(
  * @param tokens Full token sequence.
  * @return true on success, false to fall back to full prefill.
  * @dg_internal
- * @version 2.0.6
+ * @version 2.12.0
  */
 bool LlamaCppBackend::restore_cached_prefix(
     const CacheEntry* cached,
     const std::vector<llama_token>& tokens)
 {
     auto* mem = llama_get_memory(ctx_);
-    llama_memory_clear(mem, true);
+    const auto seq = static_cast<llama_seq_id>(active_slot_);
+
+    // gh#144 (v2.12.0): restore into THIS session's sequence, and clear only
+    // it. Both halves were wrong for a pool and the model test caught it:
+    // the cached prefix landed in sequence 0 while the remainder decoded into
+    // the caller's own slot, so every session except the one that happened to
+    // own slot 0 attended to a fragment with no system prompt — and the
+    // whole-context clear wiped the other sessions on the way past.
+    if (residency_.slots() > 1) {
+        llama_memory_seq_rm(mem, seq, -1, -1);
+    } else {
+        llama_memory_clear(mem, true);
+    }
 
     size_t restored = llama_state_seq_set_data(
-        ctx_, cached->data.data(), cached->data_size, 0);
+        ctx_, cached->data.data(), cached->data_size, seq);
     if (restored == 0) {
         logger->warn("KV state restore failed, falling back to full prefill");
         return false;
@@ -2286,7 +2391,7 @@ bool LlamaCppBackend::prefill_and_cache_prefix(
  * @param params Generation parameters.
  * @return true on success.
  * @dg_internal
- * @version 2.7.6
+ * @version 2.12.0
  */
 bool LlamaCppBackend::run_prefill_cached(
     const std::vector<llama_token>& tokens,
@@ -2323,7 +2428,7 @@ bool LlamaCppBackend::run_prefill_cached(
         if (!ok) {
             ok = prefill_dispatch(tokens, system_prompt, messages, params);
             if (ok) {
-                resident_tokens_ = tokens;
+                residency_.set_resident(active_slot_, tokens);
             } else {
                 invalidate_resident_kv();
             }
@@ -2344,33 +2449,53 @@ bool LlamaCppBackend::run_prefill_cached(
  * auto-positions the delta at `cut` (same mechanism the cache-restore path
  * relies on). Occupancy is derived from llama_memory_seq_pos_max, never a
  * software counter — so an out-of-band wipe (multimodal / complete /
- * speculative / a different conversation interleaved on a shared backend)
- * either fails the warm_keep_cut occupancy gate or diverges in the prefix
- * scan, and we fall back. Per-turn cost shrinks from the whole post-system
- * history to just the appended delta.
+ * speculative) fails the warm_keep_cut occupancy gate and we fall back.
+ * Per-turn cost shrinks from the whole post-system history to just the
+ * appended delta.
+ *
+ * gh#144 (v2.12.0) CORRECTION. This comment also used to claim the same held
+ * for "a different conversation interleaved on a shared backend". It does
+ * not, and NEITHER stated branch fires. Two conversations on one handle share
+ * a system prompt, so common_prefix_len is > 0 (the prefix scan yields 0 only
+ * on divergence at token 0, i.e. a DIFFERENT system prompt), and the resident
+ * conversation's own occupancy satisfies kv_pos_max + 1 >= common. So cut > 0,
+ * the seq_rm below DESTROYS the other conversation's tail, and because this
+ * function then returns true, prefill_dispatch never runs and the prompt cache
+ * is skipped too — worse than the pre-gh#96 path.
+ *
+ * Latent while one shared conversation means one monotonically growing
+ * history. Keying conversations per caller ACTIVATES it, which is why
+ * residency must become per-sequence before keying ships.
  *
  * @param tokens Full incoming token sequence.
  * @return true if reuse handled the prefill; false to fall back (no KV change).
  * @dg_internal
- * @version 2.7.5
+ * @version 2.12.0
  */
 bool LlamaCppBackend::try_warm_reuse(const std::vector<llama_token>& tokens) {
     if (!prompt_cache_config_.warm_keep || ctx_ == nullptr) {
         return false;
     }
+    // gh#144 (v2.12.0): ask THIS session's slot what it holds. Against the
+    // previous single shared vector, a second session sharing the system
+    // prompt scored a non-zero common prefix and reused destructively.
+    const int slot = active_slot_;
     auto* mem = llama_get_memory(ctx_);
-    long pos_max = static_cast<long>(llama_memory_seq_pos_max(mem, 0));
-    std::size_t cut = warm_keep_cut(resident_tokens_, tokens, pos_max);
+    long pos_max = static_cast<long>(
+        llama_memory_seq_pos_max(mem, static_cast<llama_seq_id>(slot)));
+    std::size_t cut = warm_keep_cut(residency_.resident(slot), tokens,
+                                    pos_max);
     if (cut == 0) {
         return false;  // nothing reusable — cold prefill
     }
     // Drop the divergent tail (and any prior generated tokens past `cut`),
     // then decode only the appended delta. A single exit (returns <= 3 gate):
     // success records the new resident set; failure invalidates and reports it.
-    llama_memory_seq_rm(mem, 0, static_cast<llama_pos>(cut), -1);
+    llama_memory_seq_rm(mem, static_cast<llama_seq_id>(slot),
+                        static_cast<llama_pos>(cut), -1);
     bool ok = decode_tokens_from(tokens, static_cast<int>(cut));
     if (ok) {
-        resident_tokens_ = tokens;
+        residency_.set_resident(slot, tokens);
         if (prompt_cache_config_.log_hits) {
             logger->info("Warm-keep: reused {} resident tokens, decoded {} "
                          "delta (of {} total)", cut, tokens.size() - cut,
@@ -2390,10 +2515,28 @@ bool LlamaCppBackend::try_warm_reuse(const std::vector<llama_token>& tokens) {
  * declaration run to the preceding declaration).
  * @utility
  * @dg_internal
- * @version 2.7.5
+ * @version 2.12.0
  */
 void LlamaCppBackend::invalidate_resident_kv() {
-    resident_tokens_.clear();
+    // gh#144 (v2.12.0): only this session's slot. A caller that wiped the
+    // WHOLE context must call invalidate_all_resident_kv() instead — believing
+    // another slot is still resident after that is how a stale prefix gets
+    // reused.
+    residency_.invalidate(active_slot_);
+}
+
+/**
+ * @brief Drop EVERY slot's warm-keep record (gh#144, v2.12.0).
+ *
+ * For the paths that still clear the whole context unconditionally
+ * (llama_memory_clear(mem, true)). After one of those no slot holds what the
+ * bookkeeping thinks it does.
+ * @utility
+ * @dg_internal
+ * @version 2.12.0
+ */
+void LlamaCppBackend::invalidate_all_resident_kv() {
+    residency_.invalidate_all();
 }
 
 /**
@@ -2652,7 +2795,7 @@ GenerationResult LlamaCppBackend::run_sampling_loop(
  * @return GenerationResult; ENTROPIC_ERROR_IMAGE_LOAD_FAILED when a bitmap
  *         could not be built, or the prefill's own error code.
  * @req REQ-INFER-025
- * @version 2.7.5
+ * @version 2.12.0
  */
 GenerationResult LlamaCppBackend::generate_multimodal(
     const std::vector<Message>& messages,
@@ -2661,7 +2804,7 @@ GenerationResult LlamaCppBackend::generate_multimodal(
     std::atomic<bool>* cancel)
 {
     auto t0 = entropic::log::now();
-    invalidate_resident_kv();  // gh#96: mtmd_prefill mutates seq 0 out-of-band
+    invalidate_all_resident_kv();  // gh#96: mtmd_prefill mutates seq 0 out-of-band
     std::vector<::mtmd_bitmap*> bitmaps;
     auto marked = substitute_image_markers(
         messages, mtmd_ctx_, bitmaps);
@@ -2691,6 +2834,45 @@ GenerationResult LlamaCppBackend::generate_multimodal(
 // ── Generation entry points ────────────────────────────────
 
 /**
+ * @brief Bind this generation to its session's sequence slot (gh#144).
+ *
+ * Resolves the caller-supplied key to a llama sequence and, when the pool is
+ * full, evicts the least recently used session's KV to make room. Eviction
+ * drops KV ONLY — the engine still holds that session's message history,
+ * which is authoritative and re-prefillable, so its next turn costs a cold
+ * prefill. That is exactly what every turn costs today.
+ *
+ * An empty key resolves to slot 0, so a caller that never names a session is
+ * bit-identical to pre-v2.12.0.
+ *
+ * @param params Generation parameters carrying the session key.
+ * @dg_internal
+ * @version 2.12.0
+ */
+void LlamaCppBackend::bind_session_slot(const GenerationParams& params) {
+    const int pool = derive_pool_geometry(config()).n_seq_max;
+    if (residency_.slots() != pool) {
+        residency_ = SessionResidency<llama_token>(pool);
+    }
+    if (pool <= 1) {
+        active_slot_ = 0;
+        return;
+    }
+    std::string evicted;
+    active_slot_ = residency_.acquire(params.session_key, &evicted);
+    if (!evicted.empty() && ctx_ != nullptr) {
+        // The slot is being reused, so the departing session's cells must go
+        // with it — otherwise the incoming session inherits a prefix that
+        // matches nothing it will send.
+        llama_memory_seq_rm(llama_get_memory(ctx_),
+                            static_cast<llama_seq_id>(active_slot_), -1, -1);
+        residency_.invalidate(active_slot_);
+        logger->info("Session pool: evicted '{}' from slot {} for '{}'",
+                     evicted, active_slot_, params.session_key);
+    }
+}
+
+/**
  * @brief Generate a complete response using chat template.
  *
  * v2.1.8 (gh#37 / v1.9.11 Phases 5–7): dispatches to
@@ -2703,12 +2885,15 @@ GenerationResult LlamaCppBackend::generate_multimodal(
  * @param params Generation parameters.
  * @return GenerationResult.
  * @dg_internal
- * @version 2.1.8
+ * @version 2.12.0
  */
 GenerationResult LlamaCppBackend::do_generate(
     const std::vector<Message>& messages,
     const GenerationParams& params)
 {
+    // gh#144 (v2.12.0): every generate path goes through here, so this is the
+    // one place a session has to be bound to a sequence.
+    bind_session_slot(params);
     if (!any_image_in(messages)) {
         return do_generate_text_only(messages, params);
     }
@@ -3223,6 +3408,12 @@ struct SpeculativeRunState {
     std::string generated;
     std::vector<std::string> stop;  ///< gh#108: stop seqs (effective_stop); empty for gh#36
     int n_generated = 0;
+    /// gh#144 (v2.12.0): prompt tokens actually pushed through llama_decode
+    /// during this run's prefill. The MTP path counted NOTHING, so
+    /// last_prefill_tokens() read 0 for every MTP turn and there was no way
+    /// to measure whether a prefix was reused or re-decoded. Instrument
+    /// before optimising.
+    int n_prefilled = 0;
     int n_drafted = 0;
     int n_accepted = 0;
     bool has_eos = false;
@@ -3773,7 +3964,7 @@ static void spec_run_loop(
  * @brief Assemble final GenerationResult + log metrics. Helper to
  *        keep the public entry under SLOC ≤ 50.
  * @dg_internal
- * @version 2.10.4
+ * @version 2.12.0
  */
 static GenerationResult spec_finalize(
     SpeculativeRunState& state,
@@ -3798,6 +3989,10 @@ static GenerationResult spec_finalize(
     // so the gh#88 envelope recovery and fenced-JSON fallbacks are unaffected.
     result.content = entropic::mcp::sanitize_utf8(state.generated);
     result.token_count = state.n_generated;
+    // gh#144 (v2.12.0): carry the prefill count out of the speculative path,
+    // which previously reported nothing and left last_prefill_tokens() at 0
+    // for every MTP turn.
+    result.prefill_tokens = state.n_prefilled;
     result.finish_reason = state.finish_reason;
     result.error_code = state.error_code;
     result.error_message = state.error_message;
@@ -3896,7 +4091,7 @@ static GenerationResult spec_run_from_tokens(
 /**
  * @brief Speculative generation against a draft model (gh#36).
  * @dg_internal
- * @version 2.10.4
+ * @version 2.12.0
  */
 GenerationResult LlamaCppBackend::generate_speculative_with_draft(
     const std::vector<Message>& messages,
@@ -3908,7 +4103,7 @@ GenerationResult LlamaCppBackend::generate_speculative_with_draft(
     const std::string& draft_path)
 {
     auto t0 = entropic::log::now();
-    invalidate_resident_kv();  // gh#96: speculative path manages seq 0 itself
+    invalidate_all_resident_kv();  // gh#96: speculative path manages seq 0 itself
     auto pre_err = spec_check_preconditions(
         is_active(), draft.is_active(), ctx_, draft.ctx_);
     GenerationResult result;
@@ -4063,13 +4258,19 @@ bool mtp_process_chunk(SpeculativeRunState& state, int off, int chunk) {
  * @dg_internal
  * @version 2.9.0
  */
-bool mtp_prefill_and_seed(SpeculativeRunState& state) {
+bool mtp_prefill_and_seed(SpeculativeRunState& state, int start = 0) {
     int total = static_cast<int>(state.prompt_tgt.size());
     if (total == 0) { return true; }  // 1-token prompt: round 1 drafts cold
+    // gh#144 (v2.12.0): decode only from `start`. Tokens below it are already
+    // resident and provably unchanged — the caller matched them against the
+    // KV's own occupancy before choosing the cut.
     int n_batch = llama_n_batch(state.ctx_tgt);
-    for (int off = 0; off < total; off += n_batch) {
+    for (int off = start; off < total; off += n_batch) {
         int chunk = std::min(n_batch, total - off);
         if (!mtp_process_chunk(state, off, chunk)) { return false; }
+        // gh#144 (v2.12.0): count what this path actually decodes, so
+        // last_prefill_tokens() is meaningful under speculative.mtp.
+        state.n_prefilled += chunk;
     }
     return true;
 }
@@ -4124,16 +4325,38 @@ std::string mtp_init_run(
     const std::vector<llama_token>& tokens,
     const GenerationParams& params, int n_max,
     const std::string& tool_grammar, bool tool_grammar_lazy,
-    const std::string& generation_prompt) {
+    const std::string& generation_prompt, int reuse_cut) {
     state.id_last = tokens.back();
     state.prompt_tgt.assign(tokens.begin(), tokens.end() - 1);
     state.n_past = static_cast<int>(tokens.size()) - 1;
-    llama_memory_clear(llama_get_memory(state.ctx_tgt), true);
+
+    // gh#144 (v2.12.0): retain a prefix this run can prove unchanged.
+    //
+    // This used to be an unconditional llama_memory_clear(ctx_tgt, true)
+    // followed by a full re-prefill, on EVERY generation. Nothing about
+    // speculative decoding requires discarding the cache — it was an
+    // implementation choice in this path, and it cost the whole prompt every
+    // turn: a consumer measured 18611 tokens prefilled against 196 generated
+    // (95:1) on a three-turn review, with ~85% of that being an invariant
+    // prefix of constitution, identity and a 16 KB staged tool-schema block.
+    //
+    // `reuse_cut` is 0 when nothing is reusable, which reproduces the old
+    // behaviour exactly; the caller clears the sequence in that case.
+    auto* mem = llama_get_memory(state.ctx_tgt);
+    if (reuse_cut > 0) {
+        // Drop only the divergent tail, then decode the delta.
+        llama_memory_seq_rm(mem, state.seq_id,
+                            static_cast<llama_pos>(reuse_cut), -1);
+    } else {
+        llama_memory_clear(mem, true);
+    }
     auto err = mtp_init_decoder(state, model_tgt, params, n_max,
                                 tool_grammar, tool_grammar_lazy,
                                 generation_prompt);
     if (!err.empty()) { return err; }
-    if (!mtp_prefill_and_seed(state)) { return "MTP prefill/process failed"; }
+    if (!mtp_prefill_and_seed(state, reuse_cut)) {
+        return "MTP prefill/process failed";
+    }
     common_speculative_begin(state.spec, state.seq_id, state.prompt_tgt);
     return "";
 }
@@ -4177,14 +4400,14 @@ GenerationResult mtp_run_from_tokens(
     const std::vector<std::string>& stop,
     std::chrono::steady_clock::time_point t0,
     const std::string& tool_grammar, bool tool_grammar_lazy,
-    const std::string& generation_prompt) {
+    const std::string& generation_prompt, int reuse_cut) {
     SpeculativeRunState state;
     state.ctx_tgt = ctx_tgt;
     state.ctx_dft = ctx_dft;
     state.stop = stop;  // gh#108: MTP honors stop sequences (effective_stop)
     auto init_err = mtp_init_run(state, model_tgt, tokens, params, n_max,
                                  tool_grammar, tool_grammar_lazy,
-                                 generation_prompt);
+                                 generation_prompt, reuse_cut);
     if (!init_err.empty()) {
         spec_cleanup(state);
         return spec_error(ENTROPIC_ERROR_GENERATE_FAILED,
@@ -4262,6 +4485,38 @@ GenerationResult LlamaCppBackend::mtp_guard(
 }
 
 /**
+ * @brief How much of an MTP prompt is already resident and reusable.
+ *
+ * gh#144 (v2.12.0). Same rule the plain decode path uses: a prefix match
+ * validated against the KV's OWN occupancy (llama_memory_seq_pos_max), never
+ * a software counter — so an out-of-band wipe fails the gate rather than
+ * being trusted.
+ *
+ * `mtp_prefill_and_seed` decodes `prompt_tgt`, which is the prompt minus its
+ * final token, so the cut is clamped to that length.
+ *
+ * Extracted from generate_mtp to keep it inside the ABC gate.
+ *
+ * @param tokens Full incoming prompt.
+ * @return Tokens reusable from the front; 0 when nothing is.
+ * @dg_internal
+ * @version 2.12.0
+ */
+int LlamaCppBackend::mtp_reuse_cut(
+    const std::vector<llama_token>& tokens) const {
+    if (!prompt_cache_config_.warm_keep || ctx_ == nullptr) {
+        return 0;
+    }
+    const auto seq = static_cast<llama_seq_id>(active_slot_);
+    const long pos_max = static_cast<long>(
+        llama_memory_seq_pos_max(llama_get_memory(ctx_), seq));
+    const std::size_t cut = warm_keep_cut(
+        residency_.resident(active_slot_), tokens, pos_max);
+    return static_cast<int>(
+        std::min(cut, tokens.empty() ? std::size_t{0} : tokens.size() - 1));
+}
+
+/**
  * @brief Speculative generation via a target-owned MTP head (gh#106).
  *
  * gh#108: holds mtp_mutex_ across head setup + the whole decode so a concurrent
@@ -4279,7 +4534,7 @@ GenerationResult LlamaCppBackend::mtp_guard(
  *         this route owns the outcome and never degrades to plain decode.
  * @req REQ-INFER-015
  * @req REQ-INFER-005
- * @version 2.10.4
+ * @version 2.12.0-rc1
  */
 GenerationResult LlamaCppBackend::generate_mtp(
     const std::vector<Message>& messages,
@@ -4295,19 +4550,37 @@ GenerationResult LlamaCppBackend::generate_mtp(
     if (result.error_code != ENTROPIC_OK) {
         return result;
     }
-    invalidate_resident_kv();  // MTP kernel owns seq 0 itself
+    bind_session_slot(params);
     auto tokens = tokenize(render_prompt(messages, params), true);
     if (tokens.size() < 2) {
         return spec_error(ENTROPIC_ERROR_GENERATE_FAILED,
             "MTP prompt must have at least 2 tokens");
     }
-    logger->info("MTP: {} input tokens, max_tokens={}, n_max={}",
-                 tokens.size(), params.max_tokens, mtp_n_max_);
-    return mtp_run_from_tokens(ctx_, mtp_draft_ctx_, model_, tokens, params,
-                               on_token, cancel, mtp_n_max_,
-                               effective_stop(params), t0,  // gh#108: honor stops
-                               tool_grammar_, tool_grammar_lazy_,   // gh#134
-                               parse_generation_prompt_);
+
+    const int reuse_cut = mtp_reuse_cut(tokens);
+    if (reuse_cut == 0) {
+        invalidate_all_resident_kv();  // cold run: nothing survives the clear
+    }
+    logger->info("MTP: {} input tokens, reusing {}, max_tokens={}, n_max={}",
+                 tokens.size(), reuse_cut, params.max_tokens, mtp_n_max_);
+    auto mtp_result = mtp_run_from_tokens(
+        ctx_, mtp_draft_ctx_, model_, tokens, params,
+        on_token, cancel, mtp_n_max_,
+        effective_stop(params), t0,  // gh#108: honor stops
+        tool_grammar_, tool_grammar_lazy_,   // gh#134
+        parse_generation_prompt_, reuse_cut);
+    // gh#144 (v2.12.0): publish it so last_prefill_tokens() is meaningful
+    // under speculative.mtp, exactly as it is on the plain decode path.
+    last_prefill_tokens_ = mtp_result.prefill_tokens;
+    if (mtp_result.error_code == ENTROPIC_OK) {
+        // Record what this slot now holds so the NEXT turn can match against
+        // it. Only on success: a failed run leaves the KV in a state we did
+        // not author and must not claim to know.
+        residency_.set_resident(active_slot_, tokens);
+    } else {
+        invalidate_resident_kv();
+    }
+    return mtp_result;
 }
 
 /**
@@ -4316,14 +4589,14 @@ GenerationResult LlamaCppBackend::generate_mtp(
  * @param params Generation parameters.
  * @return GenerationResult.
  * @dg_internal
- * @version 2.7.5
+ * @version 2.12.0
  */
 GenerationResult LlamaCppBackend::do_complete(
     const std::string& prompt,
     const GenerationParams& params)
 {
     auto t0 = entropic::log::now();
-    invalidate_resident_kv();  // gh#96: decode_loop/run_prefill mutate seq 0
+    invalidate_all_resident_kv();  // gh#96: decode_loop/run_prefill mutate seq 0
     auto tokens = tokenize(prompt, false);
 
     logger->info("Complete: {} input tokens, max_tokens={}",

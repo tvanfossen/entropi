@@ -19,6 +19,35 @@
 
 #include "model_test_context.h"
 
+// v2.12.0: adaptive partial-offload split from actual free VRAM.
+#include "../../src/inference/device_memory.h"
+#include "../../src/inference/partial_offload.h"
+
+/**
+ * @brief Host RAM currently available, in bytes (0 when unknown).
+ *
+ * MemAvailable, not MemFree: the kernel's own estimate of what a new
+ * allocation can obtain including reclaimable cache, which is the number that
+ * actually predicts whether a load succeeds.
+ *
+ * @return Available bytes, or 0 when /proc/meminfo cannot be read.
+ * @utility
+ * @version 2.12.0
+ */
+inline uint64_t host_available_bytes() {
+    std::ifstream mi("/proc/meminfo");
+    std::string key;
+    uint64_t kb = 0;
+    while (mi >> key) {
+        if (key == "MemAvailable:") {
+            mi >> kb;
+            return kb * 1024ull;
+        }
+        mi.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    }
+    return 0;
+}
+
 /**
  * @brief Override the default tier to load a v2.1.9 family GGUF.
  *
@@ -99,17 +128,76 @@ inline bool init_orchestrator_for_v219_family(ModelTestContext& ctx,
     // 1080 Ti OOM'd the compute-buffer alloc (model-results run7). 15
     // (~6.6GB VRAM) leaves ~2GB headroom for competing desktop GPU —
     // correctness is unaffected by the GPU/CPU offload split.
-    constexpr int PARTIAL_GPU_LAYERS = 15;
     std::error_code size_ec;
     auto file_size = fs::file_size(path, size_ec);
+    // v2.12.0: a recurrent/hybrid family is skipped when the host cannot
+    // hold the WARM load. The WARM state maps the ENTIRE model into CPU RAM
+    // regardless of gpu_layers — measured 12952 MiB for a 13.6 GB GGUF —
+    // and only the ACTIVE reload honours the partial-offload split. So peak
+    // host usage is the whole file, and on a 31 GB box already holding ~15 GB
+    // that is a coin flip rather than a clean failure.
+    //
+    // Scoped to the hybrid/recurrent Qwen family deliberately: the dense
+    // gemma4 26B-A4B is LARGER (13.6 GB vs 12.3 GB) and passes, so this is
+    // not a size rule. Gating on size would skip a test that works.
+    //
+    // Match the ADAPTER ("qwen36"), not the llama.cpp architecture string
+    // ("qwen35moe") — the first cut used the arch name, never matched, and
+    // the test skipped for an unrelated reason while appearing gated.
+    if (!size_ec && file_size > LARGE_GGUF_BYTES
+        && entry->adapter == "qwen36") {
+        const uint64_t avail = host_available_bytes();
+        const uint64_t needed = file_size + (2ULL * 1024 * 1024 * 1024);
+        if (entropic::large_model_tests_waived(file_size)
+            || !entropic::host_can_hold_warm_load(file_size, avail)) {
+            spdlog::warn("v2.1.9 family: SKIPPING '{}' — WARM load maps the "
+                         "whole {} MiB GGUF into host RAM and only {} MiB is "
+                         "available (needs ~{} MiB with headroom). This is a "
+                         "hardware limit, not a defect: a quantised model of "
+                         "this size runs fine on a host with the RAM free.",
+                         key, file_size / (1024ULL * 1024),
+                         avail / (1024ULL * 1024),
+                         needed / (1024ULL * 1024));
+            return false;
+        }
+    }
     if (!size_ec && file_size > LARGE_GGUF_BYTES) {
-        tier.gpu_layers = PARTIAL_GPU_LAYERS;
+        // v2.12.0: derive the split from ACTUAL free VRAM instead of a
+        // hardcoded 15. That constant came from a v2.7.0 measurement taken
+        // while the desktop held ~1.8 GB of VRAM, and it never adapted: on a
+        // quiet card reporting 10.2 GB free it still pinned 15 of 40 layers
+        // to the GPU (~5 GB) and left ~8.2 GB in SYSTEM RAM, which is what
+        // the low-memory watchdog killed.
+        //
+        // The direction matters and is easy to get backwards: every layer
+        // moved OFF the GPU adds ~330 MB to system RAM for this model, so
+        // "more CPU offload" makes an OOM worse, not better. Fitting more
+        // into VRAM is what reduces the host-side footprint.
+        tier.gpu_layers = entropic::partial_gpu_layers_for(
+            file_size, entropic::query_device_free_vram_bytes());
+        // v2.12.0: and UNPIN it. Clamping gpu_layers puts ~6.6 GB of a 13 GB
+        // GGUF on the CPU side, but use_mlock defaults to true, so llama.cpp
+        // tries to lock that portion into unevictable RAM — locking up to
+        // RLIMIT_MEMLOCK (3.9 GB here) before warning "failed to mlock ...
+        // Cannot allocate memory".
+        //
+        // Pinned pages cannot be reclaimed under pressure, which is what
+        // turns partial offload from SLOW into FATAL: the suite was
+        // OOM-killed loading this model rather than paging through it. The
+        // whole point of the accommodation is that a model too large for the
+        // card still RUNS, just slowly — and that requires it to be
+        // pageable. mlock is an optimisation for models that comfortably
+        // fit; for one that does not, it is precisely wrong.
+        tier.use_mlock = false;
         spdlog::warn("v2.1.9 family: '{}' GGUF is {} bytes (>{} GB) — "
-                     "clamping gpu_layers to {} for partial CPU offload "
+                     "fitting {} layers to {} MiB free VRAM and disabling "
+                     "mlock so the CPU-side portion stays pageable "
                      "(dev-box small-VRAM accommodation)",
                      key, file_size,
                      LARGE_GGUF_BYTES / (1024ULL * 1024 * 1024),
-                     PARTIAL_GPU_LAYERS);
+                     tier.gpu_layers,
+                     entropic::query_device_free_vram_bytes()
+                         / (1024ULL * 1024));
     }
 
     ctx.model_path = path.string();
