@@ -100,16 +100,39 @@ consumers that construct `ParsedConfig` directly and must recompile.
 
 ## Known limitations
 
-- **The full model suite does not complete on an 11 GB / 32 GB developer
-  host.** 41 of 41 completed tests pass, reproduced across three runs; the
-  hybrid Qwen family (`qwen36`) cannot load. The engine's WARM state maps the
-  ENTIRE GGUF into host RAM regardless of `gpu_layers` — 12952 MiB measured
-  for a 13.6 GB file — and only the ACTIVE reload honours the offload split,
-  so peak host usage is the whole file. This is not a size rule: the dense
-  13.6 GB gemma-4-26B passes where the smaller 12.6 GB hybrid Qwen fails.
-  Two related defects WERE fixed this release (mlock pinning a model too
-  large to pin, and an offload split frozen at a stale VRAM measurement), but
-  the WARM-load behaviour itself is untouched and tracked separately.
+- **The hybrid Qwen family is not covered by this release's model gate.** The
+  full 79-test roster completed: **76 passed, 0 failed, 3 skipped, 1 flaky**
+  (`test-gh106-mtp-route-c1`, passed on retry), on a GTX 1080 Ti. All three
+  skips are the same model — `qwen3_6_a3b` — and all three were skipped by an
+  explicit operator allowance (`ENTROPIC_SKIP_LARGE_MODEL_TESTS=1`), not by a
+  missing file and not by a defect in the code under test:
+  `test-v219-qwen36`, `test-gh87-verify-qwen36`, `test-gh103-sequential-stop`.
+
+  The underlying constraint (gh#148): the engine's WARM state maps the ENTIRE
+  GGUF into host RAM regardless of `gpu_layers` — 12952 MiB measured for a
+  13.6 GB file — and only the ACTIVE reload honours the offload split, so peak
+  host usage is the whole file. This is not a size rule: the dense 13.6 GB
+  gemma-4-26B passes where the smaller 12.6 GB hybrid Qwen fails, because the
+  recurrent state is additional. Two related defects WERE fixed this release
+  (mlock pinning a model too large to pin, and an offload split frozen at a
+  stale VRAM measurement); the WARM-load behaviour itself is untouched.
+
+  **What this means for the standing hybrid-arch rule.** KV-touching changes
+  are supposed to be exercised on a hybrid/recurrent architecture, not only on
+  plain-KV gemma4 — and this release touches KV heavily. That coverage is
+  absent here and the risk is not hypothetical. It is stated rather than
+  papered over.
+
+  The allowance was made explicit precisely so this is reproducible: the
+  previous gate was a MemAvailable estimate whose own documentation calls it
+  best-effort, so the same commit skipped or did not depending on page-cache
+  state. The allowance has a 10 GiB floor inside the predicate, so it cannot
+  mute the rest of the suite. See gh#149 for the skip messages, which still
+  misattribute the reason to a missing GGUF.
+
+  The gate ran at `ae418cc`. Commits after it on the release tag are
+  documentation only — verifiable with
+  `git diff ae418cc..v2.12.0 -- src include`.
 
 - The session pool is mutually exclusive with `entropic_run_batch`: gh#98's
   fan-out needs a unified KV buffer and a pool needs private streams. The
