@@ -1,1 +1,18 @@
-[]
+[
+  {
+    "req_id": "REQ-INFER-019",
+    "req_name": "Model pool dedup and VRAM residency policy govern which tier is resident",
+    "functions": [
+      {
+        "name": "partial_gpu_layers_for",
+        "file": "src/inference/partial_offload.h",
+        "version": "2.12.0"
+      },
+      {
+        "name": "host_can_hold_warm_load",
+        "file": "src/inference/partial_offload.h",
+        "version": "2.12.0"
+      }
+    ]
+  }
+]
