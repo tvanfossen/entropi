@@ -104,7 +104,8 @@ inline void verify_family_common_chat(const std::string& gguf,
         }
         const uint64_t avail = kb * 1024ull;
         if (!sz_ec
-            && !entropic::host_can_hold_warm_load(file_bytes, avail)) {
+            && (entropic::large_model_tests_waived(file_bytes)
+                || !entropic::host_can_hold_warm_load(file_bytes, avail))) {
             SKIP("host RAM insufficient for the WARM load of "
                  + gguf + ": needs ~"
                  + std::to_string((file_bytes / (1024ull * 1024)) + 2048)

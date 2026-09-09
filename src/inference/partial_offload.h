@@ -23,6 +23,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstdlib>
 
 namespace entropic {
 
@@ -114,6 +115,42 @@ inline bool host_can_hold_warm_load(
     // WARM and ACTIVE residencies can overlap across the reload boundary.
     const uint64_t peak = file_bytes + (file_bytes / 2);
     return available_bytes >= peak + headroom_bytes;
+}
+
+/// @brief Size above which a model counts as "large" for the waiver below.
+///        The two models that have ever needed the allowance are 12.6 GB and
+///        13.6 GB; every other model in the suite is under 6 GB and must stay
+///        un-waivable, so a mis-set allowance cannot silently blank the run.
+constexpr uint64_t kLargeModelThresholdBytes = 10ull * 1024 * 1024 * 1024;
+
+/**
+ * @brief Whether an operator has explicitly waived one LARGE model's test.
+ *
+ * The MemAvailable predicate above is best-effort and documented as
+ * unreliable, which makes it a poor basis for a RELEASE record — the same
+ * commit skips or does not depending on page-cache state at that instant.
+ * `ENTROPIC_SKIP_LARGE_MODEL_TESTS=1` records the decision explicitly, so
+ * results.json says the same thing on every run.
+ *
+ * The size floor is HERE rather than at the call sites on purpose. A waiver
+ * that applies to every model is not an allowance, it is a mute button: set
+ * it once and a whole green suite means nothing. Both model-test load paths
+ * consult this one predicate, so neither can drift into that shape.
+ *
+ * Deliberately opt-IN: unset, a capable host still attempts the load. This
+ * records an operator's decision; it does not make one.
+ *
+ * @param file_bytes Size of the GGUF on disk. A model at or below
+ *                   kLargeModelThresholdBytes is never waivable and returns
+ *                   false however the environment is set.
+ * @return true only when the allowance is set AND the model is large.
+ * @req REQ-INFER-019
+ * @version 2.12.0
+ */
+inline bool large_model_tests_waived(uint64_t file_bytes) {
+    if (file_bytes <= kLargeModelThresholdBytes) { return false; }
+    const char* v = std::getenv("ENTROPIC_SKIP_LARGE_MODEL_TESTS");
+    return v != nullptr && v[0] == '1';
 }
 
 }  // namespace entropic

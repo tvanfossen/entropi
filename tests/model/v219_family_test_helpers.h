@@ -148,7 +148,8 @@ inline bool init_orchestrator_for_v219_family(ModelTestContext& ctx,
         && entry->adapter == "qwen36") {
         const uint64_t avail = host_available_bytes();
         const uint64_t needed = file_size + (2ULL * 1024 * 1024 * 1024);
-        if (!entropic::host_can_hold_warm_load(file_size, avail)) {
+        if (entropic::large_model_tests_waived(file_size)
+            || !entropic::host_can_hold_warm_load(file_size, avail)) {
             spdlog::warn("v2.1.9 family: SKIPPING '{}' — WARM load maps the "
                          "whole {} MiB GGUF into host RAM and only {} MiB is "
                          "available (needs ~{} MiB with headroom). This is a "

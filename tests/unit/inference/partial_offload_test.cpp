@@ -18,6 +18,9 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <cstdlib>
+#include <string>
+
 using entropic::partial_gpu_layers_for;
 using entropic::kPartialOffloadReserveBytes;
 
@@ -132,6 +135,76 @@ SCENARIO("v2.12.0: degenerate inputs cannot produce a bad split",
             CHECK(partial_gpu_layers_for(kQwen36Bytes, 0) == 0);
             CHECK(partial_gpu_layers_for(kQwen36Bytes, 16 * kGiB, 0) == 0);
             CHECK(partial_gpu_layers_for(kQwen36Bytes, 16 * kGiB, -5) == 0);
+        }
+    }
+}
+
+namespace {
+
+/// @brief Sets ENTROPIC_SKIP_LARGE_MODEL_TESTS for one scope and restores it.
+///        Catch2 re-runs the enclosing GIVEN/WHEN once per leaf section, so an
+///        unbalanced setenv here would leak the allowance into later sections
+///        and into any test that runs after this file.
+struct WaiverEnv {
+    std::string prior;
+    bool had_prior;
+    explicit WaiverEnv(const char* value) {
+        const char* p = std::getenv("ENTROPIC_SKIP_LARGE_MODEL_TESTS");
+        had_prior = (p != nullptr);
+        if (had_prior) { prior = p; }
+        if (value == nullptr) {
+            unsetenv("ENTROPIC_SKIP_LARGE_MODEL_TESTS");
+        } else {
+            setenv("ENTROPIC_SKIP_LARGE_MODEL_TESTS", value, 1);
+        }
+    }
+    ~WaiverEnv() {
+        if (had_prior) {
+            setenv("ENTROPIC_SKIP_LARGE_MODEL_TESTS", prior.c_str(), 1);
+        } else {
+            unsetenv("ENTROPIC_SKIP_LARGE_MODEL_TESTS");
+        }
+    }
+};
+
+constexpr uint64_t kSmallModelBytes = 4ull * 1024 * 1024 * 1024;
+
+}  // namespace
+
+SCENARIO("v2.12.0: the large-model waiver cannot mute the whole suite",
+         "[partial_offload][2.12.0]") {
+    GIVEN("the operator allowance is set") {
+        WaiverEnv env("1");
+
+        THEN("a large model is waived") {
+            CHECK(entropic::large_model_tests_waived(kQwen36Bytes));
+        }
+        // THE property. A waiver that applies to every model is not an
+        // allowance, it is a mute button — one env var and a green suite
+        // proves nothing. Every model in the suite bar two is under 6 GB.
+        AND_THEN("an ordinary model is NOT waived") {
+            CHECK_FALSE(entropic::large_model_tests_waived(kSmallModelBytes));
+        }
+        AND_THEN("the threshold itself is not waivable") {
+            CHECK_FALSE(entropic::large_model_tests_waived(
+                entropic::kLargeModelThresholdBytes));
+        }
+        AND_THEN("an unmeasurable size is not waived") {
+            CHECK_FALSE(entropic::large_model_tests_waived(0));
+        }
+    }
+
+    GIVEN("the allowance is unset") {
+        WaiverEnv env(nullptr);
+        THEN("even a large model runs — the waiver is opt-in") {
+            CHECK_FALSE(entropic::large_model_tests_waived(kQwen36Bytes));
+        }
+    }
+
+    GIVEN("the allowance is set to something other than 1") {
+        WaiverEnv env("0");
+        THEN("it does not count as set") {
+            CHECK_FALSE(entropic::large_model_tests_waived(kQwen36Bytes));
         }
     }
 }
