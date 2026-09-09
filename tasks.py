@@ -255,7 +255,7 @@ def _run_one_model_test(command, timeout_s=DEFAULT_MODEL_TEST_TIMEOUT_S, name="m
 ## @utility
 ## @return Tuple of (results list, failed count). Skips do NOT count as failures.
 ## @version 2.12.0-rc1
-def _run_model_tests(build_dir, name_filter=""):
+def _run_model_tests(build_dir, name_filter="", resume=False):
     """Run model tests 1:1. Returns (results, failed_count). gh#89: a Catch2
     SKIP (GGUF/VRAM-gated or a disabled gate) reports SKIP, not PASS/FAIL.
 
@@ -285,11 +285,19 @@ def _run_model_tests(build_dir, name_filter=""):
             print("ERROR: No model tests registered in ctest")
         return [], 1
 
-    results = []
-    t_suite = time.monotonic()
-    passed = failed = flaky = skipped = 0
+    # A model gate that cannot finish inside one invocation is not a gate.
+    # This host kills a long run part-way, so --resume carries completed
+    # PASSes forward and runs only what is left; several bounded invocations
+    # then produce the same roster one long one would have.
+    carried, pending = _partition_resume(tests, resume)
 
-    for idx, test in enumerate(tests):
+    results = list(carried)
+    t_suite = time.monotonic()
+    passed = len(carried)
+    failed = skipped = 0
+    flaky = sum(1 for t in carried if t["retries"] > 0)
+
+    for idx, test in enumerate(pending):
         name = test["name"]
         # gh#142: settle between model tests so the previous process's pages are
         # reclaimed before the next one maps its model.
@@ -344,6 +352,57 @@ def _run_model_tests(build_dir, name_filter=""):
 
     print(f"\n{passed}/{len(tests)} passed, " f"{skipped} skipped, {flaky} flaky, {failed} failed")
     return results, failed
+
+
+## @brief Parsed JSON from a file, or {} when absent or unreadable.
+## @utility
+## @version 2.12.0
+def _read_json_file(path):
+    """Parsed JSON object, or {} when the file is absent or unreadable."""
+    if not os.path.isfile(path):
+        return {}
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+## @brief Prior model results eligible for reuse by a resumed run.
+## @utility
+## @version 2.12.0
+def _prior_model_results():
+    """Name -> prior result, but ONLY for the exact code under test.
+
+    A resumed suite that stitched results across commits would be a
+    FABRICATED audit record - results.json is the release evidence, so a
+    version or git_sha mismatch discards the prior file entirely rather
+    than reusing part of it.
+
+    Only PASSes carry. A prior SKIP or FAIL is re-run: a skip is a
+    failure until something proves otherwise, and carrying one forward
+    would let an unrun test look settled.
+    """
+    data = _read_json_file(MODEL_RESULTS_FILE)
+    stale = data.get("version") != _get_version() or data.get("git_sha") != _get_git_sha()
+    if data and stale:
+        print("  resume: prior results are from a different build - discarding")
+    if not data or stale:
+        return {}
+    return {t["name"]: t for t in data.get("tests", []) if t.get("status") == "pass"}
+
+
+## @brief Split a model roster into carried-forward passes and work remaining.
+## @utility
+## @version 2.12.0
+def _partition_resume(tests, resume):
+    """Return (carried prior results, tests still to run)."""
+    prior = _prior_model_results() if resume else {}
+    carried = [prior[t["name"]] for t in tests if t["name"] in prior]
+    pending = [t for t in tests if t["name"] not in prior]
+    if carried:
+        print(f"  resume: {len(carried)} prior pass(es) carried, {len(pending)} to run")
+    return carried, pending
 
 
 ## @brief Resolve the lead-tier model key from the active local config.
@@ -413,9 +472,39 @@ def _write_results_json(test_results, duration_ms):
     print(f"Written: {MODEL_RESULTS_FILE}")
 
 
-## @brief Run tests. Builds first unless --no-build.
+## @brief Run the CPU phase (unless skipped) then the model gate.
 ## @utility
 ## @version 2.12.0
+def _run_model_phase(c, build_dir, ctest_args, name_filter, model_only, resume):
+    """CPU tests then model tests 1:1; writes results.json, exits non-zero on failure."""
+    # The CPU phase runs --parallel JOBS, and that fan-out is the peak-memory
+    # moment of the whole command - well above the model phase, which runs
+    # 1:1. On a box already near its ceiling it is what gets a long run
+    # killed, and re-running a suite that is already green to reach the model
+    # phase spends that risk for nothing.
+    if not model_only:
+        c.run(f'ctest --test-dir {build_dir} {ctest_args} -LE "model|bench"')
+
+    print("\n-- Model tests (GPU) --")
+    t0 = time.monotonic()
+    results, failed = _run_model_tests(build_dir, name_filter, resume=resume)
+    # A resumed run's wall clock covers only the final invocation, which would
+    # understate the gate in the audit record. Sum the per-test durations
+    # instead, so the recorded figure describes the whole roster.
+    duration_ms = (
+        sum(r["duration_ms"] for r in results) if resume else int((time.monotonic() - t0) * 1000)
+    )
+
+    if results:
+        _write_results_json(results, duration_ms)
+
+    if failed > 0:
+        raise SystemExit(1)
+
+
+## @brief Run tests. Builds first unless --no-build.
+## @utility
+## @version 2.12.1
 @task(
     help={
         "model": "Include model tests (GPU recommended, writes results.json)",
@@ -425,10 +514,21 @@ def _write_results_json(test_results, duration_ms):
         "jobs": f"Parallel test jobs (default: {JOBS})",
         "filter": "CTest -R regex filter",
         "no-build": "Skip build step (assumes already built)",
+        "model-only": "With --model, skip the CPU phase and run only model tests",
+        "resume": "With --model, carry forward prior passes from results.json",
     }
 )
 def test(  # noqa: CFQ002
-    c, model=False, cpu=False, coverage=False, preset="", jobs=JOBS, filter="", no_build=False
+    c,
+    model=False,
+    cpu=False,
+    coverage=False,
+    preset="",
+    jobs=JOBS,
+    filter="",
+    no_build=False,
+    model_only=False,
+    resume=False,
 ):
     """Run tests. Builds first unless --no-build."""
     if not preset:
@@ -451,20 +551,7 @@ def test(  # noqa: CFQ002
         ctest_args += f' -E "{CTEST_EXCLUDE}"'
 
     if model:
-        # CPU tests first (exclude model label)
-        c.run(f'ctest --test-dir {build_dir} {ctest_args} -LE "model|bench"')
-
-        # Model tests: run 1:1 with retries, write results.json
-        print("\n── Model tests (GPU) ──")
-        t0 = time.monotonic()
-        results, failed = _run_model_tests(build_dir, filter)
-        duration_ms = int((time.monotonic() - t0) * 1000)
-
-        if results:
-            _write_results_json(results, duration_ms)
-
-        if failed > 0:
-            raise SystemExit(1)
+        _run_model_phase(c, build_dir, ctest_args, filter, model_only, resume)
     else:
         # No --model flag: always exclude the "model" label so a stale
         # model-test registration in build_dir (e.g., leftover from a
