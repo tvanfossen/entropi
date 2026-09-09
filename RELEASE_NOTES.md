@@ -100,6 +100,17 @@ consumers that construct `ParsedConfig` directly and must recompile.
 
 ## Known limitations
 
+- **The full model suite does not complete on an 11 GB / 32 GB developer
+  host.** 41 of 41 completed tests pass, reproduced across three runs; the
+  hybrid Qwen family (`qwen36`) cannot load. The engine's WARM state maps the
+  ENTIRE GGUF into host RAM regardless of `gpu_layers` — 12952 MiB measured
+  for a 13.6 GB file — and only the ACTIVE reload honours the offload split,
+  so peak host usage is the whole file. This is not a size rule: the dense
+  13.6 GB gemma-4-26B passes where the smaller 12.6 GB hybrid Qwen fails.
+  Two related defects WERE fixed this release (mlock pinning a model too
+  large to pin, and an offload split frozen at a stale VRAM measurement), but
+  the WARM-load behaviour itself is untouched and tracked separately.
+
 - The session pool is mutually exclusive with `entropic_run_batch`: gh#98's
   fan-out needs a unified KV buffer and a pool needs private streams. The
   combination is refused at configure time with a typed error naming both keys.
