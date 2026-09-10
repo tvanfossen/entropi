@@ -29,7 +29,56 @@ from pathlib import Path
 
 from invoke import task
 
-JOBS = os.cpu_count() or 4
+
+## @brief Parallel job count, capped by memory rather than by core count.
+## @utility
+## @version 2.12.2
+def _default_jobs():
+    """Jobs to run in parallel, scaled to free memory, not just to cores.
+
+    os.cpu_count() alone twice killed a session on this box, and NOT via
+    the kernel OOM killer: systemd-oomd watches PSI memory pressure on the
+    user slice and, past 50% sustained for 20s, kills an entire cgroup
+    SCOPE. The scope holding a build is the terminal — so it takes the
+    editor, the shell and every child with it, and no individual compiler
+    is ever sacrificed in their place.
+
+    That makes this a CONCURRENCY problem, not a total-work problem. The
+    same build survives at lower -j because pressure never stays above the
+    threshold long enough to trip the killer; it just takes longer.
+
+    Each C++ TU here can take 1-2 GB (llama_cpp_backend.cpp pulls the
+    vendored llama.cpp headers), so budget ~2 GB per job against
+    MemAvailable and never exceed the core count. ENTROPIC_JOBS overrides
+    for anyone who knows better than this heuristic.
+    """
+    override = os.environ.get("ENTROPIC_JOBS")
+    if override and override.isdigit() and int(override) > 0:
+        return int(override)
+    cores = os.cpu_count() or 4
+    try:
+        with open("/proc/meminfo") as f:
+            avail_kb = next(int(line.split()[1]) for line in f if line.startswith("MemAvailable:"))
+    except (OSError, StopIteration, ValueError):
+        return cores
+    # Reserve headroom before dividing. Spending ALL of MemAvailable is
+    # what trips the killer: MemAvailable counts reclaimable page cache, so
+    # consuming it forces the reclaim activity that systemd-oomd's
+    # threshold explicitly requires ("> 50% for > 20s WITH reclaim
+    # activity"). Leave the desktop its cache and take what is left.
+    usable_kb = avail_kb - (4 * 1024 * 1024)  # keep 4 GB for the rest of the box
+    by_memory = int(usable_kb / (2 * 1024 * 1024))  # ~2 GB per C++ TU
+    return max(1, min(cores, by_memory))
+
+
+JOBS = _default_jobs()
+
+# ctest parallelism is deliberately NOT JOBS. The memory hog is COMPILATION —
+# a C++ TU here costs 1-2 GB — while a unit-test binary costs tens of MB, so
+# capping tests by the same budget would serialise 1754 fast tests to protect
+# against a cost they do not have. Capped anyway rather than left at
+# os.cpu_count(): a few of these load vocab GGUFs.
+TEST_JOBS = min(os.cpu_count() or 4, max(JOBS, 4))
 
 # Tests excluded from quick runs (slow or require special setup)
 CTEST_EXCLUDE = (
@@ -504,7 +553,7 @@ def _run_model_phase(c, build_dir, ctest_args, name_filter, model_only, resume):
 
 ## @brief Run tests. Builds first unless --no-build.
 ## @utility
-## @version 2.12.1
+## @version 2.12.2
 @task(
     help={
         "model": "Include model tests (GPU recommended, writes results.json)",
@@ -543,7 +592,7 @@ def test(  # noqa: CFQ002
         build(c, preset=preset, jobs=jobs)
 
     build_dir = f"build/{preset}"
-    ctest_args = f"--output-on-failure --parallel {jobs}"
+    ctest_args = f"--output-on-failure --parallel {TEST_JOBS}"
 
     if filter:
         ctest_args += f' -R "{filter}"'
