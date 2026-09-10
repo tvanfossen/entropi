@@ -113,6 +113,23 @@ public:
      */
     void interrupt() { if (transport_) { transport_->interrupt(); } }
 
+    /**
+     * @brief Release an interrupt so this client's transport works again.
+     * @req REQ-MCP-025
+     * @version 2.12.1
+     */
+    void clear_interrupt() { if (transport_) { transport_->clear_interrupt(); } }
+
+    /**
+     * @brief Whether this client's transport is currently interrupted.
+     * @return true while calls are being short-circuited by an interrupt.
+     * @req REQ-MCP-025
+     * @version 2.12.1
+     */
+    bool is_interrupted() const {
+        return transport_ && transport_->is_interrupted();
+    }
+
 private:
     std::string name_;                           ///< Server name (tool prefix)
     std::unique_ptr<Transport> transport_;        ///< Wire transport
@@ -178,6 +195,15 @@ private:
      * @utility
      * @version 1.8.7
      */
+    /**
+     * @brief Failure envelope for an empty transport response (gh#150).
+     * @param tool_name Local tool name (without server prefix).
+     * @return An is_error envelope naming the actual condition.
+     * @version 2.12.1
+     */
+    std::string empty_response_envelope(
+        const std::string& tool_name) const;
+
     static std::string build_response(const std::string& result_text,
                                        bool is_error = false);
 };

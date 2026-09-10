@@ -245,6 +245,23 @@ public:
                                 void* user_data);
 
     /**
+     * @brief Register the external transport interrupt-release callback.
+     *
+     * gh#150: the counterpart to set_external_interrupt(). The facade
+     * wires this to ServerManager::clear_external_tool_interrupts so
+     * reset_interrupt() releases the transports it interrupted. Without
+     * it an interrupt was permanent, because the engine cleared only its
+     * own flag.
+     *
+     * @param cb Callback (nullable).
+     * @param user_data Forwarded to cb.
+     * @req REQ-LOOP-006
+     * @version 2.12.1
+     */
+    void set_external_reset(void (*cb)(void* user_data),
+                            void* user_data);
+
+    /**
      * @brief Run the engine loop on a pre-built context.
      *
      * Used by DelegationManager for child loops. Public so the
@@ -1559,6 +1576,8 @@ private:
     std::atomic<bool> pause_flag_{false};                 ///< Pause signal
     void (*external_interrupt_cb_)(void*) = nullptr;      ///< P1-10 transport abort
     void* external_interrupt_data_ = nullptr;             ///< Forwarded to cb
+    void (*external_reset_cb_)(void*) = nullptr;          ///< gh#150 transport un-abort
+    void* external_reset_data_ = nullptr;                 ///< Forwarded to reset cb
     // ── Delegation callbacks (gh#29, v2.1.5) ────────────────
     /// @brief Held under `delegation_cb_mutex_` so set + snapshot
     /// can atomically swap all three fields without tearing. Bundled

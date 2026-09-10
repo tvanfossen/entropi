@@ -297,6 +297,13 @@ public:
      */
     void interrupt_external_tools();
 
+    /**
+     * @brief Release the interrupt on every external client (gh#150).
+     * @req REQ-MCP-025
+     * @version 2.12.1
+     */
+    void clear_external_tool_interrupts();
+
 private:
     /**
      * @brief Extract server prefix from fully-qualified tool name.

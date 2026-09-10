@@ -92,6 +92,38 @@ std::string ExternalMCPClient::list_tools() const {
 }
 
 /**
+ * @brief The right failure envelope for an empty transport response.
+ *
+ * gh#150: "timed out or transport error" covered four distinct conditions,
+ * and the one that returns in 0 ms — a transport suppressed by an
+ * interrupt — read exactly like a timeout that took no time. Separating it
+ * is what makes the 0 ms case self-explaining instead of a contradiction
+ * to chase; the reporting consumer lost real time to it.
+ *
+ * Extracted rather than inlined into execute(): the extra branch put that
+ * function at 4 returns against a limit of 3, and the gate is not
+ * negotiable.
+ *
+ * @param tool_name Local tool name (without server prefix).
+ * @return An is_error envelope naming the actual condition.
+ * @req REQ-MCP-025
+ * @version 2.12.1
+ */
+std::string ExternalMCPClient::empty_response_envelope(
+    const std::string& tool_name) const {
+    if (transport_->is_interrupted()) {
+        return build_response(
+            "Error: tool '" + name_ + "." + tool_name +
+            "' was not attempted — the transport is interrupted. "
+            "The interrupt is released at the start of the next run.",
+            true);
+    }
+    return build_response(
+        "Error: tool '" + name_ + "." + tool_name +
+        "' timed out or the transport failed.", true);
+}
+
+/**
  * @brief Execute a tool call via the external server.
  * @param tool_name Local name (without server prefix).
  * @param args_json JSON arguments; unparseable arguments degrade to an
@@ -102,15 +134,22 @@ std::string ExternalMCPClient::list_tools() const {
  *         instead of a hang.
  * @req REQ-MCP-025
  * @req REQ-MCP-002
- * @version 1.8.7
+ * @version 2.12.1
  */
 std::string ExternalMCPClient::execute(
     const std::string& tool_name,
     const std::string& args_json) {
 
     if (!transport_->is_connected()) {
+        // gh#150: the leading "Error:" is load-bearing, not decoration.
+        // classify_tool_result routes on the TEXT via looks_like_tool_error,
+        // which matches a leading "error"/"[error]"/JSON-error shape. This
+        // message used to start with "Server '...'", so a failed call was
+        // logged status=ok and counted as a success — the reporting
+        // consumer watched every external call fail while the logs said
+        // everything was fine.
         return build_response(
-            "Server '" + name_ + "' is disconnected. "
+            "Error: server '" + name_ + "' is disconnected. "
             "Tool '" + name_ + "." + tool_name + "' unavailable.",
             true);
     }
@@ -128,9 +167,7 @@ std::string ExternalMCPClient::execute(
         request, DEFAULT_TIMEOUT_MS);
 
     if (response.empty()) {
-        return build_response(
-            "Tool '" + name_ + "." + tool_name +
-            "' timed out or transport error.", true);
+        return empty_response_envelope(tool_name);
     }
 
     auto result_text = extract_tool_result(response);

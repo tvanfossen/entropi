@@ -2,6 +2,85 @@ _Last 10 releases. Older history: [OLD_NOTES.md](OLD_NOTES.md). Kept short
 because `gh release create --notes-file` hits GitHub's 125,000-char release
 body limit once this file accumulates full project history — see v2.9.3._
 
+# entropic v2.12.1
+
+Patch release — **one interrupt no longer permanently disables every external
+MCP server.**
+
+## The bug (gh#150)
+
+`StdioTransport::cancel_flag_` was a latch, not a flag. `store(true)` appeared
+exactly once in the tree and nothing anywhere stored false:
+
+```
+AgentEngine::interrupt()       -> external_interrupt_cb_
+                               -> ServerManager::interrupt_external_tools
+                               -> StdioTransport::interrupt()
+                               -> cancel_flag_.store(true)     never cleared
+
+AgentEngine::reset_interrupt() -> interrupt_flag_.store(false)
+                                  clears the ENGINE flag; transports untold
+```
+
+So the first interrupt — a Ctrl+C, or a bridge client disconnecting — took
+every external MCP server away for the lifetime of the process. `open()` did
+not help: it early-returns when already connected, and cleared nothing on any
+path.
+
+**Reported by a consumer hosting one engine for several clients over the
+external bridge**, where clients connecting and disconnecting is not an edge
+case, it is the normal operating mode. One disconnect disabled external tools
+for every other session on that host.
+
+This is **not a v2.12.0 regression** — `cancel_flag_` and the interrupt
+propagation both landed 2026-04-23 in the 2.0.6-rc16 P1 batch, so the defect
+has been latent for roughly four months. What changed is reachability: v2.12.0
+exists to make hosted multi-client operation the normal case, which is exactly
+the pattern that trips it.
+
+## Fixes
+
+- **The interrupt is scoped to a run again.** `Transport::clear_interrupt()`
+  (virtual, default no-op, symmetric with the existing `interrupt()`), a
+  `StdioTransport` override, `ServerManager::clear_external_tool_interrupts()`,
+  and `AgentEngine::reset_interrupt()` now driving it through a registered
+  callback. The facade wires the release alongside the abort, so no future
+  call site can get one without the other.
+- **`open()` now does what its doc always claimed.** The comment on
+  `interrupt()` said the flag was "cleared implicitly by a successful open()".
+  It was not, and nothing else cleared it either. `open()` clears first, on
+  both paths — the early return when already connected is precisely why a
+  later placement would have left a live-but-latched transport stuck. The
+  false comment is called out rather than quietly corrected: it sent the
+  reporter looking in the wrong subsystem first.
+- **A dropped call is now reported as a failure.** `Transport::is_interrupted()`
+  makes the state answerable at all, and the two failure envelopes in
+  `ExternalMCPClient::execute` now lead with `Error:`. That prefix is
+  load-bearing: `classify_tool_result` routes on the leading text, so a call
+  that failed was logged `status=ok` and counted as a success. The consumer
+  watched every external call fail while the logs said everything was fine.
+- **The 0 ms timeout is explained.** `"timed out or transport error"` covered
+  four distinct conditions, and the one that returns instantly — a transport
+  suppressed by an interrupt — read as a timeout that took no time. The
+  interrupted case now says so in its own words.
+
+## Verification
+
+- RED first: the engine-level test fails on unfixed code at the exact
+  assertion that matters — the transport latch is still set after
+  `reset_interrupt()`.
+- 4 new scenarios; CPU suite 1748/1748; pre-commit clean.
+- No model-suite re-run: this release changes no inference path. The v2.12.0
+  gate (76 passed, 0 failed, 3 skipped) stands.
+
+## Known limitations
+
+- The hybrid Qwen family remains outside the model gate on this host; see the
+  v2.12.0 notes and gh#148. Unchanged by this release.
+- `SSETransport` does not latch and so needs no release, but it has no
+  interrupt support at all — an interrupt does not abort an in-flight SSE
+  request. Pre-existing, and out of scope here.
+
 # entropic v2.12.0
 
 Minor release — **one hosted engine can now serve several callers without them
@@ -69,10 +148,17 @@ stated and nothing implemented.
   Nothing about speculative decoding requires discarding the cache; that
   was an implementation choice in this path. Measured over four turns of a
   growing conversation, prefill went from 52 -> 116 -> 180 -> 244 tokens
-  (linear in history) to a constant per-turn delta. A consumer had measured
-  18611 tokens prefilled against 196 generated on a three-turn review —
-  95:1, with zero warm-keep events — while the same workload with MTP off
-  avoided 98.1% of prefill.
+  (linear in history) to a constant per-turn delta.
+
+  **Corrected after publication.** This entry originally carried a
+  consumer's prefill ratio and an MTP-off comparison. The consumer has
+  withdrawn those figures: every external tool call in both arms of their
+  measurement was silently failing (gh#150), so both arms measured a
+  degraded fallback path rather than the feature. What they have confirmed
+  instead, and what stands: prefix retention engaged on **19 of 19 turns**
+  with MTP active, against **0 events on v2.11.1**. The engine-side
+  measurement above is our own instrumented figure and is unaffected. A
+  real latency number will follow once gh#150 is in their hands.
 - `GenerationResult::prefill_tokens` reports what a run actually decoded.
   The MTP path counted nothing, so there was no way to tell reuse from
   re-decode.

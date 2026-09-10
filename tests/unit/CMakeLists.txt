@@ -355,6 +355,7 @@ add_executable(entropic-mcp-tests
     mcp/tool_result_classify_test.cpp
     # v2.1.5 gh#19: StdioTransport display_name sanitization
     mcp/stdio_transport_test.cpp
+    mcp/gh150_interrupt_latch_test.cpp
     # gh#133 (v2.10.1): dlopen-based MCP server plugin loader
     mcp/plugin_loader_test.cpp
 )

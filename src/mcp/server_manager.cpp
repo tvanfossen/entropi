@@ -794,6 +794,25 @@ void ServerManager::interrupt_external_tools() {
 }
 
 /**
+ * @brief Release the interrupt on every external client.
+ *
+ * gh#150: the counterpart to interrupt_external_tools(). Without it an
+ * interrupt was permanent — the engine cleared its own flag and the
+ * transports were never told, so every external MCP server stayed dead
+ * until the host process restarted. For a host serving several clients
+ * over the bridge, one disconnect took every external server away from
+ * all of them.
+ *
+ * @req REQ-MCP-025
+ * @version 2.12.1
+ */
+void ServerManager::clear_external_tool_interrupts() {
+    for (auto& [_, client] : external_clients_) {
+        if (client) { client->clear_interrupt(); }
+    }
+}
+
+/**
  * @brief Initialize external servers from config + .mcp.json.
  *
  * YAML `external_servers` are connected first, then `.mcp.json`
