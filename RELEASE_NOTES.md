@@ -2,6 +2,87 @@ _Last 10 releases. Older history: [OLD_NOTES.md](OLD_NOTES.md). Kept short
 because `gh release create --notes-file` hits GitHub's 125,000-char release
 body limit once this file accumulates full project history — see v2.9.3._
 
+# entropic v2.12.2
+
+Patch release — **an MTP-vs-plain comparison can now be read off the logs**, and
+the prompt log stops re-emitting itself.
+
+Both fixes are observability. Neither changes what the engine computes or what
+the model sees. Both were found by a consumer whose measurements went wrong in
+ways that pointed at their own code first.
+
+## gh#151 — the two decode paths reported throughput differently
+
+The plain paths logged:
+
+```
+Generated: 87 tokens, finish=stop, 3040ms, 28.5 tok/s
+```
+
+The speculative path logged a differently shaped line carrying no throughput,
+so an MTP-vs-plain A/B measured from logs could read tok/s on one arm and not
+on the other — the single comparison speculative decoding exists to be judged
+by. The consumer resorted to **estimating** the MTP arm's output volume from
+drafted/accepted arithmetic, and had to publish their result as an upper bound
+because of it.
+
+**The field itself was never broken.** `spec_finalize` has populated
+`throughput_tok_s` since gh#108, and `state.n_generated` carried the true
+generated-token count all along — this issue was originally filed here claiming
+the field read zero, and that claim was wrong. What was missing was the *line*.
+
+Both paths now format through one shared `format_generation_summary`, because
+two hand-rolled lines drifting apart is the defect being fixed; a second one
+would reintroduce it the first time either changed. The plain line is
+byte-identical to what it has always been, and speculative runs append
+`drafted=…, accepted=…, accept_rate=…` rather than substituting a different
+shape. A plain decode prints no speculative clause at all, so "did speculation
+run" stays answerable from the log.
+
+The original `Speculative:` line is kept, not replaced — it is an existing log
+contract, at least one consumer parses these logs, and it carries the same
+numbers.
+
+## gh#152 — the prompt log re-emitted the whole conversation every turn
+
+`log_prompt` wrote every message on every turn, and the message list grows
+monotonically, so a body emitted at turn 5 was re-logged by turns 6, 7, 8 …
+Anyone counting model output by grepping the log over-counted by roughly the
+number of remaining turns.
+
+The consumer counted finding-shaped lines across two A/B arms, got **147 against
+380**, and read it as one arm looping 2.6x more — a serious defect in their own
+code, which is where they went looking. It was re-emission: 36 and 38
+`End prompt` markers against 36 and 38 generation turns. Their framing is the
+right one: **the log is not a transcript, and it reads like one.**
+
+The rule already existed for the system message, which has been hashed and
+elided when unchanged since v2.0.6. It was applied to the one message known to
+be large and invariant, and never to the ones that *accumulate* — which are
+exactly the ones a reader is trying to count. Each distinct body is now logged
+in full once and referenced thereafter by index, role, size and hash, so the
+sequence is still reconstructable.
+
+`ENTROPIC_LOG_FULL_PROMPT=1` restores the unabridged dump verbatim. The full
+prompt is what you want when diagnosing what the model actually saw, so eliding
+it is not the only option.
+
+## Verification
+
+- 10 new scenarios across two pure headers (`generation_summary.h`,
+  `prompt_log_util.h`), CPU-testable with no model and no GPU.
+- CPU suite green; pre-commit clean.
+- No model-suite re-run: no inference path changed. The v2.12.0 gate
+  (76 passed, 0 failed, 3 skipped) stands.
+
+## Known limitations
+
+- The hybrid Qwen family remains outside the model gate on this host; see the
+  v2.12.0 notes and gh#148. Unchanged by this release.
+- Elision is per-tier and keyed by content hash, so two genuinely identical
+  bodies in one conversation render the second as a reference. The reference
+  line names the index, so the sequence is unambiguous.
+
 # entropic v2.12.1
 
 Patch release — **one interrupt no longer permanently disables every external

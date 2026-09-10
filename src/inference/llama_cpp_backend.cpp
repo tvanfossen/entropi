@@ -15,6 +15,7 @@
 
 #include "llama_cpp_backend.h"
 #include <entropic/mcp/utf8_sanitize.h>
+#include "generation_summary.h"  // gh#151: one summary line, both paths
 #include "grammar_source.h"
 #include "llama_cpp_sampler.h"
 #include "llama_cpp_tokenizer.h"
@@ -131,7 +132,7 @@ void log_sampler_config(const GenerationParams& params) {
  * @param result Generation result (mutated: timing fields populated).
  * @param start_time Generation start time.
  * @utility
- * @version 1.10.4
+ * @version 2.12.2
  */
 void finalize_result(GenerationResult& result,
     std::chrono::steady_clock::time_point start_time)
@@ -144,10 +145,11 @@ void finalize_result(GenerationResult& result,
             static_cast<double>(result.token_count)
             / result.generation_time_ms * 1000.0;
     }
-    logger->info("Generated: {} tokens, finish={}, {:.0f}ms, "
-                 "{:.1f} tok/s",
-                 result.token_count, result.finish_reason,
-                 result.generation_time_ms, result.throughput_tok_s);
+    // gh#151: through the shared formatter, so this line and the
+    // speculative path's cannot drift apart — the drift IS the defect.
+    logger->info("{}", entropic::format_generation_summary(
+        {result.token_count, result.finish_reason,
+         result.generation_time_ms, result.throughput_tok_s, 0, 0}));
     logger->info("Content:\n{}", result.content);
 }
 
@@ -3964,7 +3966,7 @@ static void spec_run_loop(
  * @brief Assemble final GenerationResult + log metrics. Helper to
  *        keep the public entry under SLOC ≤ 50.
  * @dg_internal
- * @version 2.12.0
+ * @version 2.12.2
  */
 static GenerationResult spec_finalize(
     SpeculativeRunState& state,
@@ -4009,6 +4011,20 @@ static GenerationResult spec_finalize(
             static_cast<double>(result.token_count)
             / result.generation_time_ms * 1000.0;
     }
+    // gh#151: the speculative path computed throughput_tok_s (gh#108) and
+    // then never logged it, emitting only the "Speculative:" line below.
+    // So an MTP-vs-plain A/B measured from logs could read tok/s on one arm
+    // and not the other — the one comparison the feature exists to be judged
+    // by. A consumer ESTIMATED the MTP arm's output volume from
+    // drafted/accepted arithmetic and had to publish an upper bound, when
+    // state.n_generated was the true figure all along.
+    logger->info("{}", entropic::format_generation_summary(
+        {result.token_count, result.finish_reason,
+         result.generation_time_ms, result.throughput_tok_s,
+         state.n_drafted, state.n_accepted}));
+    // The original line is KEPT, not replaced: it is an existing log
+    // contract and at least one consumer parses these logs. It carries the
+    // same numbers, so this costs one line and breaks nobody.
     if (state.n_drafted > 0) {
         const float accept_rate =
             static_cast<float>(state.n_accepted)

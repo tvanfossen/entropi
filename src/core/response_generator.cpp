@@ -6,6 +6,8 @@
  */
 
 #include <entropic/core/response_generator.h>
+
+#include "prompt_log_util.h"  // gh#152: log the transcript, not the re-emission
 #include <entropic/mcp/utf8_sanitize.h>
 #include <entropic/types/error.h>
 #include <entropic/types/logging.h>
@@ -25,39 +27,89 @@ namespace entropic {
 
 /// Per-tier system prompt hash for diff detection across delegations.
 static std::unordered_map<std::string, size_t> s_tier_system_hash;
+/// @brief gh#152: bodies already shown in this tier's prompt log.
+static std::unordered_map<std::string, entropic::PromptLogDedup>
+    s_tier_prompt_dedup;
 
 /**
- * @brief Log the full assembled prompt (all messages, no truncation).
+ * @brief Log the system message, in full only when it has changed.
  *
- * Tracks system prompt hash per-tier so that consecutive delegations
- * to the same tier correctly detect content drift.
+ * Tracks the system prompt hash per-tier so consecutive delegations to the
+ * same tier correctly detect content drift.
+ *
+ * @param i Position in the message list.
+ * @param msg The system message.
+ * @param tier Locked tier name.
+ * @utility
+ * @version 2.12.2
+ */
+static void log_system_message(size_t i, const Message& msg,
+                               const std::string& tier) {
+    size_t h = std::hash<std::string>{}(msg.content);
+    size_t prev = s_tier_system_hash[tier];
+    s_tier_system_hash[tier] = h;
+    if (h != prev || prev == 0) {
+        logger->info("[{}] role=system hash={:016x} prev={:016x}\n{}",
+                     i, h, prev, msg.content);
+    } else {
+        logger->info("[{}] role=system [unchanged, {} chars, hash={:016x}]",
+                     i, msg.content.size(), h);
+    }
+}
+
+/**
+ * @brief Log one non-system message, in full the first time only.
+ *
+ * gh#152: this used to log every message in full on every turn. The list
+ * grows monotonically, so a message emitted at turn 5 was re-logged by
+ * turns 6, 7, 8 … and a reader counting model output by grepping the log
+ * over-counted by roughly the number of remaining turns. A consumer read
+ * 147 lines against 380 across two A/B arms and took it for one arm looping
+ * 2.6x more; it was re-emission, and the hunt landed in their code.
+ *
+ * The system message has been elided this way since v2.0.6. Extending it to
+ * the roles that ACCUMULATE is what makes the log read as the transcript it
+ * was already being read as.
+ *
+ * @param i Position in the message list.
+ * @param msg The message.
+ * @param dedup Per-tier record of bodies already shown.
+ * @utility
+ * @version 2.12.2
+ */
+static void log_other_message(size_t i, const Message& msg,
+                              entropic::PromptLogDedup& dedup) {
+    const size_t h = std::hash<std::string>{}(msg.content);
+    if (dedup.note(h) || entropic::prompt_log_unabridged()) {
+        logger->info("[{}] role={}\n{}", i, msg.role, msg.content);
+        return;
+    }
+    logger->info("{}", entropic::prompt_log_reference(
+        i, msg.role, msg.content.size(), h));
+}
+
+/**
+ * @brief Log the assembled prompt, each distinct body in full exactly once.
+ *
+ * A reader can count model output from this log without over-counting; set
+ * ENTROPIC_LOG_FULL_PROMPT=1 for the unabridged pre-gh#152 dump when
+ * diagnosing what the model actually saw.
  *
  * @param messages Message list being sent to inference.
  * @param tier Locked tier name.
  * @utility
- * @version 2.0.6
+ * @version 2.12.2
  */
 static void log_prompt(const std::vector<Message>& messages,
                        const std::string& tier) {
     logger->info("─── Prompt ({} messages, tier={}) ───",
                  messages.size(), tier);
+    auto& dedup = s_tier_prompt_dedup[tier];
     for (size_t i = 0; i < messages.size(); ++i) {
         if (messages[i].role == "system") {
-            size_t h = std::hash<std::string>{}(messages[i].content);
-            size_t prev = s_tier_system_hash[tier];
-            s_tier_system_hash[tier] = h;
-            if (h != prev || prev == 0) {
-                logger->info("[{}] role=system hash={:016x} "
-                             "prev={:016x}\n{}",
-                             i, h, prev, messages[i].content);
-            } else {
-                logger->info("[{}] role=system [unchanged, {} chars, "
-                             "hash={:016x}]",
-                             i, messages[i].content.size(), h);
-            }
+            log_system_message(i, messages[i], tier);
         } else {
-            logger->info("[{}] role={}\n{}", i, messages[i].role,
-                         messages[i].content);
+            log_other_message(i, messages[i], dedup);
         }
     }
     logger->info("─── End prompt ───");
