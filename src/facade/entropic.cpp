@@ -406,13 +406,22 @@ static int facade_get_tool_prompt(const char* tier, char** result,
  *
  * @param h Engine handle with engine and server_manager constructed.
  * @utility
- * @version 2.0.6-rc16
+ * @version 2.12.1
  */
 static void wire_external_interrupt(entropic_handle_t h) {
     h->engine->set_external_interrupt(
         [](void* ud) {
             auto* sm = static_cast<entropic::ServerManager*>(ud);
             if (sm) { sm->interrupt_external_tools(); }
+        }, h->server_manager.get());
+    // gh#150: wire the release alongside the abort, never separately. A
+    // handle that can interrupt its transports but not un-interrupt them
+    // is the defect itself, so the two are registered together and any
+    // future call site gets both or neither.
+    h->engine->set_external_reset(
+        [](void* ud) {
+            auto* sm = static_cast<entropic::ServerManager*>(ud);
+            if (sm) { sm->clear_external_tool_interrupts(); }
         }, h->server_manager.get());
 }
 

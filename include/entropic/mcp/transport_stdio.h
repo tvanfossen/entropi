@@ -126,6 +126,28 @@ public:
     void interrupt() override;
 
     /**
+     * @brief Release the cancel flag so this transport works again.
+     *
+     * gh#150: cancel_flag_ was set in exactly one place and cleared in
+     * none, so the first interrupt() disabled the transport permanently.
+     * AgentEngine::reset_interrupt() now drives this at the start of each
+     * run, which is what makes an interrupt scoped to one run rather than
+     * to the process.
+     *
+     * @req REQ-MCP-025
+     * @version 2.12.1
+     */
+    void clear_interrupt() override;
+
+    /**
+     * @brief Whether an interrupt is currently short-circuiting calls.
+     * @return true while cancel_flag_ is set.
+     * @req REQ-MCP-025
+     * @version 2.12.1
+     */
+    bool is_interrupted() const override;
+
+    /**
      * @brief Get the sanitized display name used for stderr labeling.
      *
      * Exposed for unit tests (gh#19) and consumer diagnostics. The

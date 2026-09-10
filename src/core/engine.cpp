@@ -1047,12 +1047,38 @@ void AgentEngine::set_external_interrupt(void (*cb)(void*),
 }
 
 /**
+ * @brief Register external transport interrupt-release callback.
+ *
+ * Facade wires this to ServerManager::clear_external_tool_interrupts so
+ * AgentEngine::reset_interrupt() releases what interrupt() suppressed.
+ * (gh#150)
+ *
+ * @param cb Callback (nullable).
+ * @param user_data Forwarded to cb.
+ * @req REQ-LOOP-006
+ * @version 2.12.1
+ */
+void AgentEngine::set_external_reset(void (*cb)(void*),
+                                     void* user_data) {
+    external_reset_cb_ = cb;
+    external_reset_data_ = user_data;
+}
+
+/**
  * @brief Reset interrupt flag.
  * @req REQ-LOOP-006
- * @version 1.8.4
+ * @version 2.12.1
  */
 void AgentEngine::reset_interrupt() {
     interrupt_flag_.store(false);
+    // gh#150: an interrupt is scoped to a RUN, not to the process. This
+    // used to clear the engine's flag and stop, leaving every external
+    // MCP transport latched shut with no path in the tree that could
+    // reopen it — so the first Ctrl+C, or the first bridge client to
+    // disconnect, silently disabled external tools until restart.
+    if (external_reset_cb_ != nullptr) {
+        external_reset_cb_(external_reset_data_);
+    }
 }
 
 /**

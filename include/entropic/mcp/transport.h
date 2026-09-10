@@ -74,6 +74,36 @@ public:
      * @version 2.0.6-rc16
      */
     virtual void interrupt() {}
+
+    /**
+     * @brief Release an interrupt so the transport can be used again.
+     *
+     * The counterpart to interrupt(). gh#150: without one, a transport
+     * that latches on interrupt() stays disabled for the lifetime of the
+     * process, because AgentEngine::reset_interrupt() clears only the
+     * engine's own flag and never reaches here.
+     *
+     * Default is a no-op, matching interrupt(): a transport that does not
+     * latch has nothing to release.
+     *
+     * @req REQ-MCP-025
+     * @version 2.12.1
+     */
+    virtual void clear_interrupt() {}
+
+    /**
+     * @brief Whether an interrupt is currently suppressing this transport.
+     *
+     * gh#150: a suppressed transport returns an empty response, which a
+     * caller cannot distinguish from a legitimate empty result — the
+     * reporting consumer saw `status=ok` on every call while every call
+     * was in fact being dropped. This makes the state answerable.
+     *
+     * @return true when calls are being short-circuited by an interrupt.
+     * @req REQ-MCP-025
+     * @version 2.12.1
+     */
+    virtual bool is_interrupted() const { return false; }
 };
 
 } // namespace entropic

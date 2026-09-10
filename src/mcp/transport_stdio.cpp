@@ -151,9 +151,15 @@ bool StdioTransport::create_all_pipes(int (&fds)[6]) {
  * @brief Spawn child process and open pipes.
  * @return true on success.
  * @dg_internal
- * @version 2.1.5
+ * @version 2.12.1
  */
 bool StdioTransport::open() {
+    // gh#150: clear FIRST, and on both paths. open() means "I want this
+    // usable"; returning a transport that silently drops every call is
+    // never the useful reading. The early return below is why placing
+    // this after it would have left a live-but-latched transport stuck.
+    cancel_flag_.store(false, std::memory_order_release);
+
     if (connected_) {
         return true;
     }
@@ -283,16 +289,47 @@ bool StdioTransport::is_connected() const {
  * read_line / poll_until_ready short-circuit the next poll tick so
  * the pending send_request returns empty within ~50ms (one poll
  * slice). Subsequent send_request calls also early-exit until the
- * flag is cleared implicitly by a successful open(). (P1-10)
+ * flag is cleared by clear_interrupt() or by a successful open().
  *
  * This is what bounds Ctrl+C to ~100ms instead of waiting out a
  * transport timeout.
  *
+ * gh#150: this doc previously said the flag was "cleared implicitly by
+ * a successful open()". It was not, and nothing else cleared it either
+ * — the flag was a latch, and one interrupt disabled the transport for
+ * the life of the process. The claim is now true because open() and
+ * clear_interrupt() below actually implement it. The comment is called
+ * out rather than quietly corrected because it cost the reporting
+ * consumer a debugging session pointed at the wrong subsystem.
+ *
  * @req REQ-MCP-025
- * @version 2.0.6-rc16
+ * @version 2.12.1
  */
 void StdioTransport::interrupt() {
     cancel_flag_.store(true, std::memory_order_release);
+}
+
+/**
+ * @brief Release the cancel flag so subsequent calls are attempted.
+ *
+ * Driven by AgentEngine::reset_interrupt() at the start of a run, which
+ * is what scopes an interrupt to one run instead of to the process.
+ *
+ * @req REQ-MCP-025
+ * @version 2.12.1
+ */
+void StdioTransport::clear_interrupt() {
+    cancel_flag_.store(false, std::memory_order_release);
+}
+
+/**
+ * @brief Whether calls are currently being short-circuited.
+ * @return true while the cancel flag is set.
+ * @req REQ-MCP-025
+ * @version 2.12.1
+ */
+bool StdioTransport::is_interrupted() const {
+    return cancel_flag_.load(std::memory_order_acquire);
 }
 
 /**
