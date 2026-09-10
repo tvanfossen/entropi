@@ -1544,6 +1544,16 @@ ENTROPIC_EXPORT entropic_error_t entropic_set_attempt_boundary_cb(
  * Connects to the server immediately. For stdio: spawns child process.
  * For SSE: connects to HTTP endpoint.
  *
+ * @warning The two transports differ in how they answer an interrupt, and
+ *          the choice is made HERE, so it is stated here. A stdio server's
+ *          in-flight call aborts within ~100ms of entropic_interrupt() and
+ *          the suppression is released at the start of the next run
+ *          (gh#150). An SSE server has NO interrupt support: an in-flight
+ *          request runs to completion or to its own timeout, and
+ *          entropic_interrupt() does not shorten it. A consumer cannot
+ *          otherwise tell which behaviour it gets, because the transport
+ *          is implied by the shape of config_json rather than named.
+ *
  * @param handle Engine handle.
  * @param name Unique server name (null-terminated).
  * @param config_json JSON configuration:
