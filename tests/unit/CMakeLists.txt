@@ -92,6 +92,7 @@ add_executable(entropic-inference-tests
     inference/session_residency_test.cpp
     # v2.12.0: oversized-model GPU/CPU split from actual free VRAM.
     inference/partial_offload_test.cpp
+    inference/generation_summary_test.cpp
     # gh#103 (v2.8.2): CPU pin for the family-aware tool-call close-marker map
     # (sequential tool_call_mode). Vendor-coupled to the common_chat PEG
     # section_end defaults; needs the llama.cpp common/ include for <chat.h>.
@@ -287,6 +288,7 @@ target_link_libraries(entropic-cap-tests PRIVATE
 # v2.1.5: worktree replaced by sandbox (gh#29)
 add_executable(entropic-core-tests
     core/compaction_test.cpp
+    core/prompt_log_util_test.cpp
     core/compactor_registry_test.cpp
     core/directives_test.cpp
     core/context_manager_test.cpp
